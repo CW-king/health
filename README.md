@@ -31,7 +31,8 @@
 ## 휴대폰에서 쓰기
 
 1. 저장소 **Settings → Pages → Source**를 `GitHub Actions`로 바꿉니다.
-2. `main`에 푸시하면 배포되고 `https://<계정>.github.io/health/` 주소가 생깁니다.
+2. `main` 또는 작업 브랜치에 푸시하면 배포되고 `https://<계정>.github.io/health/` 주소가 생깁니다.
+   (Actions 탭에서 `Deploy to GitHub Pages`를 직접 실행해도 됩니다.)
 3. 휴대폰에서 그 주소를 열고 홈 화면에 추가합니다.
    - 아이폰(Safari): 공유 버튼 → 홈 화면에 추가
    - 안드로이드(Chrome): ⋮ → 홈 화면에 추가
