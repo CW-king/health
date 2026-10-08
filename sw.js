@@ -1,5 +1,5 @@
 // 오프라인 캐시. 파일을 바꾸면 CACHE 이름의 버전을 올린다.
-const CACHE = 'fitlog-v1';
+const CACHE = 'fitlog-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './css/app.css',
@@ -8,6 +8,10 @@ const ASSETS = [
   './js/views/common.js', './js/views/today.js', './js/views/workout.js',
   './js/views/diet.js', './js/views/review.js', './js/views/more.js',
   './icons/icon-192.png', './icons/icon-512.png',
+  // 눈보라 벌목장 (game/)
+  './game/', './game/index.html', './game/manifest.webmanifest', './game/game.css',
+  './game/config.js', './game/audio.js', './game/sim.js', './game/render.js', './game/main.js',
+  './game/icons/icon-192.png', './game/icons/icon-512.png', './game/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (e) => {
@@ -32,6 +36,6 @@ self.addEventListener('fetch', (e) => {
         caches.open(CACHE).then(c => c.put(e.request, copy));
         return res;
       })
-      .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
+      .catch(() => caches.match(e.request).then(r => r || caches.match(url.pathname.includes('/game/') ? './game/index.html' : './index.html')))
   );
 });

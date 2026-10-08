@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0f1b2d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="눈보라 벌목장">
+<meta name="description" content="목재를 팔아 캠프를 키우고 북극곰 습격을 막는 방치형 타이쿤 게임">
+<title>눈보라 벌목장</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="stylesheet" href="./game.css">
+</head>
+<body>
+<div id="game">
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div>
+      <div class="top">
+        <div class="pill money" id="money">$0</div>
+        <div class="pill wave" id="wave"></div>
+        <div class="buttons">
+          <button class="icon-btn" id="btn-sound" aria-label="소리 켜기/끄기">🔊</button>
+          <button class="icon-btn" id="btn-help" aria-label="도움말">❓</button>
+          <button class="icon-btn" id="btn-menu" aria-label="메뉴">☰</button>
+        </div>
+      </div>
+      <div class="bars">
+        <div class="bar"><span id="hut-text">🏠</span><div class="track"><div class="fill" id="hut-bar"></div></div></div>
+        <div class="bar"><span id="fence-text">🧱</span><div class="track"><div class="fill fence" id="fence-bar"></div></div></div>
+      </div>
+      <div class="bonus" id="bonus"></div>
+      <div id="warn" hidden></div>
+    </div>
+    <div class="bottom"><div id="hint" hidden><span id="hint-text"></span></div></div>
+  </div>
+  <div id="modal-root"></div>
+</div>
+<script src="./config.js"></script>
+<script src="./audio.js"></script>
+<script src="./sim.js"></script>
+<script src="./render.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>
