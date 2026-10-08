@@ -7,7 +7,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const rndi = (a, b) => Math.floor(rnd(a, b + 1));
 const inRect = (x, y, r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
-const GOOD_IDS = ['wood', 'meat', 'fish'];
+const GOOD_IDS = ['wood', 'meat', 'fish', 'pelt', 'animal'];
 const ALL_GOODS = Object.keys(CFG.goods);
 const FURN_IDS = ALL_GOODS.filter(g => CFG.goods[g].tier);
 const emptyStock = () => { const o = {}; for (const g of ALL_GOODS) o[g] = 0; return o; };
@@ -58,6 +58,7 @@ const HUT_RECT = { x: CFG.hut.x - 62, y: CFG.hut.y - 30, w: 124, h: 56 };
 const MART_RECT = { x: CFG.shops.mart.x - CFG.shops.mart.w / 2, y: CFG.shops.mart.y - 60, w: CFG.shops.mart.w, h: 100 };
 const FURN_RECT = { x: CFG.shops.furn.x - CFG.shops.furn.w / 2, y: CFG.shops.furn.y - 60, w: CFG.shops.furn.w, h: 90 };
 const RIVER_RECT = CFG.river;
+const SLAUGHTER_RECT = { x: CFG.shops.slaughter.x - 75, y: CFG.shops.slaughter.y - 50, w: 150, h: 70 };
 const CUSTOMER_COATS = ['#3b82c4', '#2f6fb0', '#4a90d9', '#346fa8', '#5aa0e0', '#7b6fd1', '#d16f9a'];
 
 class Game {
@@ -102,12 +103,18 @@ class Game {
   shopOpen(id) {
     if (id === 'mart') return this.lv.mart >= 1;
     if (id === 'furn') return this.lv.workshop >= 1;
+    if (id === 'slaughter') return this.lv.slaughter >= 1;
+    if (id === 'pelt') return this.lv.furShop >= 1 && this.lv.mart < 1;
     if (this.lv.mart >= 1) return false;
     if (id === 'meat') return this.lv.butcher >= 1;
     if (id === 'fish') return this.lv.fishShop >= 1;
     return true;
   }
-  deliveryShop(good) { if (this.lv.mart >= 1) return 'mart'; return this.shopOpen(good) ? good : null; }
+  deliveryShop(good) {
+    if (good === 'animal') return this.shopOpen('slaughter') ? 'slaughter' : null;
+    if (this.lv.mart >= 1) return 'mart';
+    return this.shopOpen(good) ? good : null;
+  }
   // 벌목꾼용: 판매대(또는 마트)와 공방 중 재고 비율이 낮은 쪽으로 목재를 나른다
   woodDest() {
     const main = this.deliveryShop('wood');
@@ -138,6 +145,9 @@ class Game {
   get growTime() { return Math.max(6, CFG.ranch.growTime * Math.pow(0.89, this.lv.feed)); }
   get meatPerAnimal() { return CFG.ranch.meat + this.lv.breed; }
   get animalCount() { return this.lv.ranch * CFG.ranch.perLevel; }
+  get animalCap() { return 1 + Math.floor(this.lv.bag / 3); }   // 한 번에 데려갈 수 있는 순록
+  get slaughterTime() { return CFG.shops.slaughter.time * Math.pow(0.9, Math.max(0, this.lv.slaughter - 1)); }
+  get slaughterAnimalCap() { return CFG.shops.slaughter.animalCap + 2 * Math.max(0, this.lv.slaughter - 1); }
 
   emit(type, x, y, extra) { this.events.push({ type, x, y, extra }); }
   text(x, y, text, color, life) { this.texts.push({ x, y, text, color: color || '#fff', t: 0, life: life || 1 }); }
@@ -166,7 +176,7 @@ class Game {
       if (id === 'wood' && s.counterLogs) st.wood = s.counterLogs;   // 예전 저장 호환
       this.shops[id] = { id, stock: st, custT: 2 + Math.random() * 2 };
     }
-    const inv = Object.assign({ wood: s.playerLogs || 0, meat: 0, fish: 0 }, s.inv || {});
+    const inv = Object.assign({ wood: s.playerLogs || 0, meat: 0, fish: 0, pelt: 0, animal: 0 }, s.inv || {});
     this.player = { x: CFG.player.x, y: CFG.player.y, inv, chopT: 0, fishT: 0, atkT: 0, dropT: 0,
                     facing: 1, moving: false, anim: 0, swing: 0, tree: null, fishing: false, fullT: 0, hp: 0, maxhp: 0, down: 0, flash: 0 };
     this.player.maxhp = this.playerMaxHP; this.player.hp = s.playerHp != null ? Math.min(s.playerHp, this.player.maxhp) : this.player.maxhp;
@@ -176,6 +186,8 @@ class Game {
     this.hunters = []; for (let i = 0; i < this.lv.hunter; i++) this.addHunter();
     this.craftsmen = []; for (let i = 0; i < this.lv.craftsman; i++) this.addCraftsman();
     this.animals = []; for (let i = 0; i < this.animalCount; i++) this.addAnimal(s.animals && s.animals[i] != null ? s.animals[i] : Math.random() * 0.6);
+    this.slaughtermen = []; for (let i = 0; i < this.lv.slaughterman; i++) this.addSlaughterman();
+    this.player.proc = null;
     this.ranchers = []; for (let i = 0; i < this.lv.rancher; i++) this.addRancher();
     this.player.craft = null;
     this.fishers = []; for (let i = 0; i < this.lv.fisher; i++) this.addFisher();
@@ -185,7 +197,7 @@ class Game {
     this.tutorial = s.tutorial || 0;
     this.tips = (s.tips || []).slice();
     this.tipQueue = [];
-    this.stats = Object.assign({ sales: 0, chops: 0, kills: 0, fish: 0, hunts: 0, crafts: 0, harvests: 0 }, s.stats || {});
+    this.stats = Object.assign({ sales: 0, chops: 0, kills: 0, fish: 0, hunts: 0, crafts: 0, harvests: 0, slaughters: 0 }, s.stats || {});
     this.activePad = null; this.padFlow = 0; this.towerT = 0; this.shake = 0;
   }
 
@@ -211,14 +223,14 @@ class Game {
     const woodDemand = avgWant / (this.custInterval * (this.lv.mart ? CFG.shops.mart.rate : CFG.shops.wood.rate));
     rate += Math.min(woodProd, woodDemand) * this.price('wood');
     // 고기
-    if (this.deliveryShop('meat') && this.lv.hunter) {
-      const meatProd = Math.min(this.lv.hunter * 0.06, this.wildMax * CFG.hunt.meat / CFG.hunt.respawn);
-      const meatDemand = avgWant / (this.custInterval * (this.lv.mart ? CFG.shops.mart.rate : CFG.shops.meat.rate));
-      rate += Math.min(meatProd, meatDemand) * this.price('meat');
+    if (this.deliveryShop('pelt') && this.lv.hunter) {
+      const peltProd = Math.min(this.lv.hunter * 0.05, this.wildMax * CFG.hunt.pelt / CFG.hunt.respawn);
+      const peltDemand = avgWant / (this.custInterval * (this.lv.mart ? CFG.shops.mart.rate : CFG.shops.pelt.rate));
+      rate += Math.min(peltProd, peltDemand) * this.price('pelt');
     }
     // 목장(목동이 있어야 자동)
-    if (this.deliveryShop('meat') && this.lv.rancher && this.lv.ranch) {
-      const ranchProd = this.animalCount * this.meatPerAnimal / (this.growTime + 8);
+    if (this.deliveryShop('meat') && this.lv.rancher && this.lv.ranch && this.lv.slaughter && this.lv.slaughterman) {
+      const ranchProd = Math.min(this.animalCount * this.meatPerAnimal / (this.growTime + 8), this.lv.slaughterman * this.meatPerAnimal / (this.slaughterTime * 1.2 / this.effMul + 4));
       const meatDemand2 = avgWant / (this.custInterval * (this.lv.mart ? CFG.shops.mart.rate : CFG.shops.meat.rate));
       rate += Math.min(ranchProd, meatDemand2) * this.price('meat');
     }
@@ -246,7 +258,7 @@ class Game {
 
   addWorker() {
     const i = this.workers.length;
-    this.workers.push({ x: CFG.shops.wood.drop.x - 40, y: CFG.shops.wood.drop.y + 40 + i * 6, inv: { wood: 0, meat: 0, fish: 0 }, state: 'find', target: null,
+    this.workers.push({ x: CFG.shops.wood.drop.x - 40, y: CFG.shops.wood.drop.y + 40 + i * 6, inv: { wood: 0, meat: 0, fish: 0, pelt: 0, animal: 0 }, state: 'find', target: null,
                         chopT: 0, dropT: 0, facing: 1, moving: false, anim: 0, swing: 0, i });
   }
   addGuard(militia) {
@@ -257,19 +269,19 @@ class Game {
   }
   addHunter() {
     const i = this.hunters.length, P = CFG.hunt.post;
-    this.hunters.push({ x: P.x + (i % 3) * 30, y: P.y + Math.floor(i / 3) * 26, inv: { wood: 0, meat: 0, fish: 0 }, state: 'find', target: null,
+    this.hunters.push({ x: P.x + (i % 3) * 30, y: P.y + Math.floor(i / 3) * 26, inv: { wood: 0, meat: 0, fish: 0, pelt: 0, animal: 0 }, state: 'find', target: null,
                         atkT: 0, dropT: 0, swing: 0, facing: 1, moving: false, anim: 0, i });
   }
   addFisher() {
     const i = this.fishers.length, sp = CFG.fishing.spots[i % CFG.fishing.spots.length];
-    this.fishers.push({ x: sp.x + 20, y: sp.y + 60, spot: sp, inv: { wood: 0, meat: 0, fish: 0 }, state: 'toSpot', fishT: 0, dropT: 0,
+    this.fishers.push({ x: sp.x + 20, y: sp.y + 60, spot: sp, inv: { wood: 0, meat: 0, fish: 0, pelt: 0, animal: 0 }, state: 'toSpot', fishT: 0, dropT: 0,
                         fishing: false, facing: 1, moving: false, anim: 0, i });
   }
   addCraftsman() {
     const i = this.craftsmen.length, b = CFG.shops.furn.benches[i % CFG.shops.furn.benches.length];
     this.craftsmen.push({ x: b.x, y: b.y + 60, bench: b, state: 'toBench', craft: null, swing: 0, facing: 1, moving: false, anim: 0, i });
   }
-  carried(e) { return e.inv.wood + e.inv.meat + e.inv.fish; }
+  carried(e) { return GOOD_IDS.reduce((a, g) => a + (e.inv[g] || 0), 0); }
   // ---- 목장 ----
   addAnimal(grow) {
     const R = CFG.ranch.rect, x = rnd(R.x + 40, R.x + R.w - 40), y = rnd(R.y + 60, R.y + R.h - 30);
@@ -277,7 +289,7 @@ class Game {
   }
   addRancher() {
     const i = this.ranchers.length, P = CFG.ranch.post;
-    this.ranchers.push({ x: P.x + i * 28, y: P.y, inv: { wood: 0, meat: 0, fish: 0 }, state: 'find', target: null, harvestT: 0, dropT: 0, swing: 0, facing: 1, moving: false, anim: 0, i });
+    this.ranchers.push({ x: P.x + i * 28, y: P.y, inv: { wood: 0, meat: 0, fish: 0, pelt: 0, animal: 0 }, state: 'find', target: null, harvestT: 0, dropT: 0, swing: 0, facing: 1, moving: false, anim: 0, i });
   }
   nearestReadyAnimal(x, y, range) {
     let best = null, bd = range;
@@ -289,8 +301,8 @@ class Game {
     a.harvestT += dt;
     if (a.harvestT < CFG.ranch.harvestTime) return false;
     a.harvestT = 0; a.grow = 0;
-    const n = this.meatPerAnimal; who.inv.meat += n; this.stats.harvests++;
-    this.text(a.x, a.y - 50, `🥩 +${n}`, '#ffb4b4', 1);
+    who.inv.animal++; this.stats.harvests++;
+    this.text(a.x, a.y - 50, '🦌 출하!', '#ffd166', 1);
     for (let i = 0; i < 4; i++) this.sparks.push({ x: a.x, y: a.y - 30, vx: rnd(-40, 40), vy: rnd(-80, -30), t: 0, life: 0.6, color: '#ff8a80', s: 3 });
     this.emit('harvest', a.x, a.y);
     return true;
@@ -308,21 +320,21 @@ class Game {
     separate(this.animals, 36, 0.4);
   }
   updateRanchers(dt) {
-    const cap = CFG.ranch.rancherCarry + Math.floor(this.lv.bag / 2);
-    const shopId = this.deliveryShop('meat');
+    const cap = CFG.ranch.rancherCarry + Math.floor(this.lv.training / 3);
+    const shopId = this.deliveryShop('animal');
     for (const r of this.ranchers) {
       r.moving = false; r.swing = Math.max(0, r.swing - dt * 4);
       if (r.state === 'find') {
-        if (r.inv.meat >= cap) { r.state = 'toShop'; continue; }
+        if (r.inv.animal >= cap) { r.state = 'toShop'; continue; }
         const a = this.nearestReadyAnimal(r.x, r.y, Infinity);
-        if (a) { r.target = a; r.state = 'go'; }
-        else if (r.inv.meat > 0 && shopId) r.state = 'toShop';
+        if (a && shopId) { r.target = a; r.state = 'go'; }
+        else if (r.inv.animal > 0 && shopId) r.state = 'toShop';
         else moveToward(r, CFG.ranch.post.x + r.i * 28, CFG.ranch.post.y, this.workerSpeed, dt);
       } else if (r.state === 'go') {
         const a = r.target;
         if (!a || a.grow < 1) { r.target = null; r.state = 'find'; continue; }
         if (dist(r.x, r.y, a.x, a.y) > CFG.ranch.range - 10) moveToward(r, a.x, a.y, this.workerSpeed, dt);
-        else { r.facing = a.x < r.x ? -1 : 1; r.swing = 1; if (this.harvest(a, r, dt)) { r.target = null; r.state = 'find'; } }
+        else { r.facing = a.x < r.x ? -1 : 1; r.swing = 1; if (this.harvest(a, r, dt * this.effMul)) { r.target = null; r.state = 'find'; } }
       } else if (r.state === 'toShop') {
         if (!shopId) { r.state = 'find'; continue; }
         const dz = CFG.shops[shopId].drop, ang = (r.i / 3) * Math.PI * 2 + 2.5;
@@ -332,6 +344,60 @@ class Game {
         if (!this.deposit(r, shopId, dt, CFG.worker.dropRate)) r.state = 'find';
       }
       if (r.moving) r.anim += dt * 11;
+    }
+  }
+  // ---- 도축 ----
+  addSlaughterman() {
+    const i = this.slaughtermen.length, W = CFG.shops.slaughter.work;
+    this.slaughtermen.push({ x: W.x + i * 26, y: W.y + 50, inv: { wood: 0, meat: 0, fish: 0, pelt: 0, animal: 0 }, state: 'toWork', proc: null, dropT: 0, swing: 0, facing: 1, moving: false, anim: 0, i });
+  }
+  // 대기 순록 한 마리를 고기로 만든다
+  updateSlaughter(e, dt, mul) {
+    const shop = this.shops.slaughter, cap = this.shopCap('slaughter');
+    if (!e.proc) {
+      if (shop.stock.animal <= 0) { e.procWait = 'animal'; return; }
+      if (shop.stock.meat + this.meatPerAnimal > cap) { e.procWait = 'full'; return; }
+      shop.stock.animal--; e.proc = { t: 0, need: this.slaughterTime * mul };
+    }
+    e.procWait = null;
+    e.proc.t += dt;
+    if (Math.floor(e.proc.t * 1.5) !== Math.floor((e.proc.t - dt) * 1.5)) { e.swing = 1; this.emit('chop', e.x, e.y); }
+    if (e.proc.t >= e.proc.need) {
+      e.proc = null; shop.stock.meat += this.meatPerAnimal; this.stats.slaughters++;
+      this.text(e.x, e.y - 80, `🥩 +${this.meatPerAnimal}`, '#ffb4b4', 1.1);
+      this.emit('harvest', e.x, e.y);
+    }
+  }
+  // 도축장 고기를 가져간다(고기 받기 칸)
+  withdraw(e, dt, cap) {
+    const shop = this.shops.slaughter;
+    e.dropT += dt;
+    while (e.dropT >= CFG.counter.dropRate && shop.stock.meat > 0 && e.inv.meat < cap) { e.dropT -= CFG.counter.dropRate; shop.stock.meat--; e.inv.meat++; this.emit('drop', e.x, e.y); }
+    if (shop.stock.meat <= 0 || e.inv.meat >= cap) e.dropT = Math.min(e.dropT, CFG.counter.dropRate);
+  }
+  updateSlaughtermen(dt) {
+    if (!this.shopOpen('slaughter')) return;
+    const S = CFG.shops.slaughter, shop = this.shops.slaughter, cap = 8 + Math.floor(this.lv.bag / 2);
+    const shopId = this.deliveryShop('meat');
+    for (const m of this.slaughtermen) {
+      m.moving = false; m.swing = Math.max(0, m.swing - dt * 4);
+      if (m.state === 'toWork') { if (moveToward(m, S.work.x + m.i * 26, S.work.y + 8, this.workerSpeed, dt)) m.state = 'work'; }
+      else if (m.state === 'work') {
+        m.facing = -1;
+        this.updateSlaughter(m, dt, 1.2 / this.effMul);
+        // 고기가 쌓였거나(용량) 더 할 일이 없으면 정육점으로 나른다
+        if (shopId && (shop.stock.meat >= cap || (shop.stock.animal <= 0 && !m.proc && shop.stock.meat > 0))) {
+          const take = Math.min(cap, shop.stock.meat); shop.stock.meat -= take; m.inv.meat += take; m.state = 'toShop';
+        }
+      } else if (m.state === 'toShop') {
+        if (!shopId) { m.state = 'toWork'; continue; }
+        const dz = CFG.shops[shopId].drop, ang = (m.i / 3) * Math.PI * 2 + 4;
+        if (moveToward(m, dz.x + Math.cos(ang) * 22, dz.y + Math.sin(ang) * 16, this.workerSpeed, dt)) { m.state = 'drop'; m.dropT = 0; }
+      } else if (m.state === 'drop') {
+        if (!shopId) { m.state = 'toWork'; continue; }
+        if (!this.deposit(m, shopId, dt, CFG.worker.dropRate)) m.state = 'toWork';
+      }
+      if (m.moving) m.anim += dt * 11;
     }
   }
   // ---- 가구 제작 ----
@@ -389,6 +455,7 @@ class Game {
     this.updateFishers(dt);
     this.updateAnimals(dt);
     this.updateRanchers(dt);
+    this.updateSlaughtermen(dt);
     this.updateCraftsmen(dt);
     this.updateCustomers(dt);
     this.updateBills(dt);
@@ -444,11 +511,13 @@ class Game {
     for (const id of Object.keys(CFG.shops)) {
       if (id === 'mart') { if (this.lv.mart) pushOutRect(e, r, MART_RECT); }
       else if (id === 'furn') { /* FURN_RECT로 처리 */ }
+      else if (id === 'slaughter') { /* SLAUGHTER_RECT로 처리 */ }
       else if (this.shopOpen(id) || (id === 'wood')) pushOutRect(e, r, shopRect(CFG.shops[id]));
-      else if ((id === 'meat' && this.lv.butcher) || (id === 'fish' && this.lv.fishShop)) pushOutRect(e, r, shopRect(CFG.shops[id]));
+      else if ((id === 'meat' && this.lv.butcher) || (id === 'fish' && this.lv.fishShop) || (id === 'pelt' && this.lv.furShop)) pushOutRect(e, r, shopRect(CFG.shops[id]));
     }
     if (this.lv.workshop) pushOutRect(e, r, FURN_RECT);
     if (this.lv.ranch) pushOutRect(e, r, { x: CFG.ranch.barn.x - 50, y: CFG.ranch.barn.y - 30, w: 100, h: 50 });
+    if (this.lv.slaughter) pushOutRect(e, r, SLAUGHTER_RECT);
     if (this.lv.townhall) pushOutRect(e, r, { x: TOWNHALL.x - 80, y: TOWNHALL.y - 40, w: 160, h: 70 });
     pushOutRect(e, r, HUT_RECT);
     pushOutRect(e, r, { x: RIVER_RECT.x, y: RIVER_RECT.y - 40, w: RIVER_RECT.w + 40, h: RIVER_RECT.h + 8 });
@@ -468,7 +537,8 @@ class Game {
   }
   // 물건 내려놓기(가게가 받는 상품만). true면 내려놓을 게 남아 있음
   deposit(e, shopId, dt, rate) {
-    const sh = CFG.shops[shopId], shop = this.shops[shopId], cap = shopId === 'furn' ? sh.matCap : this.shopCap(shopId);
+    const sh = CFG.shops[shopId], shop = this.shops[shopId];
+    const cap = shopId === 'furn' ? sh.matCap : shopId === 'slaughter' ? this.slaughterAnimalCap : this.shopCap(shopId);
     const goods = this.shopAccepts(shopId);
     e.dropT += dt;
     let moved = false;
@@ -483,7 +553,7 @@ class Game {
     if (!moved) e.dropT = Math.min(e.dropT, rate);
     return goods.some(g => e.inv[g] > 0);
   }
-  shopFull(e, shopId) { const cap = shopId === 'furn' ? CFG.shops.furn.matCap : this.shopCap(shopId); return this.shopAccepts(shopId).every(g => e.inv[g] === 0 || this.shops[shopId].stock[g] >= cap); }
+  shopFull(e, shopId) { const cap = shopId === 'furn' ? CFG.shops.furn.matCap : shopId === 'slaughter' ? this.slaughterAnimalCap : this.shopCap(shopId); return this.shopAccepts(shopId).every(g => e.inv[g] === 0 || this.shops[shopId].stock[g] >= cap); }
 
   updatePlayer(dt) {
     const p = this.player;
@@ -507,7 +577,7 @@ class Game {
     p.x = clamp(p.x, 18, CFG.world.w - 18); p.y = clamp(p.y, 30, CFG.world.h - 14);
 
     p.atkT -= dt; p.swing = Math.max(0, p.swing - dt * 4); p.fullT = Math.max(0, p.fullT - dt);
-    p.fishing = false; p.crafting = false; p.harvesting = null;
+    p.fishing = false; p.crafting = false; p.harvesting = null; p.slaughtering = false;
     const enemy = this.nearestEnemy(p.x, p.y, CFG.player.atkRange);
     if (enemy) {
       p.chopT = 0; p.tree = null;
@@ -517,6 +587,7 @@ class Game {
       const spot = !tree ? this.nearestSpot(p.x, p.y, CFG.fishing.range) : null;
       const bench = !tree && !spot && this.shopOpen('furn') ? this.nearestBench(p.x, p.y) : null;
       const animal = !tree && !spot && !bench && this.lv.ranch ? this.nearestReadyAnimal(p.x, p.y, CFG.ranch.range) : null;
+      const SW = CFG.shops.slaughter.work, atWork = !tree && !spot && !bench && !animal && this.shopOpen('slaughter') && dist(p.x, p.y, SW.x, SW.y + 8) < 44;
       if (tree && p.inv.wood < this.carryCap) {
         if (p.tree !== tree) { p.tree = tree; p.chopT = 0; }
         p.facing = tree.x < p.x ? -1 : 1;
@@ -529,16 +600,20 @@ class Game {
         if (p.fishT >= this.fishTime) { p.fishT = 0; this.catchFish(p, spot.x, spot.y - 50); }
       } else if (bench && !p.moving) {
         p.crafting = true; p.facing = -1; this.updateCraft(p, dt, 1);
-      } else if (animal && p.inv.meat < this.carryCap && !p.moving) {
+      } else if (animal && p.inv.animal < this.animalCap && !p.moving) {
         p.harvesting = animal; p.facing = animal.x < p.x ? -1 : 1; p.swing = Math.max(p.swing, 0.5);
         this.harvest(animal, p, dt);
+      } else if (atWork && !p.moving) {
+        p.slaughtering = true; p.facing = -1; this.updateSlaughter(p, dt, 1);
       } else {
-        if (((tree && p.inv.wood >= this.carryCap) || (spot && p.inv.fish >= this.carryCap) || (animal && p.inv.meat >= this.carryCap)) && p.fullT <= 0) { p.fullT = 1.5; this.text(p.x, p.y - 80, '가득 찼어요!', '#ffd166', 1.2); }
+        if (((tree && p.inv.wood >= this.carryCap) || (spot && p.inv.fish >= this.carryCap) || (animal && p.inv.animal >= this.animalCap)) && p.fullT <= 0) { p.fullT = 1.5; this.text(p.x, p.y - 80, '가득 찼어요!', '#ffd166', 1.2); }
         p.tree = null; p.chopT = 0; p.fishT = 0;
       }
     }
-    // 가게에 내려놓기
+    // 도축장 고기 받기
     let inZone = false;
+    if (this.shopOpen('slaughter')) { const pk = CFG.shops.slaughter.pickup; if (dist(p.x, p.y, pk.x, pk.y) < pk.r) { inZone = true; this.withdraw(p, dt, this.carryCap); if (this.shops.slaughter.stock.meat <= 0 && p.fullT <= 0 && p.inv.meat === 0) { p.fullT = 2; this.text(pk.x, pk.y - 60, '아직 고기가 없어요', '#ffd166', 1.2); } } }
+    // 가게에 내려놓기
     for (const id of Object.keys(CFG.shops)) {
       if (!this.shopOpen(id)) continue;
       const dz = CFG.shops[id].drop;
@@ -617,7 +692,7 @@ class Game {
     const R = CFG.hunt.rect, hp = this.wildHP();
     const x = rnd(R.x + 30, R.x + R.w - 30), y = rnd(R.y + 30, R.y + R.h - 30);
     this.wild.push({ x, y, hp, maxhp: hp, speed: CFG.hunt.speed, state: 'wander', tx: x, ty: y, waitT: rnd(0.5, 2), fleeT: 0, fx: 0, fy: 0,
-                     type: 'wild', flash: 0, lunge: 0, facing: 1, moving: false, anim: 0, dead: false, meat: CFG.hunt.meat,
+                     type: 'wild', flash: 0, lunge: 0, facing: 1, moving: false, anim: 0, dead: false, meat: CFG.hunt.meat, pelt: CFG.hunt.pelt,
                      bounty: Math.round(this.bounty(Math.max(1, this.wave.n)) * CFG.hunt.bountyMul) });
     this.emit('wild', x, y);
   }
@@ -643,18 +718,18 @@ class Game {
 
   updateHunters(dt) {
     const H = CFG.hunt, cap = H.hunterCarry + Math.floor(this.lv.bag / 2);
-    const shopId = this.deliveryShop('meat');
+    const shopId = this.deliveryShop('pelt');
     for (const h of this.hunters) {
       h.moving = false; h.atkT -= dt; h.swing = Math.max(0, h.swing - dt * 4);
       // 근처 고기 줍기
-      for (const d of this.drops) if (d.kind === 'meat' && d.state === 'ground' && h.inv.meat < cap && dist(d.x, d.y, h.x, h.y) < H.pickup) { d.state = 'fly'; d.to = h; }
+      for (const d of this.drops) if (d.kind === 'pelt' && d.state === 'ground' && h.inv.pelt < cap && dist(d.x, d.y, h.x, h.y) < H.pickup) { d.state = 'fly'; d.to = h; }
       if (h.state === 'find') {
-        if (h.inv.meat >= cap) { h.state = 'toShop'; continue; }
+        if (h.inv.pelt >= cap) { h.state = 'toShop'; continue; }
         const b = this.nearestWild(h.x, h.y, Infinity);
-        const drop = this.nearestDrop('meat', h.x, h.y, 260);
+        const drop = this.nearestDrop('pelt', h.x, h.y, 260);
         if (drop) { h.target = drop; h.state = 'collect'; }
         else if (b) { h.target = b; h.state = 'chase'; }
-        else if (h.inv.meat > 0 && shopId) h.state = 'toShop';
+        else if (h.inv.pelt > 0 && shopId) h.state = 'toShop';
         else moveToward(h, H.post.x + (h.i % 3) * 30, H.post.y + Math.floor(h.i / 3) * 26, this.guardSpeed, dt);
       } else if (h.state === 'chase') {
         const b = h.target;
@@ -663,7 +738,7 @@ class Game {
         else { h.facing = b.x < h.x ? -1 : 1; if (h.atkT <= 0) { h.atkT = H.hunterCd; h.swing = 1; this.hitBear(b, this.hunterDmg, 'hunter', h); } }
       } else if (h.state === 'collect') {
         const d = h.target;
-        if (!d || d.state !== 'ground' || h.inv.meat >= cap) { h.target = null; h.state = 'find'; continue; }
+        if (!d || d.state !== 'ground' || h.inv.pelt >= cap) { h.target = null; h.state = 'find'; continue; }
         moveToward(h, d.x, d.y, this.guardSpeed, dt);
       } else if (h.state === 'toShop') {
         if (!shopId) { h.state = 'find'; continue; }
@@ -735,7 +810,7 @@ class Game {
     const C = CFG.customer;
     for (const id of Object.keys(CFG.shops)) {
       const shop = this.shops[id];
-      if (!this.shopOpen(id)) continue;
+      if (!this.shopOpen(id) || !CFG.shops[id].goods.length) continue;
       shop.custT -= dt;
       if (shop.custT <= 0) {
         const sh = CFG.shops[id];
@@ -850,7 +925,7 @@ class Game {
       d.t += dt;
       if (d.state === 'ground') {
         if (d.z > 0 || d.vz !== 0) { d.vz -= 420 * dt; d.z += d.vz * dt; if (d.z <= 0) { d.z = 0; d.vz = 0; } }
-        if (p.inv[d.kind] < this.carryCap && dist(d.x, d.y, p.x, p.y) < CFG.player.pickup) { d.state = 'fly'; d.to = p; }
+        if (p.inv[d.kind] < this.carryCap && p.down <= 0 && dist(d.x, d.y, p.x, p.y) < CFG.player.pickup) { d.state = 'fly'; d.to = p; }
       } else {
         const to = d.to, tx = to.x, ty = to.y - 40;
         const k = 1 - Math.pow(0.0005, dt), dd = dist(d.x, d.y, tx, ty);
@@ -897,6 +972,7 @@ class Game {
     else if (u.id === 'fisher') this.addFisher();
     else if (u.id === 'craftsman') this.addCraftsman();
     else if (u.id === 'rancher') this.addRancher();
+    else if (u.id === 'slaughterman') this.addSlaughterman();
     else if (u.id === 'ranch') { while (this.animals.length < this.animalCount) this.addAnimal(0); }
     else if (u.id === 'weapon') { for (const g of this.guards) { const m = Math.round(this.guardMaxHP * (g.militia ? 2.2 : 1)); g.hp += m - g.maxhp; g.maxhp = m; } const p = this.player; p.hp += this.playerMaxHP - p.maxhp; p.maxhp = this.playerMaxHP; }
     else if (u.id === 'workshop' && this.lv.workshop > 1) { const g = FURN_IDS[this.lv.workshop - 1]; this.text(u.pad.x, u.pad.y - 80, `${CFG.goods[g].emoji} ${CFG.goods[g].name} 제작 가능!`, '#ffd166', 2); }
@@ -906,8 +982,8 @@ class Game {
     } else if (u.id === 'mart' && this.lv.mart === 1) {
       // 가게 재고를 마트로 옮기고, 줄 선 손님은 돌려보낸다
       const m = this.shops.mart.stock;
-      for (const id of ['wood', 'meat', 'fish']) { for (const g of GOOD_IDS) { m[g] += this.shops[id].stock[g]; this.shops[id].stock[g] = 0; } }
-      for (const c of this.customers) if (c.state === 'queue' && c.shop !== 'furn') { c.state = 'leave'; c.mood = 0; }
+      for (const id of ['wood', 'meat', 'fish', 'pelt']) { for (const g of ['wood', 'meat', 'fish', 'pelt']) { m[g] += this.shops[id].stock[g]; this.shops[id].stock[g] = 0; } }
+      for (const c of this.customers) if (c.state === 'queue' && c.shop !== 'furn' && c.shop !== 'slaughter') { c.state = 'leave'; c.mood = 0; }
       this.text(CFG.shops.mart.x, CFG.shops.mart.y - 130, '🏪 마트 개업! 모든 손님이 마트로 옵니다', '#ffd166', 3);
     }
     const nameLv = u.max === 1 ? u.name : `${u.name} Lv${this.lv[u.id]}`;
@@ -957,6 +1033,9 @@ class Game {
     else if (id === 'ranch') { this.pops.ranch = 1; this.sparkle(CFG.ranch.barn.x, CFG.ranch.barn.y - 50, 20, '#ffd166'); for (const a of this.animals) this.sparkle(a.x, a.y - 20, 3, '#fff'); if (TIERS.ranch.some(t => t.at === lv)) { this.text(CFG.ranch.barn.x, CFG.ranch.barn.y - 130, `🦌 ${TIERS.ranch[tierOf('ranch', lv)].name}으로 확장!`, '#ffd166', 2.4); this.emit('tierUp'); } }
     else if (id === 'feed' || id === 'breed') { for (const a of this.animals) this.sparkle(a.x, a.y - 20, 4, id === 'feed' ? '#7CFC9A' : '#ffb4b4'); }
     else if (id === 'rancher') { const r = this.ranchers[this.ranchers.length - 1]; if (r) this.sparkle(r.x, r.y - 40, 10, '#fff'); }
+    else if (id === 'slaughter') { this.pops.slaughter = 1; this.sparkle(CFG.shops.slaughter.x, CFG.shops.slaughter.y - 50, 18, '#ffb4b4'); }
+    else if (id === 'slaughterman') { const m = this.slaughtermen[this.slaughtermen.length - 1]; if (m) this.sparkle(m.x, m.y - 40, 10, '#fff'); }
+    else if (id === 'furShop' || id === 'peltPrice') { this.pops.pelt = 1; this.sparkle(CFG.shops.pelt.x, CFG.shops.pelt.y - 40, 16, '#d9a86c'); }
   }
 
   // ---- 습격 ----
@@ -988,7 +1067,7 @@ class Game {
     const boss = type === 'yeti' ? BOSS[bossTier(n)] : null;
     const hp = Math.round(this.bearHP(n) * (boss ? boss.hp : E.hp)), a = rnd(0, Math.PI * 2);
     this.bears.push({ x, y, hp, maxhp: hp, dmg: this.bearDmg(n) * (boss ? boss.dmg : E.dmg), speed: CFG.wave.speed * E.speed * rnd(0.95, 1.15), state: 'walk',
-                      tx: this.hut.x + Math.cos(a) * 45, ty: this.hut.y + 28 + Math.sin(a) * 22, type: type || 'bear', r: E.r * (boss ? boss.scale : 1), meat: boss ? boss.meat : E.meat,
+                      tx: this.hut.x + Math.cos(a) * 45, ty: this.hut.y + 28 + Math.sin(a) * 22, type: type || 'bear', r: E.r * (boss ? boss.scale : 1), meat: boss ? boss.meat : E.meat, pelt: boss ? E.pelt + bossTier(n) * 2 : E.pelt,
                       bounty: Math.round(this.bounty(n) * (boss ? boss.bounty : E.bounty)), scale: boss ? boss.scale : 1, bossName: boss ? boss.name : null, enraged: false,
                       atkT: rnd(0.2, 0.8), lunge: 0, flash: 0, facing: -1, moving: false, anim: 0, n, dead: false });
     if (boss) { this.text(x, y - 160, `👹 ${boss.name} 출현!`, '#ff5252', 3); this.emit('boss', x, y); }
@@ -1012,6 +1091,7 @@ class Game {
       if (b.type === 'wild') this.stats.hunts++;
       this.spawnBills(b.bounty, b.x, b.y, 20, 12, null);
       if (b.meat) this.spawnDrops('meat', b.meat, b.x, b.y);
+      if (b.pelt) this.spawnDrops('pelt', b.pelt, b.x, b.y);
       this.emit('kill', b.x, b.y);
     }
   }
@@ -1171,4 +1251,4 @@ class Game {
   }
 }
 
-if (typeof module !== 'undefined') module.exports = { Game, dist, clamp, lerp, moveToward, HUT_RECT, MART_RECT, FURN_RECT, shopRect, GOOD_IDS, ALL_GOODS, FURN_IDS };
+if (typeof module !== 'undefined') module.exports = { Game, dist, clamp, lerp, moveToward, HUT_RECT, MART_RECT, FURN_RECT, SLAUGHTER_RECT, shopRect, GOOD_IDS, ALL_GOODS, FURN_IDS };

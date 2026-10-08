@@ -79,10 +79,11 @@ function drawGround(ctx, g, view, time) {
   // 길
   ctx.strokeStyle = PAL.path; ctx.lineWidth = 50; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(340, 870); ctx.lineTo(680, 905); ctx.lineTo(820, 1000); ctx.lineTo(1280, 1000); ctx.lineTo(1580, 1100);   // 숲 → 판매대 → 정육점 → 손님 입구
-  ctx.moveTo(820, 1000); ctx.lineTo(760, 1140); ctx.lineTo(560, 1250); ctx.lineTo(310, 1600);                            // 판매대 → 갈림길 → 캠프
-  ctx.moveTo(760, 1140); ctx.lineTo(820, 1420); ctx.lineTo(1090, 1800); ctx.lineTo(1580, 1300);                            // 갈림길 → 공방 → 마트 → 입구
-  ctx.moveTo(740, 380); ctx.lineTo(760, 770); ctx.moveTo(1280, 800); ctx.lineTo(1180, 620);                                // 어물전 ↔ 판매대, 정육점 ↔ 사냥터
+  ctx.moveTo(360, 900); ctx.lineTo(840, 1025); ctx.lineTo(980, 1120); ctx.lineTo(1560, 1120); ctx.lineTo(1980, 1250);   // 숲 → 판매대 → 정육점 → 손님 입구
+  ctx.moveTo(980, 1120); ctx.lineTo(840, 1300); ctx.lineTo(600, 1420); ctx.lineTo(330, 1900);                            // 판매대 → 갈림길 → 캠프 남문
+  ctx.moveTo(840, 1300); ctx.lineTo(900, 1700); ctx.lineTo(1290, 2200); ctx.lineTo(1980, 1450);                           // 갈림길 → 공방 → 마트 → 입구
+  ctx.moveTo(860, 410); ctx.lineTo(900, 880); ctx.moveTo(1560, 900); ctx.lineTo(1500, 690); ctx.lineTo(1680, 830);        // 어물전 ↔ 판매대, 정육점 ↔ 사냥터 ↔ 모피 상점
+  ctx.moveTo(1560, 1120); ctx.lineTo(1300, 1405); ctx.lineTo(1500, 1620);                                                  // 정육점 ↔ 도축장 ↔ 목장
   ctx.stroke();
   // 강
   const R = CFG.river;
@@ -223,8 +224,12 @@ function drawPerson(ctx, e, o, g) {
     const nf = Math.min(e.inv.fish, 5);
     for (let i = 0; i < nf; i++) fishShape(ctx, e.x, e.y - bob - h - 4 - i * 7, 0.8);
     h += nf * 7;
+    const np = Math.min(e.inv.pelt || 0, 4);
+    for (let i = 0; i < np; i++) peltBundle(ctx, e.x, e.y - bob - h - 6 - i * 9, 0.8);
+    h += np * 9;
+    if (e.inv.animal > 0) { const ax = e.x - (e.facing || 1) * 34; drawReindeer(ctx, { x: ax, y: e.y + 2, grow: 1, facing: e.facing || 1, moving: e.moving, anim: e.anim, harvestT: 0, i: 0, led: true }, 0); ctx.strokeStyle = '#5b4636'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(e.x + (e.facing || 1) * 6, e.y - 30); ctx.lineTo(ax + (e.facing || 1) * 18, e.y - 34); ctx.stroke(); if (e.inv.animal > 1) pill(ctx, ax, e.y - 70, `×${e.inv.animal}`, 'rgba(20,30,45,0.7)'); }
     const parts = [];
-    if (e.inv.wood) parts.push(`🪵${e.inv.wood}`); if (e.inv.meat) parts.push(`🥩${e.inv.meat}`); if (e.inv.fish) parts.push(`🐟${e.inv.fish}`);
+    if (e.inv.wood) parts.push(`🪵${e.inv.wood}`); if (e.inv.meat) parts.push(`🥩${e.inv.meat}`); if (e.inv.fish) parts.push(`🐟${e.inv.fish}`); if (e.inv.pelt) parts.push(`🧥${e.inv.pelt}`); if (e.inv.animal) parts.push(`🦌${e.inv.animal}`);
     if (parts.length && o.showInv) pill(ctx, e.x, e.y - bob - h - 12, parts.join(' '), 'rgba(20,30,45,0.7)');
   }
 }
@@ -245,7 +250,7 @@ function drawBear(ctx, b, colors) {
   ctx.scale(sc, sc);
   ctx.translate(b.lunge * 9, 0);
   const bob = b.moving ? Math.abs(Math.sin(b.anim)) * 2 : 0;
-  const body = b.flash > 0.01 ? '#ffb4b4' : colors.body, dark = b.flash > 0.01 ? '#e59a9a' : colors.dark;
+  const body = b.flash > 0.6 ? '#ffd6d6' : colors.body, dark = b.flash > 0.6 ? '#f0b0b0' : colors.dark;
   ctx.fillStyle = dark; rrect(ctx, -22, -14, 9, 15, 4); rrect(ctx, -6, -14, 9, 15, 4); rrect(ctx, 8, -12, 9, 13, 4); rrect(ctx, 16, -13, 9, 14, 4);
   ctx.fillStyle = body; ellipse(ctx, -2, -20 - bob, 27, 17);
   ctx.strokeStyle = 'rgba(60,80,110,0.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(-2, -20 - bob, 27, 17, 0, 0, Math.PI * 2); ctx.stroke();
@@ -264,7 +269,7 @@ function drawWolf(ctx, b) {
   if (b.facing < 0) ctx.scale(-1, 1);
   ctx.translate(b.lunge * 9, 0);
   const bob = b.moving ? Math.abs(Math.sin(b.anim * 1.4)) * 3 : 0;
-  const body = b.flash > 0.01 ? '#ffb4b4' : '#8d99a6', dark = b.flash > 0.01 ? '#e59a9a' : '#5f6b78';
+  const body = b.flash > 0.6 ? '#ffd6d6' : '#8d99a6', dark = b.flash > 0.6 ? '#f0b0b0' : '#5f6b78';
   ctx.fillStyle = dark; rrect(ctx, -17, -12, 6, 13, 3); rrect(ctx, -7, -12, 6, 13, 3); rrect(ctx, 5, -11, 6, 12, 3); rrect(ctx, 12, -12, 6, 13, 3);
   ctx.fillStyle = body; ellipse(ctx, -2, -17 - bob, 21, 11);
   ctx.strokeStyle = dark; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-20, -20 - bob); ctx.quadraticCurveTo(-34, -24 - bob, -32, -36 - bob); ctx.stroke();
@@ -283,7 +288,7 @@ function drawYeti(ctx, b, time) {
   ctx.scale(sc, sc);
   ctx.translate(b.lunge * 12, 0);
   const bob = b.moving ? Math.abs(Math.sin(b.anim * 0.7)) * 4 : 0;
-  const fur = b.flash > 0.01 ? '#ffb4b4' : b.enraged ? '#ffe3e3' : '#e8f1fb', dark = b.flash > 0.01 ? '#e59a9a' : b.enraged ? '#e8a8a8' : '#b7c9dd', skin = '#7f9bb8';
+  const fur = b.flash > 0.6 ? '#ffd6d6' : b.enraged ? '#ffe3e3' : '#e8f1fb', dark = b.flash > 0.6 ? '#f0b0b0' : b.enraged ? '#e8a8a8' : '#b7c9dd', skin = '#7f9bb8';
   ctx.fillStyle = dark; rrect(ctx, -26, -22, 18, 24, 8); rrect(ctx, 8, -22, 18, 24, 8);
   ctx.fillStyle = fur; rrect(ctx, -34, -92 - bob, 68, 76, 26);
   ctx.fillStyle = dark; rrect(ctx, -16, -70 - bob, 32, 40, 12);
@@ -382,6 +387,66 @@ function drawFishShop(ctx, g, time) {
   drawSign(ctx, sh.x + sh.w / 2 + 28, sh.y + 4, '어물전', open ? `$${g.price('fish')}/마리` : null);
   ctx.restore();
 }
+function drawFurShop(ctx, g, time) {
+  const sh = CFG.shops.pelt, open = g.shopOpen('pelt');
+  ctx.save(); const sc = popScale(g, 'pelt'); ctx.translate(sh.x, sh.y); ctx.scale(sc, sc); ctx.translate(-sh.x, -sh.y);
+  drawStallBase(ctx, g, sh, '#8b5a2b', 1);
+  ctx.strokeStyle = '#5b4636'; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { const hx = sh.x - 40 + i * 40; ctx.beginPath(); ctx.moveTo(hx, sh.y - 90); ctx.lineTo(hx, sh.y - 66); ctx.stroke(); peltBundle(ctx, hx, sh.y - 56, 1); }   // 걸린 모피
+  const n = Math.min(g.shops.pelt.stock.pelt, 6);
+  for (let i = 0; i < n; i++) peltBundle(ctx, sh.x - 50 + (i % 3) * 50, sh.y - 30 + Math.floor(i / 3) * 10 - 10, 0.9);
+  if (open) drawStockPill(ctx, g, 'pelt', sh.x, sh.y - 124); else drawClosed(ctx, sh.x, sh.y);
+  drawSign(ctx, sh.x + sh.w / 2 + 28, sh.y + 4, '모피 상점', open ? `$${g.price('pelt')}/장` : null);
+  ctx.restore();
+}
+function peltBundle(ctx, x, y, s) {
+  ctx.fillStyle = '#8d6a4a'; ellipse(ctx, x, y, 13 * s, 8 * s);
+  ctx.fillStyle = '#a67c52'; ellipse(ctx, x - 2 * s, y - 2 * s, 9 * s, 5 * s);
+  ctx.fillStyle = '#f4f9fc'; for (let i = -1; i <= 1; i++) circle(ctx, x + i * 7 * s, y - 6 * s, 2.2 * s);
+  ctx.strokeStyle = '#5b4636'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 8 * s); ctx.lineTo(x - 4 * s, y + 8 * s); ctx.stroke();
+}
+function drawSlaughterhouse(ctx, g, time) {
+  if (!g.lv.slaughter) return;
+  const sh = CFG.shops.slaughter, st = g.shops.slaughter.stock, x = sh.x, y = sh.y, w = sh.w, h = 70;
+  ctx.save(); const sc = popScale(g, 'slaughter'); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
+  shadow(ctx, x, y + 24, w / 2 + 6, 12);
+  ctx.fillStyle = '#c9c2b2'; ctx.fillRect(x - w / 2, y - h + 20, w, h);
+  ctx.fillStyle = '#b3aa98'; for (let i = 0; i < 5; i++) ctx.fillRect(x - w / 2, y - h + 22 + i * 12, w, 2);
+  ctx.fillStyle = '#7b2d26'; ctx.beginPath(); ctx.moveTo(x - w / 2 - 12, y - h + 22); ctx.lineTo(x, y - h - 22); ctx.lineTo(x + w / 2 + 12, y - h + 22); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = PAL.treeTop; ctx.beginPath(); ctx.moveTo(x - w / 2 - 4, y - h + 20); ctx.lineTo(x, y - h - 18); ctx.lineTo(x + w / 2 + 4, y - h + 20); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#4a2d12'; rrect(ctx, x - 16, y - 12, 32, 34, 4);
+  ctx.fillStyle = '#7f8c8d'; ctx.fillRect(x + w / 2 - 34, y - h - 10, 12, 26);
+  for (let i = 0; i < 2; i++) { const k = ((time * 0.5 + i * 0.5) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k)})`; circle(ctx, x + w / 2 - 28 + Math.sin(k * 6) * 5, y - h - 14 - k * 36, 5 + k * 7); }
+  // 대기 순록 우리(건물 왼쪽)
+  const penX = x - w / 2 - 44, penY = y + 6;
+  ctx.strokeStyle = PAL.wood; ctx.lineWidth = 3; ctx.strokeRect(penX - 26, penY - 30, 52, 36);
+  const na = Math.min(st.animal, 3);
+  for (let i = 0; i < na; i++) { ctx.fillStyle = '#8d6a4a'; ellipse(ctx, penX - 12 + i * 12, penY - 10, 9, 6); ctx.fillStyle = '#4a2d12'; circle(ctx, penX - 4 + i * 12, penY - 16, 3); }
+  pill(ctx, penX, penY - 44, `🦌 ${st.animal}/${g.slaughterAnimalCap}`, st.animal >= g.slaughterAnimalCap ? '#c0392b' : 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
+  // 도축대(건물 오른쪽 아래)
+  const W = sh.work; shadow(ctx, W.x, W.y + 4, 26, 8);
+  ctx.fillStyle = PAL.woodDark; ctx.fillRect(W.x - 22, W.y - 6, 5, 14); ctx.fillRect(W.x + 17, W.y - 6, 5, 14);
+  ctx.fillStyle = '#d9c7a8'; rrect(ctx, W.x - 26, W.y - 22, 52, 16, 3); ctx.fillStyle = '#c0392b'; rrect(ctx, W.x - 12, W.y - 20, 18, 8, 2);
+  ctx.fillStyle = '#9aa7b5'; rrect(ctx, W.x + 8, W.y - 30, 12, 9, 2); ctx.fillStyle = PAL.woodDark; ctx.fillRect(W.x + 18, W.y - 28, 10, 3);   // 칼
+  const worker = g.slaughtermen[0] || (g.player.slaughtering ? g.player : null);
+  if (worker && worker.proc) bar(ctx, W.x - 22, W.y - 40, 44, 5, worker.proc.t / worker.proc.need, '#ff6b81');
+  else if (worker && worker.procWait === 'animal') drawBubble(ctx, W.x, W.y - 36, '🦌 대기 없음');
+  else if (worker && worker.procWait === 'full') drawBubble(ctx, W.x, W.y - 36, '고기 보관 가득');
+  label(ctx, W.x, W.y + 18, '도축대', 10, '#fff');
+  // 고기 받기 칸
+  const pk = sh.pickup;
+  ctx.save(); ctx.translate(pk.x, pk.y); ctx.scale(1, 0.72);
+  ctx.fillStyle = 'rgba(255,107,129,0.2)'; circle(ctx, 0, 0, pk.r);
+  ctx.strokeStyle = '#ff6b81'; ctx.lineWidth = 4; ctx.setLineDash([14, 10]); ctx.lineDashOffset = time * 30; ctx.beginPath(); ctx.arc(0, 0, pk.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.restore();
+  emoji(ctx, pk.x, pk.y - 4, '🥩', 22); label(ctx, pk.x, pk.y + 22, '고기 받기', 11, '#fff');
+  const nm = Math.min(st.meat, 6); for (let i = 0; i < nm; i++) meatChunk(ctx, pk.x - 20 + (i % 3) * 20, pk.y - 44 - Math.floor(i / 3) * 10, 0.8);
+  pill(ctx, pk.x, pk.y - 66, `🥩 ${st.meat}/${g.shopCap('slaughter')}`, st.meat >= g.shopCap('slaughter') ? '#c0392b' : 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
+  // 간판
+  ctx.fillStyle = '#f5e6c8'; rrect(ctx, x - 50, y - h + 28, 100, 24, 5); ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x - 50, y - h + 28, 100, 24, 5); ctx.stroke();
+  ctx.fillStyle = PAL.ink; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🔪 도축장 Lv${g.lv.slaughter}`, x, y - h + 40);
+  pill(ctx, x, y - h + 6, `마리당 ${Math.round(g.slaughterTime * 10) / 10}초 → 🥩${g.meatPerAnimal}`, 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
+  ctx.restore();
+}
 function drawMart(ctx, g, time) {
   if (!g.lv.mart) return;
   const sh = CFG.shops.mart, tier = tierOf('mart', g.lv.mart), x = sh.x, y = sh.y, w = sh.w + tier * 20, h = 100 + tier * 14;
@@ -394,15 +459,15 @@ function drawMart(ctx, g, time) {
   ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - w / 2 + 14, y - h + 56, w - 28, 8);
   // 선반에 진열된 재고
   const st = g.shops.mart.stock, cap = g.shopCap('mart');
-  const shelves = [['wood', '🪵'], ['meat', '🥩'], ['fish', '🐟']];
-  shelves.forEach(([gd, em], i) => { const sx = x - w / 2 + 40 + i * ((w - 80) / 2); ctx.fillStyle = '#5b4636'; ctx.fillRect(sx - 28, y - 30, 56, 3); ctx.fillRect(sx - 28, y - 52, 56, 3); emoji(ctx, sx, y - 40, em, 16); pill(ctx, sx, y - 14, `${st[gd]}`, st[gd] >= cap ? '#c0392b' : 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); });
+  const shelves = [['wood', '🪵'], ['meat', '🥩'], ['fish', '🐟'], ['pelt', '🧥']];
+  shelves.forEach(([gd, em], i) => { const sx = x - w / 2 + 36 + i * ((w - 72) / 3); ctx.fillStyle = '#5b4636'; ctx.fillRect(sx - 28, y - 30, 56, 3); ctx.fillRect(sx - 28, y - 52, 56, 3); emoji(ctx, sx, y - 40, em, 16); pill(ctx, sx, y - 14, `${st[gd]}`, st[gd] >= cap ? '#c0392b' : 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); });
   // 간판
   ctx.fillStyle = tier >= 2 ? '#e74c3c' : '#f5e6c8'; rrect(ctx, x - 90 - tier * 10, y - h + 2, 180 + tier * 20, 30, 6);
   ctx.fillStyle = tier >= 2 ? '#fff' : PAL.ink; ctx.font = `bold ${15 + tier}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🏪 ${TIERS.mart[tier].name}`, x, y - h + 17);
   if (tier >= 2) { ctx.fillStyle = `rgba(255,80,80,${0.25 + Math.sin(time * 4) * 0.15})`; rrect(ctx, x - 96 - tier * 10, y - h - 4, 192 + tier * 20, 42, 10); }
   // 계산대(열린 줄마다)
   for (let i = 0; i < g.martLanes; i++) { const ln = sh.lanes[i]; const cx = ln.x - 40, cy = ln.y - 10; ctx.fillStyle = PAL.woodDark; ctx.fillRect(cx - 18, cy - 8, 36, 16); ctx.fillStyle = PAL.wood; ctx.fillRect(cx - 18, cy - 30, 36, 24); ctx.fillStyle = '#2c3e50'; rrect(ctx, cx - 8, cy - 44, 16, 14, 3); pill(ctx, cx, cy - 56, `계산대 ${i + 1}`, 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); }
-  pill(ctx, x, y + 46, `총 ${st.wood + st.meat + st.fish} / ${cap}개 · 가격 ×${sh.mul}`, 'rgba(20,30,45,0.75)');
+  pill(ctx, x, y + 46, `총 ${st.wood + st.meat + st.fish + st.pelt} / ${cap}개 · 가격 ×${sh.mul}`, 'rgba(20,30,45,0.75)');
   ctx.restore();
 }
 function drawWorkshop(ctx, g, time) {
@@ -450,7 +515,7 @@ function drawDropZone(ctx, g, id, time) {
   ctx.beginPath(); ctx.arc(0, 0, d.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
   ctx.restore();
   emoji(ctx, d.x, d.y - 4, accepts, 22);
-  label(ctx, d.x, d.y + 22, id === 'furn' ? '재료 내려놓기' : `${sh.name} 내려놓기`, 11, '#fff');
+  label(ctx, d.x, d.y + 22, id === 'furn' ? '재료 내려놓기' : id === 'slaughter' ? '순록 데려오기' : `${sh.name} 내려놓기`, 11, '#fff');
 }
 
 // ---- 캠프: 울타리 · 본부 · 감시탑(단계별 외형) ----
@@ -499,7 +564,8 @@ function drawReindeer(ctx, a, time) {
   ctx.beginPath(); ctx.moveTo(16, -46 - bob); ctx.lineTo(12, -58 - bob); ctx.moveTo(13, -53 - bob); ctx.lineTo(7, -56 - bob); ctx.moveTo(22, -46 - bob); ctx.lineTo(26, -58 - bob); ctx.moveTo(25, -53 - bob); ctx.lineTo(31, -56 - bob); ctx.stroke();
   ctx.fillStyle = '#c0392b'; circle(ctx, 28, -36 - bob, 1.8);   // 빨간 코
   ctx.restore();
-  if (ready) { const k = Math.sin(time * 4 + a.i) * 2; drawBubble(ctx, a.x, a.y - 66 + k, '🥩 출하'); }
+  if (a.led) return;
+  if (ready) { const k = Math.sin(time * 4 + a.i) * 2; drawBubble(ctx, a.x, a.y - 66 + k, '🦌 출하'); }
   else bar(ctx, a.x - 14, a.y - 60 * sc, 28, 3, a.grow, '#7CFC9A');
   if (a.harvestT > 0) bar(ctx, a.x - 14, a.y - 66 * sc, 28, 4, a.harvestT / CFG.ranch.harvestTime, '#ffd166');
 }
@@ -703,7 +769,7 @@ function drawBill(ctx, b) {
 function drawDrop(ctx, d) {
   const y = d.y - d.z;
   if (d.z > 0.5) shadow(ctx, d.x, d.y, 9, 4);
-  ctx.save(); ctx.translate(d.x, y); ctx.rotate(d.rot); meatChunk(ctx, 0, 0, 1); ctx.restore();
+  ctx.save(); ctx.translate(d.x, y); ctx.rotate(d.rot); if (d.kind === 'pelt') peltBundle(ctx, 0, 0, 1); else meatChunk(ctx, 0, 0, 1); ctx.restore();
 }
 function drawArrow(ctx, a) {
   ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(a.ang || 0);
@@ -732,7 +798,7 @@ function drawMinimap(ctx, g, cam, ui) {
   const R = (r, c) => { ctx.fillStyle = c; ctx.fillRect(x0 + r.x * k, y0 + r.y * k, r.w * k, r.h * k); };
   R(CFG.river, PAL.water); R(CFG.forest.rect, '#9ad8ac'); R(CFG.hunt.rect, '#d3c3a8'); R(CFG.wild.rect, '#c9cfd6'); R(CFG.camp, '#c9a47a'); if (g.lv.ranch) R(CFG.ranch.rect, '#cfd6b8');
   const dot = (x, y, c, r) => { ctx.fillStyle = c; circle(ctx, x0 + x * k, y0 + y * k, r); };
-  for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id)) dot(CFG.shops[id].x, CFG.shops[id].y, id === 'mart' ? '#e74c3c' : id === 'furn' ? '#d35400' : id === 'meat' ? '#c0392b' : id === 'fish' ? '#2980b9' : '#8b5a2b', 3);
+  for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id)) dot(CFG.shops[id].x, CFG.shops[id].y, id === 'mart' ? '#e74c3c' : id === 'furn' ? '#d35400' : id === 'meat' ? '#c0392b' : id === 'fish' ? '#2980b9' : id === 'pelt' ? '#6d4c41' : id === 'slaughter' ? '#7b2d26' : '#8b5a2b', 3);
   for (const b of g.wild) dot(b.x, b.y, '#a67c52', 2);
   for (const b of g.bears) dot(b.x, b.y, '#e74c3c', b.type === 'yeti' ? 4 : 2.5);
   for (const c of g.customers) dot(c.x, c.y, '#3b82c4', 1.2);
@@ -780,6 +846,8 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   items.push({ y: CFG.shops.wood.y + 10, f: () => drawWoodStall(ctx, g, time) });
   if (g.lv.butcher) items.push({ y: CFG.shops.meat.y + 10, f: () => drawMeatShop(ctx, g, time) });
   if (g.lv.fishShop) items.push({ y: CFG.shops.fish.y + 10, f: () => drawFishShop(ctx, g, time) });
+  if (g.lv.furShop) items.push({ y: CFG.shops.pelt.y + 10, f: () => drawFurShop(ctx, g, time) });
+  items.push({ y: CFG.shops.slaughter.y + 24, f: () => drawSlaughterhouse(ctx, g, time) });
   items.push({ y: CFG.shops.mart.y + 40, f: () => drawMart(ctx, g, time) });
   items.push({ y: CFG.shops.furn.y + 30, f: () => drawWorkshop(ctx, g, time) });
   if (g.lv.workshop) CFG.shops.furn.benches.forEach((b, i) => items.push({ y: b.y + 8, f: () => drawBench(ctx, g, b, g.craftsmen[i] || (g.player.crafting && g.nearestBench(g.player.x, g.player.y) === b ? g.player : null), time) }));
@@ -798,7 +866,8 @@ function render(ctx, g, cam, time, dtv, js, ui) {
     drawPerson(ctx, p, { coat: '#e8d9b8', pants: '#4a3b2a', hood: '#c9b48e', beard: '#f4f4f4', tool: p.fishing ? 'rod' : p.crafting ? 'hammer' : 'axe', belt: '#7a5230', bag: g.lv.bag ? '#7a5230' : null, bagSize: Math.min(g.lv.bag, 6), showInv: true, scale: sc }, g);
     if (p.fishing) { drawFishingLine(ctx, p, time); bar(ctx, p.x - 18, p.y - 76, 36, 4, p.fishT / g.fishTime, '#5aa9e6'); }
     if (p.tree && p.chopT > 0) bar(ctx, p.x - 18, p.y - 76, 36, 4, p.chopT / (CFG.player.chopTime * g.chopMul), '#f1c40f');
-    if (p.harvesting) label(ctx, p.x, p.y - 96, '🥩 거두는 중…', 11, '#fff');
+    if (p.harvesting) label(ctx, p.x, p.y - 96, '🦌 데려오는 중…', 11, '#fff');
+    if (p.slaughtering) label(ctx, p.x, p.y - 96, '🔪 도축 중…', 11, '#fff');
     if (p.hp < p.maxhp) bar(ctx, p.x - 20, p.y - 70, 40, 5, p.hp / p.maxhp, p.hp / p.maxhp < 0.35 ? '#e74c3c' : '#2ecc71');
     if (p.down > 0) label(ctx, p.x, p.y - 60, `😵 ${Math.ceil(p.down)}`, 14, '#fff');
   } });
@@ -808,6 +877,7 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   for (const gd of g.guards) if (vis(gd.x, gd.y, 80)) items.push({ y: gd.y, f: () => { drawPerson(ctx, gd, gd.militia ? militiaLook : guardLook, g); if (gd.hp < gd.maxhp && gd.down <= 0) bar(ctx, gd.x - 18, gd.y - 72, 36, 4, gd.hp / gd.maxhp, '#2ecc71'); if (gd.down > 0) label(ctx, gd.x, gd.y - 40, `💫 ${Math.ceil(gd.down)}`, 12, '#fff'); } });
   for (const hn of g.hunters) if (vis(hn.x, hn.y, 80)) items.push({ y: hn.y, f: () => drawPerson(ctx, hn, { coat: '#6d4c41', pants: '#3e2723', fur: '#a1887f', tool: 'spear' }, g) });
   for (const fs of g.fishers) if (vis(fs.x, fs.y, 80)) items.push({ y: fs.y, f: () => { drawPerson(ctx, fs, { coat: '#f1c40f', pants: '#2b3a55', cap: '#e67e22', tool: 'rod' }, g); if (fs.fishing) { drawFishingLine(ctx, fs, time); bar(ctx, fs.x - 18, fs.y - 76, 36, 4, fs.fishT / (g.fishTime * CFG.fishing.fisherMul), '#5aa9e6'); } } });
+  for (const sm of g.slaughtermen) if (vis(sm.x, sm.y, 80)) items.push({ y: sm.y, f: () => drawPerson(ctx, sm, { coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', cap: '#7b2d26', tool: 'hammer' }, g) });
   for (const cm of g.craftsmen) if (vis(cm.x, cm.y, 80)) items.push({ y: cm.y, f: () => drawPerson(ctx, cm, { coat: '#5d6d7e', pants: '#2b3a55', apron: '#8b5a2b', cap: '#c0392b', tool: 'hammer' }, g) });
   for (const c of g.customers) if (vis(c.x, c.y, 90)) items.push({ y: c.y, f: () => {
     if (c.big) { drawSled(ctx, c); drawPerson(ctx, c, { coat: c.coat, pants: '#3b2a1a', hat: '#8b1e1e', pom: '#fff', beard: '#d9c7a8' }, g); }
