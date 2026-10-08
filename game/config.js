@@ -73,7 +73,7 @@ const CFG = {
   hunt: { rect: { x: 1450, y: 250, w: 500, h: 370 }, max: 3, maxPerHunter: 0.5, respawn: 10, firstAt: 45,
           hp: 25, hpGrowth: 1.06, speed: 35, fleeSpeed: 95, meat: 1, pelt: 2, bountyMul: 0.5,
           hunterDmg: 6, hunterCd: 0.8, hunterRange: 52, hunterCarry: 4, pickup: 46,
-          post: { x: 1520, y: 580 } },                           // 야생 곰 사냥터(오른쪽 위)
+          post: { x: 1520, y: 580 }, collectorPost: { x: 1600, y: 640 }, collectorCarry: 6 },   // 야생 곰 사냥터(오른쪽 위)
   wild: { rect: { x: 20, y: 2020, w: 880, h: 560 } },            // 남쪽 황무지: 습격은 여기서 온다
   // 목장: 순록을 길러 출하한다. 레벨마다 perLevel마리, growTime초 자라면 출하 가능
   ranch: { rect: { x: 1500, y: 1450, w: 400, h: 350 }, barn: { x: 1600, y: 1530 }, perLevel: 2, growTime: 60, meat: 4, harvestTime: 1.0, range: 48,
@@ -135,6 +135,8 @@ const UPG = [
     cost: () => 400,                                pad: { x: 1780, y: 800 }, unlock: g => g.stats.kills >= 1 },
   { id: 'hunter', icon: '🏹', name: '사냥꾼 고용', desc: '사냥터의 곰을 잡아 모피를 나릅니다', max: 6,
     cost: l => [300, 700, 1500, 3200, 6500, 13000][l], pad: { x: 1480, y: 680 }, unlock: g => g.lv.furShop >= 1 },
+  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '바닥에 남은 고기·모피를 주워 가게에 나릅니다', max: 3,
+    cost: l => [350, 900, 2200][l],                pad: { x: 1640, y: 690 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
   { id: 'peltPrice', icon: '🏷️', name: '모피 가격', desc: '모피 판매가 +12%',          max: Infinity,
     cost: l => Math.round(350 * Math.pow(1.4, l)),  pad: { x: 1800, y: 680 }, unlock: g => g.lv.furShop >= 1 },
   { id: 'meatPrice', icon: '🍖', name: '고기 가격', desc: '고기 판매가 +12%',          max: Infinity,
@@ -272,6 +274,7 @@ const HINTS = [
 const TIPS = [
   { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. 잡으면 🧥 모피! ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
   { id: 'pelt',    when: g => g.drops.some(d => d.kind === 'pelt'),  text: '🧥 모피가 떨어졌어요! 주워 두세요. 사냥터 옆 모피 상점을 열면 비싸게 팝니다' },
+  { id: 'collector', when: g => g.padVisible(UPG.find(u => u.id === 'collector')) && g.drops.length >= 4, text: '바닥에 고기·모피가 남아 있어요. 🧺 수거꾼(사냥터 입구)을 고용하면 돌아다니며 주워 가게에 나릅니다' },
   { id: 'furShop', when: g => g.lv.furShop >= 1, text: '모피 상점 개업! 모피는 상점 왼쪽 칸에 내려놓으세요. 🏹 사냥꾼을 고용하면 자동으로 사냥해 나릅니다' },
   { id: 'butcher', when: g => g.lv.butcher >= 1,                     text: '정육점 개업! 고기는 정육점 위쪽 칸에 내려놓으세요. 꾸준한 고기는 🦌 목장(정육점 아래)에서 나옵니다' },
   { id: 'ranchpad', when: g => g.padVisible(UPG.find(u => u.id === 'ranch')), text: '곰 사냥만으론 고기가 모자라죠? 🦌 목장(정육점 아래)을 지으면 순록을 길러 꾸준히 고기를 얻습니다. 목장 → 도축장 → 정육점 순서로 이어집니다' },
