@@ -135,6 +135,9 @@ class Game {
   bounty(n) { return Math.round(CFG.wave.bounty * Math.pow(CFG.wave.bountyGrowth, n - 1) * this.bonus); }
   wildHP() { return Math.round(CFG.hunt.hp * Math.pow(CFG.hunt.hpGrowth, this.wave.n)); }
   get wildMax() { return CFG.hunt.max + Math.floor(this.hunters.length * CFG.hunt.maxPerHunter); }
+  get growTime() { return Math.max(6, CFG.ranch.growTime * Math.pow(0.89, this.lv.feed)); }
+  get meatPerAnimal() { return CFG.ranch.meat + this.lv.breed; }
+  get animalCount() { return this.lv.ranch * CFG.ranch.perLevel; }
 
   emit(type, x, y, extra) { this.events.push({ type, x, y, extra }); }
   text(x, y, text, color, life) { this.texts.push({ x, y, text, color: color || '#fff', t: 0, life: life || 1 }); }
@@ -172,6 +175,8 @@ class Game {
     this.guards = []; for (let i = 0; i < this.lv.guard; i++) this.addGuard(false); for (let i = 0; i < this.lv.militia; i++) this.addGuard(true);
     this.hunters = []; for (let i = 0; i < this.lv.hunter; i++) this.addHunter();
     this.craftsmen = []; for (let i = 0; i < this.lv.craftsman; i++) this.addCraftsman();
+    this.animals = []; for (let i = 0; i < this.animalCount; i++) this.addAnimal(s.animals && s.animals[i] != null ? s.animals[i] : Math.random() * 0.6);
+    this.ranchers = []; for (let i = 0; i < this.lv.rancher; i++) this.addRancher();
     this.player.craft = null;
     this.fishers = []; for (let i = 0; i < this.lv.fisher; i++) this.addFisher();
     this.customers = []; this.bigT = CFG.customer.bigEvery * 0.6;
@@ -180,7 +185,7 @@ class Game {
     this.tutorial = s.tutorial || 0;
     this.tips = (s.tips || []).slice();
     this.tipQueue = [];
-    this.stats = Object.assign({ sales: 0, chops: 0, kills: 0, fish: 0, hunts: 0, crafts: 0 }, s.stats || {});
+    this.stats = Object.assign({ sales: 0, chops: 0, kills: 0, fish: 0, hunts: 0, crafts: 0, harvests: 0 }, s.stats || {});
     this.activePad = null; this.padFlow = 0; this.towerT = 0; this.shake = 0;
   }
 
@@ -190,6 +195,7 @@ class Game {
       t: this.t, money: this.money, earned: this.earned, lv: this.lv, paid: this.paid,
       fenceHp: this.fence.hp, hutHp: this.hut.hp, waveN: this.wave.n, waveNextAt: this.wave.nextAt,
       shops, inv: this.player.inv, playerHp: this.player.hp, tutorial: this.tutorial, tips: this.tips, stats: this.stats,
+      animals: this.animals.map(a => a.grow),
     };
   }
 
@@ -209,6 +215,12 @@ class Game {
       const meatProd = Math.min(this.lv.hunter * 0.06, this.wildMax * CFG.hunt.meat / CFG.hunt.respawn);
       const meatDemand = avgWant / (this.custInterval * (this.lv.mart ? CFG.shops.mart.rate : CFG.shops.meat.rate));
       rate += Math.min(meatProd, meatDemand) * this.price('meat');
+    }
+    // 목장(목동이 있어야 자동)
+    if (this.deliveryShop('meat') && this.lv.rancher && this.lv.ranch) {
+      const ranchProd = this.animalCount * this.meatPerAnimal / (this.growTime + 8);
+      const meatDemand2 = avgWant / (this.custInterval * (this.lv.mart ? CFG.shops.mart.rate : CFG.shops.meat.rate));
+      rate += Math.min(ranchProd, meatDemand2) * this.price('meat');
     }
     // 생선
     if (this.deliveryShop('fish') && this.lv.fisher) {
@@ -258,6 +270,70 @@ class Game {
     this.craftsmen.push({ x: b.x, y: b.y + 60, bench: b, state: 'toBench', craft: null, swing: 0, facing: 1, moving: false, anim: 0, i });
   }
   carried(e) { return e.inv.wood + e.inv.meat + e.inv.fish; }
+  // ---- 목장 ----
+  addAnimal(grow) {
+    const R = CFG.ranch.rect, x = rnd(R.x + 40, R.x + R.w - 40), y = rnd(R.y + 60, R.y + R.h - 30);
+    this.animals.push({ x, y, grow: Math.min(1, grow || 0), tx: x, ty: y, waitT: rnd(0.5, 2), facing: 1, moving: false, anim: 0, harvestT: 0, i: this.animals.length });
+  }
+  addRancher() {
+    const i = this.ranchers.length, P = CFG.ranch.post;
+    this.ranchers.push({ x: P.x + i * 28, y: P.y, inv: { wood: 0, meat: 0, fish: 0 }, state: 'find', target: null, harvestT: 0, dropT: 0, swing: 0, facing: 1, moving: false, anim: 0, i });
+  }
+  nearestReadyAnimal(x, y, range) {
+    let best = null, bd = range;
+    for (const a of this.animals) { if (a.grow < 1) continue; const d = dist(x, y, a.x, a.y); if (d < bd) { bd = d; best = a; } }
+    return best;
+  }
+  // 다 자란 순록에게서 고기를 거둔다. true면 수확 완료
+  harvest(a, who, dt) {
+    a.harvestT += dt;
+    if (a.harvestT < CFG.ranch.harvestTime) return false;
+    a.harvestT = 0; a.grow = 0;
+    const n = this.meatPerAnimal; who.inv.meat += n; this.stats.harvests++;
+    this.text(a.x, a.y - 50, `🥩 +${n}`, '#ffb4b4', 1);
+    for (let i = 0; i < 4; i++) this.sparks.push({ x: a.x, y: a.y - 30, vx: rnd(-40, 40), vy: rnd(-80, -30), t: 0, life: 0.6, color: '#ff8a80', s: 3 });
+    this.emit('harvest', a.x, a.y);
+    return true;
+  }
+  updateAnimals(dt) {
+    while (this.animals.length < this.animalCount) this.addAnimal(0);
+    const R = CFG.ranch.rect, gt = this.growTime;
+    for (const a of this.animals) {
+      a.moving = false;
+      if (a.grow < 1) a.grow = Math.min(1, a.grow + dt / gt);
+      if (a.waitT > 0) { a.waitT -= dt; if (a.waitT <= 0) { a.tx = rnd(R.x + 40, R.x + R.w - 40); a.ty = rnd(R.y + 60, R.y + R.h - 30); } continue; }
+      if (moveToward(a, a.tx, a.ty, CFG.ranch.speed, dt)) a.waitT = rnd(1.5, 4);
+      if (a.moving) a.anim += dt * 6;
+    }
+    separate(this.animals, 36, 0.4);
+  }
+  updateRanchers(dt) {
+    const cap = CFG.ranch.rancherCarry + Math.floor(this.lv.bag / 2);
+    const shopId = this.deliveryShop('meat');
+    for (const r of this.ranchers) {
+      r.moving = false; r.swing = Math.max(0, r.swing - dt * 4);
+      if (r.state === 'find') {
+        if (r.inv.meat >= cap) { r.state = 'toShop'; continue; }
+        const a = this.nearestReadyAnimal(r.x, r.y, Infinity);
+        if (a) { r.target = a; r.state = 'go'; }
+        else if (r.inv.meat > 0 && shopId) r.state = 'toShop';
+        else moveToward(r, CFG.ranch.post.x + r.i * 28, CFG.ranch.post.y, this.workerSpeed, dt);
+      } else if (r.state === 'go') {
+        const a = r.target;
+        if (!a || a.grow < 1) { r.target = null; r.state = 'find'; continue; }
+        if (dist(r.x, r.y, a.x, a.y) > CFG.ranch.range - 10) moveToward(r, a.x, a.y, this.workerSpeed, dt);
+        else { r.facing = a.x < r.x ? -1 : 1; r.swing = 1; if (this.harvest(a, r, dt)) { r.target = null; r.state = 'find'; } }
+      } else if (r.state === 'toShop') {
+        if (!shopId) { r.state = 'find'; continue; }
+        const dz = CFG.shops[shopId].drop, ang = (r.i / 3) * Math.PI * 2 + 2.5;
+        if (moveToward(r, dz.x + Math.cos(ang) * 22, dz.y + Math.sin(ang) * 16, this.workerSpeed, dt)) { r.state = 'drop'; r.dropT = 0; }
+      } else if (r.state === 'drop') {
+        if (!shopId) { r.state = 'find'; continue; }
+        if (!this.deposit(r, shopId, dt, CFG.worker.dropRate)) r.state = 'find';
+      }
+      if (r.moving) r.anim += dt * 11;
+    }
+  }
   // ---- 가구 제작 ----
   // 열린 가구 중 재고가 가장 적은 것(같으면 높은 단계)을 만든다. 재고가 다 찼으면 null
   craftTier() {
@@ -311,6 +387,8 @@ class Game {
     this.updateWild(dt);
     this.updateHunters(dt);
     this.updateFishers(dt);
+    this.updateAnimals(dt);
+    this.updateRanchers(dt);
     this.updateCraftsmen(dt);
     this.updateCustomers(dt);
     this.updateBills(dt);
@@ -370,6 +448,7 @@ class Game {
       else if ((id === 'meat' && this.lv.butcher) || (id === 'fish' && this.lv.fishShop)) pushOutRect(e, r, shopRect(CFG.shops[id]));
     }
     if (this.lv.workshop) pushOutRect(e, r, FURN_RECT);
+    if (this.lv.ranch) pushOutRect(e, r, { x: CFG.ranch.barn.x - 50, y: CFG.ranch.barn.y - 30, w: 100, h: 50 });
     if (this.lv.townhall) pushOutRect(e, r, { x: TOWNHALL.x - 80, y: TOWNHALL.y - 40, w: 160, h: 70 });
     pushOutRect(e, r, HUT_RECT);
     pushOutRect(e, r, { x: RIVER_RECT.x, y: RIVER_RECT.y - 40, w: RIVER_RECT.w + 40, h: RIVER_RECT.h + 8 });
@@ -428,7 +507,7 @@ class Game {
     p.x = clamp(p.x, 18, CFG.world.w - 18); p.y = clamp(p.y, 30, CFG.world.h - 14);
 
     p.atkT -= dt; p.swing = Math.max(0, p.swing - dt * 4); p.fullT = Math.max(0, p.fullT - dt);
-    p.fishing = false; p.crafting = false;
+    p.fishing = false; p.crafting = false; p.harvesting = null;
     const enemy = this.nearestEnemy(p.x, p.y, CFG.player.atkRange);
     if (enemy) {
       p.chopT = 0; p.tree = null;
@@ -437,6 +516,7 @@ class Game {
       const tree = this.nearestTree(p.x, p.y, CFG.tree.range, p);
       const spot = !tree ? this.nearestSpot(p.x, p.y, CFG.fishing.range) : null;
       const bench = !tree && !spot && this.shopOpen('furn') ? this.nearestBench(p.x, p.y) : null;
+      const animal = !tree && !spot && !bench && this.lv.ranch ? this.nearestReadyAnimal(p.x, p.y, CFG.ranch.range) : null;
       if (tree && p.inv.wood < this.carryCap) {
         if (p.tree !== tree) { p.tree = tree; p.chopT = 0; }
         p.facing = tree.x < p.x ? -1 : 1;
@@ -449,8 +529,11 @@ class Game {
         if (p.fishT >= this.fishTime) { p.fishT = 0; this.catchFish(p, spot.x, spot.y - 50); }
       } else if (bench && !p.moving) {
         p.crafting = true; p.facing = -1; this.updateCraft(p, dt, 1);
+      } else if (animal && p.inv.meat < this.carryCap && !p.moving) {
+        p.harvesting = animal; p.facing = animal.x < p.x ? -1 : 1; p.swing = Math.max(p.swing, 0.5);
+        this.harvest(animal, p, dt);
       } else {
-        if (((tree && p.inv.wood >= this.carryCap) || (spot && p.inv.fish >= this.carryCap)) && p.fullT <= 0) { p.fullT = 1.5; this.text(p.x, p.y - 80, '가득 찼어요!', '#ffd166', 1.2); }
+        if (((tree && p.inv.wood >= this.carryCap) || (spot && p.inv.fish >= this.carryCap) || (animal && p.inv.meat >= this.carryCap)) && p.fullT <= 0) { p.fullT = 1.5; this.text(p.x, p.y - 80, '가득 찼어요!', '#ffd166', 1.2); }
         p.tree = null; p.chopT = 0; p.fishT = 0;
       }
     }
@@ -813,6 +896,8 @@ class Game {
     else if (u.id === 'hunter') this.addHunter();
     else if (u.id === 'fisher') this.addFisher();
     else if (u.id === 'craftsman') this.addCraftsman();
+    else if (u.id === 'rancher') this.addRancher();
+    else if (u.id === 'ranch') { while (this.animals.length < this.animalCount) this.addAnimal(0); }
     else if (u.id === 'weapon') { for (const g of this.guards) { const m = Math.round(this.guardMaxHP * (g.militia ? 2.2 : 1)); g.hp += m - g.maxhp; g.maxhp = m; } const p = this.player; p.hp += this.playerMaxHP - p.maxhp; p.maxhp = this.playerMaxHP; }
     else if (u.id === 'workshop' && this.lv.workshop > 1) { const g = FURN_IDS[this.lv.workshop - 1]; this.text(u.pad.x, u.pad.y - 80, `${CFG.goods[g].emoji} ${CFG.goods[g].name} 제작 가능!`, '#ffd166', 2); }
     else if (u.id === 'fence') {
@@ -869,6 +954,9 @@ class Game {
     else if (id === 'beacon') { this.pops.beacon = 1; this.sparkle(BEACON.x, BEACON.y - 80, 20, '#ffb347'); }
     else if (id === 'training') { for (const w of this.workers.concat(this.hunters, this.fishers, this.craftsmen)) this.sparkle(w.x, w.y - 40, 6, '#7CFC9A'); }
     else if (id === 'fishShop') { this.pops.fish = 1; this.sparkle(CFG.shops.fish.x, CFG.shops.fish.y - 40, 20, '#9ad0ff'); }
+    else if (id === 'ranch') { this.pops.ranch = 1; this.sparkle(CFG.ranch.barn.x, CFG.ranch.barn.y - 50, 20, '#ffd166'); for (const a of this.animals) this.sparkle(a.x, a.y - 20, 3, '#fff'); if (TIERS.ranch.some(t => t.at === lv)) { this.text(CFG.ranch.barn.x, CFG.ranch.barn.y - 130, `🦌 ${TIERS.ranch[tierOf('ranch', lv)].name}으로 확장!`, '#ffd166', 2.4); this.emit('tierUp'); } }
+    else if (id === 'feed' || id === 'breed') { for (const a of this.animals) this.sparkle(a.x, a.y - 20, 4, id === 'feed' ? '#7CFC9A' : '#ffb4b4'); }
+    else if (id === 'rancher') { const r = this.ranchers[this.ranchers.length - 1]; if (r) this.sparkle(r.x, r.y - 40, 10, '#fff'); }
   }
 
   // ---- 습격 ----

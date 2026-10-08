@@ -108,7 +108,7 @@
         <li><b>사냥</b> 사냥터(오른쪽 위)의 🐻 야생 곰 옆에 서면 도끼로 때립니다. ⚔️ 사냥 버튼(또는 F·스페이스)을 누르면 가까운 적에게 알아서 달려갑니다. 잡으면 🥩 고기와 현상금</li>
         <li><b>습격</b> 남쪽 황무지에서 북극곰이 본부를 노립니다. 울타리 → 본부 순서로 부수고, 본부 내구도가 0이 되면 끝. 곰은 경비병과 나도 공격해서 쓰러뜨립니다</li>
         <li><b>끝없는 위협</b> 3의 배수 웨이브엔 🐺 늑대 무리, 10의 배수 웨이브엔 👹 보스(설인 → 설인 전사 → 설인 왕 → 고대 설인 → 얼음 거인). 보스는 체력이 낮아지면 분노합니다</li>
-        <li><b>끝없는 성장</b> 정육점 · 어물전 · 가구 공방(의자 → 소파 → 침대 → 옷장 → 피아노) · 마트가 차례로 열립니다. 울타리·본부·감시탑·무기는 레벨에 따라 모습이 튼튼해집니다</li>
+        <li><b>끝없는 성장</b> 정육점 · 🦌 목장(순록을 길러 고기) · 어물전 · 가구 공방(의자 → 소파 → 침대 → 옷장 → 피아노) · 마트 · 마을 회관(개척지 → 도시) · 방위대 · 봉화대가 차례로 열립니다. 울타리·본부·감시탑·무기는 레벨에 따라 모습이 튼튼해집니다</li>
         <li><b>눈송이 ❄</b> 끝나도 격퇴한 습격 3번마다 눈송이 1개. 다음 판 수입이 영구히 +3%씩</li>
       </ul>
       <p class="dim">자리를 비우면 일꾼들이 최대 2시간까지 대신 벌어 두고, 곰은 그동안 오지 않습니다. 3초마다 자동 저장됩니다.</p>`,
@@ -117,7 +117,7 @@
   function showMenu() {
     modal(`<h2>메뉴</h2>
       <p>${game.wave.n}차 습격까지 버팀 · 누적 $${fmt(game.earned)} · 경과 ${fmtTime(game.t)}</p>
-      <p class="dim">잡은 곰 ${game.stats.kills} · 낚은 생선 ${game.stats.fish} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
+      <p class="dim">잡은 곰 ${game.stats.kills} · 순록 출하 ${game.stats.harvests} · 낚은 생선 ${game.stats.fish} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
       <p class="dim">최고 기록 ${game.meta.bestWave}웨이브 · 눈송이 ❄ ${game.meta.snowflakes} (수입 +${Math.round((game.bonus - 1) * 100)}%) · ${game.meta.runs}번째 판</p>`,
       [{ label: '계속하기', cls: 'primary' },
        { label: '도움말', onClick: () => setTimeout(showHelp, 0) },

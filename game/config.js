@@ -66,6 +66,9 @@ const CFG = {
           hunterDmg: 6, hunterCd: 0.8, hunterRange: 52, hunterCarry: 4, pickup: 46,
           post: { x: 1180, y: 620 } },                           // 야생 곰 사냥터(오른쪽 위)
   wild: { rect: { x: 20, y: 1720, w: 760, h: 460 } },            // 남쪽 황무지: 습격은 여기서 온다
+  // 목장: 순록을 길러 고기를 얻는다. 레벨마다 perLevel마리, growTime초 자라면 출하 가능
+  ranch: { rect: { x: 1230, y: 1270, w: 330, h: 300 }, barn: { x: 1310, y: 1340 }, perLevel: 2, growTime: 60, meat: 4, harvestTime: 1.0, range: 48,
+           speed: 26, rancherCarry: 4, post: { x: 1250, y: 1540 }, hay: [{ x: 1500, y: 1310 }, { x: 1530, y: 1330 }], trough: { x: 1480, y: 1540 } },
   customer: {
     spawn: { x: 1580, y: 1100 }, exit: { x: 1580, y: 1300 },
     speed: 135,
@@ -124,12 +127,22 @@ const UPG = [
   { id: 'meatPrice', icon: '🍖', name: '고기 가격', desc: '고기 판매가 +12%',          max: Infinity,
     cost: l => Math.round(300 * Math.pow(1.4, l)),  pad: { x: 1200, y: 1040 }, unlock: g => g.lv.butcher >= 1 },
 
+  // ---- 목장 ----
+  { id: 'ranch',  icon: '🦌', name: '목장',       desc: '순록 +2마리. 자라면 옆에 서서 고기를 얻습니다. 꾸준한 고기 공급원', max: 10,
+    cost: l => Math.round(1200 * Math.pow(1.6, l)), pad: { x: 1370, y: 1420 }, unlock: g => g.lv.butcher >= 1 },
+  { id: 'feed',   icon: '🌾', name: '사료',       desc: '순록 성장 속도 +12%',          max: Infinity,
+    cost: l => Math.round(150 * Math.pow(1.4, l)),  pad: { x: 1160, y: 1310 }, unlock: g => g.lv.ranch >= 1 },
+  { id: 'breed',  icon: '🧬', name: '품종 개량',  desc: '순록 한 마리당 고기 +1',        max: Infinity,
+    cost: l => Math.round(300 * Math.pow(1.45, l)), pad: { x: 1480, y: 1630 }, unlock: g => g.lv.ranch >= 1 },
+  { id: 'rancher', icon: '🧑‍🌾', name: '목동 고용', desc: '다 자란 순록에게서 고기를 거둬 나릅니다', max: 3,
+    cost: l => [400, 1000, 2500][l],               pad: { x: 1250, y: 1620 }, unlock: g => g.lv.ranch >= 1 },
+
   // ---- 강 · 낚시 ----
   { id: 'fishShop', icon: '🐟', name: '어물전 열기', desc: '강에서 잡은 생선을 파는 가게', max: 1,
     cost: () => 800,                                pad: { x: 860, y: 350 }, unlock: g => g.lv.butcher >= 1 || g.lv.worker >= 3 || g.t >= 300 },
   { id: 'rod',    icon: '🎣', name: '낚싯대',     desc: '낚시 속도 +12%',             max: Infinity,
     cost: l => Math.round(80 * Math.pow(1.4, l)),   pad: { x: 660, y: 270 }, unlock: g => g.lv.fishShop >= 1 },
-  { id: 'fisher', icon: '🧑‍🌾', name: '어부 고용',   desc: '강가에서 낚시해 생선을 나릅니다', max: 4,
+  { id: 'fisher', icon: '🛶', name: '어부 고용',   desc: '강가에서 낚시해 생선을 나릅니다', max: 4,
     cost: l => [350, 800, 1800, 4000][l],           pad: { x: 680, y: 480 }, unlock: g => g.lv.fishShop >= 1 },
   { id: 'fishPrice', icon: '🍣', name: '생선 가격', desc: '생선 판매가 +12%',          max: Infinity,
     cost: l => Math.round(220 * Math.pow(1.4, l)),  pad: { x: 1080, y: 300 }, unlock: g => g.lv.fishShop >= 1 },
@@ -199,6 +212,7 @@ const TIERS = {
   stall: [{ at: 0, name: '좌판' }, { at: 3, name: '천막 가게' }, { at: 7, name: '목재 상점' }],
   workshop: [{ at: 1, name: '작업 헛간' }, { at: 2, name: '가구 공방' }, { at: 4, name: '대형 공방' }],
   mart:  [{ at: 1, name: '동네 마트' }, { at: 2, name: '마트' }, { at: 3, name: '대형 마트' }],
+  ranch: [{ at: 1, name: '울타리 목장' }, { at: 4, name: '축사' }, { at: 8, name: '대형 축사' }],
   village: [{ at: 0, name: '개척지' }, { at: 1, name: '마을' }, { at: 3, name: '큰 마을' }, { at: 6, name: '읍내' }, { at: 10, name: '도시' }],
   axe:   [{ at: 0, name: '쇠도끼', color: '#9aa7b5' }, { at: 3, name: '강철 도끼', color: '#6fa8dc' }, { at: 6, name: '황금 도끼', color: '#f1c40f' }, { at: 10, name: '수정 도끼', color: '#b388ff' }],
   weapon: [{ at: 0, name: '나무 창', color: '#d6dde6' }, { at: 3, name: '강철 창', color: '#6fa8dc' }, { at: 7, name: '황금 창', color: '#f1c40f' }, { at: 12, name: '수정 창', color: '#b388ff' }],
@@ -240,6 +254,8 @@ const TIPS = [
   { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
   { id: 'meat',    when: g => g.drops.some(d => d.kind === 'meat'),  text: '🥩 고기가 떨어졌어요! 주워 두세요. 정육점을 열면 팔 수 있습니다' },
   { id: 'butcher', when: g => g.lv.butcher >= 1,                     text: '정육점 개업! 고기는 정육점 위쪽 칸에 내려놓으세요. 🏹 사냥꾼을 고용하면 자동으로 사냥해 옵니다' },
+  { id: 'ranchpad', when: g => g.padVisible(UPG.find(u => u.id === 'ranch')), text: '곰 사냥만으론 고기가 모자라죠? 🦌 목장(정육점 아래)을 지으면 순록을 길러 꾸준히 고기를 얻습니다. 사료·품종 개량·목동으로 키우세요' },
+  { id: 'ranch', when: g => g.lv.ranch >= 1, text: '목장 개업! 순록이 다 자라면 🥩 표시가 뜹니다. 옆에 서면 고기를 얻고, 목동을 고용하면 자동으로 거둬 정육점에 가져갑니다' },
   { id: 'fishpad', when: g => g.padVisible(UPG.find(u => u.id === 'fishShop')), text: '강가(위쪽)에서 낚시를 할 수 있어요. 🐟 어물전을 열면 생선을 팝니다' },
   { id: 'fish',    when: g => g.lv.fishShop >= 1,                    text: '어물전 개업! 강가 낚시터에 서면 낚시합니다. 🧑‍🌾 어부를 고용하면 자동!' },
   { id: 'mart',    when: g => g.padVisible(UPG.find(u => u.id === 'mart')), text: '🏪 마트를 지을 수 있어요! 모든 손님이 한곳에 모이고, 목재·고기·생선을 묶음으로 1.3배 가격에 사 갑니다' },
