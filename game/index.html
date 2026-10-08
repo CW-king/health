@@ -19,7 +19,7 @@
 <div id="game">
   <canvas id="c"></canvas>
   <div id="hud">
-    <div>
+    <div id="top-block">
       <div class="top">
         <div class="pill money" id="money">$0</div>
         <div class="pill wave" id="wave"></div>
@@ -32,11 +32,16 @@
       <div class="bars">
         <div class="bar"><span id="hut-text">🏠</span><div class="track"><div class="fill" id="hut-bar"></div></div></div>
         <div class="bar"><span id="fence-text">🧱</span><div class="track"><div class="fill fence" id="fence-bar"></div></div></div>
+        <div class="bar"><span id="hp-text">❤️</span><div class="track"><div class="fill hp" id="hp-bar"></div></div></div>
       </div>
       <div class="bonus" id="bonus"></div>
       <div id="warn" hidden></div>
     </div>
-    <div class="bottom"><div id="hint" hidden><span id="hint-text"></span></div></div>
+    <div class="bottom" id="bottom">
+      <div id="tip" hidden><span class="tip-badge">새 소식</span><span id="tip-text"></span></div>
+      <div id="hint" hidden><span id="hint-text"></span></div>
+      <button class="hunt-btn" id="btn-hunt" hidden>⚔️ 사냥</button>
+    </div>
   </div>
   <div id="modal-root"></div>
 </div>

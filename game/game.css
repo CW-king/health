@@ -27,11 +27,16 @@ body { background: var(--bg); color: var(--fg); font-family: system-ui, -apple-s
 .bar { flex: 1; background: var(--panel); border-radius: 8px; padding: 4px 8px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .track { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.15); overflow: hidden; margin-top: 3px; }
 .fill { height: 100%; width: 100%; background: var(--accent); border-radius: 3px; transition: width 0.2s; }
-.fill.warn { background: var(--warn); } .fill.bad { background: var(--danger); } .fill.fence { background: #d9a86c; }
+.fill.warn { background: var(--warn); } .fill.bad { background: var(--danger); } .fill.fence { background: #d9a86c; } .fill.hp { background: #ff6b81; }
 .bonus { padding: 6px 10px 0; max-width: 760px; width: 100%; margin: 0 auto; font-size: 11px; color: #cfe4ff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); font-weight: 700; }
 #warn { align-self: center; margin-top: 10px; background: rgba(192, 57, 43, 0.9); color: #fff; font-weight: 800; padding: 8px 16px; border-radius: 10px; font-size: 14px; animation: blink 0.5s steps(2) infinite; }
-.bottom { padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; justify-content: center; }
+.bottom { padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; align-items: center; gap: 8px; }
 #hint { background: var(--panel); color: var(--fg); border-radius: 12px; padding: 8px 14px; font-size: 13px; font-weight: 600; max-width: 480px; text-align: center; line-height: 1.4; backdrop-filter: blur(6px); }
+#tip { pointer-events: auto; background: rgba(39, 96, 60, 0.92); color: #fff; border-radius: 12px; padding: 8px 14px; font-size: 13px; font-weight: 600; max-width: 480px; text-align: left; line-height: 1.4; display: flex; gap: 8px; align-items: flex-start; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+.tip-badge { flex: none; background: #ffd166; color: #06291a; font-size: 10px; border-radius: 6px; padding: 2px 6px; margin-top: 1px; }
+.hunt-btn { pointer-events: auto; border: 0; border-radius: 999px; background: #e74c3c; color: #fff; font-weight: 800; font-size: 15px; padding: 12px 22px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.35); align-self: flex-end; margin-right: 6px; }
+.hunt-btn.on { background: #f39c12; color: #1f2d3d; }
+.hunt-btn:focus-visible { outline: 2px solid #fff; }
 
 .modal { position: fixed; inset: 0; background: rgba(5, 12, 22, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; pointer-events: auto; z-index: 10; }
 .modal-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; max-width: 440px; width: 100%; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
