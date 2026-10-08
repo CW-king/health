@@ -109,7 +109,8 @@
         <li><b>고기</b> 정육점 → 🦌 목장(순록 키우기) → 🔪 도축장(순록을 고기로) 순서로 열립니다. 목동이 출하 순록을 도축장에 데려가고, 도축업자가 고기로 만들어 정육점에 나릅니다</li>
         <li><b>습격</b> 남쪽 황무지에서 북극곰이 본부를 노립니다. 울타리 → 본부 순서로 부수고, 본부 내구도가 0이 되면 끝. 곰은 경비병과 나도 공격해서 쓰러뜨립니다</li>
         <li><b>끝없는 위협</b> 3의 배수 웨이브엔 🐺 늑대 무리, 10의 배수 웨이브엔 👹 보스(설인 → 설인 전사 → 설인 왕 → 고대 설인 → 얼음 거인). 보스는 체력이 낮아지면 분노합니다</li>
-        <li><b>끝없는 성장</b> 정육점 · 🦌 목장(순록을 길러 고기) · 어물전 · 가구 공방(의자 → 소파 → 침대 → 옷장 → 피아노) · 마트 · 마을 회관(개척지 → 도시) · 방위대 · 봉화대가 차례로 열립니다. 울타리·본부·감시탑·무기는 레벨에 따라 모습이 튼튼해집니다</li>
+        <li><b>끝없는 성장</b> 정육점 · 🦌 목장 · 🔪 도축장 · 어물전 · 모피 상점 · 가구 공방(의자 → 피아노) · 마트 · 마을 회관(개척지 → 도시) · 방위대 · 봉화대가 차례로 열립니다. 울타리·본부·감시탑·무기는 레벨에 따라 모습이 튼튼해집니다</li>
+        <li><b>마트 이후</b> 판매대·정육점·어물전·모피 상점은 마트로 합쳐져 사라지고, 빈 자리에 🍲 식당(생선·고기 요리), 🧵 재단소(모피 옷), 🏨 여관(침대·의자로 객실), 🚢 무역 부두(3분마다 무역선이 마트 재고를 대량 매입)가 들어섭니다. 마트는 계산대·품목 확장·묶음 구매로 키웁니다</li>
         <li><b>눈송이 ❄</b> 끝나도 격퇴한 습격 3번마다 눈송이 1개. 다음 판 수입이 영구히 +3%씩</li>
       </ul>
       <p class="dim">자리를 비우면 일꾼들이 최대 2시간까지 대신 벌어 두고, 곰은 그동안 오지 않습니다. 3초마다 자동 저장됩니다.</p>`,
@@ -118,7 +119,7 @@
   function showMenu() {
     modal(`<h2>메뉴</h2>
       <p>${game.wave.n}차 습격까지 버팀 · 누적 $${fmt(game.earned)} · 경과 ${fmtTime(game.t)}</p>
-      <p class="dim">잡은 곰 ${game.stats.kills} · 순록 출하 ${game.stats.harvests} · 도축 ${game.stats.slaughters} · 낚은 생선 ${game.stats.fish} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
+      <p class="dim">잡은 곰 ${game.stats.kills} · 순록 출하 ${game.stats.harvests} · 도축 ${game.stats.slaughters} · 투숙객 ${game.stats.guests} · 무역 ${game.stats.trades}회 · 낚은 생선 ${game.stats.fish} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
       <p class="dim">최고 기록 ${game.meta.bestWave}웨이브 · 눈송이 ❄ ${game.meta.snowflakes} (수입 +${Math.round((game.bonus - 1) * 100)}%) · ${game.meta.runs}번째 판</p>`,
       [{ label: '계속하기', cls: 'primary' },
        { label: '도움말', onClick: () => setTimeout(showHelp, 0) },
@@ -166,6 +167,8 @@
       if (e.type === 'clear') hud.warn.hidden = true;
       if (e.type === 'big' || e.type === 'tierUp') { Sfx.play('clear'); continue; }
       if (e.type === 'boss' || e.type === 'enrage') { Sfx.play('wave'); continue; }
+      if (e.type === 'ship') { Sfx.play('clear'); continue; }
+      if (e.type === 'shipLeave') { Sfx.play('drop'); continue; }
       if (e.type === 'playerDown' || e.type === 'guardDown') { Sfx.play('fenceBroken'); continue; }
       Sfx.play(e.type);
     }
@@ -235,8 +238,9 @@
     const k = 1 - Math.pow(0.002, dt);
     cam.x += (game.player.x - cam.x) * k; cam.y += (game.player.y - 20 - cam.y) * k;
     const hw = cam.w / 2 / cam.scale, hh = cam.h / 2 / cam.scale;
+    const topPad = ui.topPad / cam.scale, botPad = ui.bottomPad / cam.scale;   // HUD에 가려지는 띠만큼 더 보여 준다
     cam.x = hw * 2 >= CFG.world.w ? CFG.world.w / 2 : clamp(cam.x, hw, CFG.world.w - hw);
-    cam.y = hh * 2 >= CFG.world.h ? CFG.world.h / 2 : clamp(cam.y, hh, CFG.world.h - hh);
+    cam.y = hh * 2 >= CFG.world.h + topPad + botPad ? CFG.world.h / 2 : clamp(cam.y, hh - topPad, CFG.world.h - hh + botPad);
     render(ctx, game, cam, time, dt, js, ui);
     updateHud();
   }

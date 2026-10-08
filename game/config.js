@@ -8,7 +8,7 @@ const CFG = {
   view: { portraitW: 580, landscapeH: 800 },
 
   player: {
-    x: 800, y: 1150, speed: 170,
+    x: 700, y: 1200, speed: 170,
     chopTime: 1.3,          // 도끼 1레벨 기준 통나무 1개를 베는 시간(초)
     carry: 5, carryPerBag: 3,
     pickup: 64,             // 돈·고기를 자동으로 줍는 반경
@@ -31,12 +31,20 @@ const CFG = {
     fish: { name: '생선', emoji: '🐟', base: 15, priceUp: 'fishPrice' },
     pelt: { name: '모피', emoji: '🧥', base: 45, priceUp: 'peltPrice' },     // 사냥터 곰의 모피
     animal: { name: '순록', emoji: '🦌', base: 0, priceUp: 'meatPrice' },   // 출하 순록(도축장으로 데려간다)
-    // 가구(공방 레벨 순서대로 열림). wood = 재료 목재, time = 제작 시간(초)
-    chair:  { name: '의자',   emoji: '🪑', base: 60,   priceUp: 'furnPrice', wood: 3,  time: 4,  tier: 1 },
-    sofa:   { name: '소파',   emoji: '🛋️', base: 150,  priceUp: 'furnPrice', wood: 6,  time: 7,  tier: 2 },
-    bed:    { name: '침대',   emoji: '🛏️', base: 300,  priceUp: 'furnPrice', wood: 10, time: 11, tier: 3 },
-    closet: { name: '옷장',   emoji: '🗄️', base: 560,  priceUp: 'furnPrice', wood: 16, time: 16, tier: 4 },
-    piano:  { name: '피아노', emoji: '🎹', base: 1300, priceUp: 'furnPrice', wood: 30, time: 28, tier: 5 },
+    // 제작품: shop = 만드는 곳, tier = 그 가게 레벨 순서, inputs = 재료, time = 제작 시간(초)
+    chair:  { name: '의자',   emoji: '🪑', base: 60,   priceUp: 'furnPrice', shop: 'furn', inputs: { wood: 3 },  time: 4,  tier: 1 },
+    sofa:   { name: '소파',   emoji: '🛋️', base: 150,  priceUp: 'furnPrice', shop: 'furn', inputs: { wood: 6 },  time: 7,  tier: 2 },
+    bed:    { name: '침대',   emoji: '🛏️', base: 300,  priceUp: 'furnPrice', shop: 'furn', inputs: { wood: 10 }, time: 11, tier: 3 },
+    closet: { name: '옷장',   emoji: '🗄️', base: 560,  priceUp: 'furnPrice', shop: 'furn', inputs: { wood: 16 }, time: 16, tier: 4 },
+    piano:  { name: '피아노', emoji: '🎹', base: 1300, priceUp: 'furnPrice', shop: 'furn', inputs: { wood: 30 }, time: 28, tier: 5 },
+    sashimi: { name: '생선회',   emoji: '🍣', base: 80,  priceUp: 'dishPrice', shop: 'rest', inputs: { fish: 2 },          time: 5,  tier: 1 },
+    stew:    { name: '순록 스튜', emoji: '🍲', base: 140, priceUp: 'dishPrice', shop: 'rest', inputs: { meat: 2 },          time: 8,  tier: 2 },
+    hotpot:  { name: '해물탕',   emoji: '🥘', base: 300, priceUp: 'dishPrice', shop: 'rest', inputs: { fish: 3, meat: 1 }, time: 12, tier: 3 },
+    feast:   { name: '잔치 상차림', emoji: '🍱', base: 800, priceUp: 'dishPrice', shop: 'rest', inputs: { fish: 4, meat: 4 }, time: 20, tier: 4 },
+    gloves:  { name: '가죽 장갑', emoji: '🧤', base: 90,   priceUp: 'clothPrice', shop: 'tailor', inputs: { pelt: 1 }, time: 5,  tier: 1 },
+    coat:    { name: '모피 코트', emoji: '🧥', base: 320,  priceUp: 'clothPrice', shop: 'tailor', inputs: { pelt: 3 }, time: 10, tier: 2 },
+    cloak:   { name: '모피 망토', emoji: '🧣', base: 700,  priceUp: 'clothPrice', shop: 'tailor', inputs: { pelt: 5 }, time: 16, tier: 3 },
+    robe:    { name: '왕실 예복', emoji: '👘', base: 1600, priceUp: 'clothPrice', shop: 'tailor', inputs: { pelt: 8 }, time: 26, tier: 4 },
   },
   // 가게. drop = 물건을 내려놓는 칸, lanes = 손님 줄(시작점·방향), rate = 손님 방문 간격 배수, mul = 가격 배수
   shops: {
@@ -51,7 +59,7 @@ const CFG = {
             lanes: [{ x: 1090, y: 415, dx: 0.3, dy: 0.95 }], gap: 46, max: 8, serve: 0.8 },
     mart: { name: '마트', goods: ['wood', 'meat', 'fish', 'pelt'], x: 1500, y: 2150, w: 300, cap: 120, rate: 0.55, mul: 1.3,
             drop: { x: 1290, y: 2200, r: 58 }, moneySpot: { x: 1380, y: 2260 }, cashier: { x: 1440, y: 2100 },
-            lanes: [{ x: 1450, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1540, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1630, y: 2270, dx: 0.12, dy: 0.99 }],
+            lanes: [{ x: 1420, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1500, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1580, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1660, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1740, y: 2270, dx: 0.12, dy: 0.99 }],
             gap: 44, max: 6, serve: 0.6 },
     pelt: { name: '모피 상점', goods: ['pelt'], x: 1780, y: 800, w: 150, cap: 30, rate: 1.6, mul: 1,
             drop: { x: 1680, y: 830, r: 48 }, moneySpot: { x: 1780, y: 875 }, cashier: { x: 1830, y: 756 },
@@ -60,17 +68,30 @@ const CFG = {
     furn: { name: '가구 공방', goods: ['chair', 'sofa', 'bed', 'closet', 'piano'], accepts: ['wood'], x: 900, y: 1800, w: 240, cap: 12, matCap: 60, rate: 1.5, mul: 1,
             drop: { x: 740, y: 1720, r: 52 }, moneySpot: { x: 1080, y: 1945 }, cashier: { x: 980, y: 1756 },
             lanes: [{ x: 1150, y: 1865, dx: 1, dy: 0.05 }], gap: 48, max: 7, serve: 1.0,
-            benches: [{ x: 820, y: 1885 }, { x: 900, y: 1885 }, { x: 980, y: 1885 }], benchRange: 42 },
+            benches: [{ x: 820, y: 1885 }, { x: 900, y: 1885 }, { x: 980, y: 1885 }], benchRange: 42, upg: 'workshop', worker: 'craftsman' },
+    // 마트가 생기면 열리는 새 가게들(빈 자리에 들어선다)
+    rest: { name: '식당', goods: ['sashimi', 'stew', 'hotpot', 'feast'], accepts: ['fish', 'meat'], x: 980, y: 1000, w: 220, cap: 12, matCap: 60, rate: 1.3, mul: 1,
+            drop: { x: 840, y: 1025, r: 56 }, moneySpot: { x: 870, y: 1140 }, cashier: { x: 1060, y: 956 },
+            lanes: [{ x: 1130, y: 1040, dx: 0.2, dy: 0.98 }], gap: 48, max: 8, serve: 0.9,
+            benches: [{ x: 900, y: 1090 }, { x: 980, y: 1090 }, { x: 1060, y: 1090 }], benchRange: 42, upg: 'restaurant', worker: 'cook' },
+    tailor: { name: '재단소', goods: ['gloves', 'coat', 'cloak', 'robe'], accepts: ['pelt'], x: 1780, y: 800, w: 170, cap: 10, matCap: 40, rate: 1.6, mul: 1,
+            drop: { x: 1680, y: 830, r: 48 }, moneySpot: { x: 1780, y: 960 }, cashier: { x: 1830, y: 756 },
+            lanes: [{ x: 1890, y: 835, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.0,
+            benches: [{ x: 1740, y: 890 }, { x: 1820, y: 890 }], benchRange: 42, upg: 'tailor', worker: 'tailorman' },
+    inn: { name: '여관', goods: [], accepts: [], x: 1560, y: 1000, w: 170, cap: 0, rate: 1.2, mul: 1, stay: 40, rent: 25,
+            drop: { x: 1560, y: 900, r: 0 }, moneySpot: { x: 1470, y: 1085 }, cashier: { x: 1615, y: 956 }, door: { x: 1560, y: 1050 },
+            lanes: [{ x: 1660, y: 1070, dx: 0.25, dy: 0.97 }], gap: 46, max: 8, serve: 0.5 },
     // 도축장: 출하 순록(accepts)을 받아 고기로 만든다. 손님은 오지 않고, 고기는 정육점·마트로 나른다
     slaughter: { name: '도축장', goods: [], accepts: ['animal'], x: 1300, y: 1500, w: 150, cap: 60, animalCap: 6, rate: 1, mul: 1,
             drop: { x: 1300, y: 1392, r: 48 }, pickup: { x: 1190, y: 1565, r: 46 }, work: { x: 1380, y: 1560 }, moneySpot: { x: 1300, y: 1560 }, cashier: { x: 1300, y: 1456 },
             lanes: [{ x: 1300, y: 1600, dx: 0, dy: 1 }], gap: 40, max: 0, serve: 1, time: 6 },
   },
   counter: { dropRate: 0.07 },
+  ship: { every: 180, stay: 60, mul: 1.6, dock: { x: 980, y: 300 }, berth: { x: 980, y: 110 }, minDemand: 10, maxDemand: 30 },   // 무역선: 마트가 있으면 3분마다 입항
   river: { x: 0, y: 30, w: 2000, h: 120 },                        // 강(맨 위)
   fishing: { spots: [{ x: 820, y: 190 }, { x: 940, y: 190 }, { x: 1060, y: 190 }, { x: 1180, y: 190 }],
              range: 42, time: 3.0, fisherMul: 1.3, carry: 4 },   // 낚시: 3초에 한 마리, 낚싯대 레벨당 ×0.89
-  hunt: { rect: { x: 1450, y: 250, w: 500, h: 370 }, max: 3, maxPerHunter: 0.5, respawn: 10, firstAt: 45,
+  hunt: { rect: { x: 1450, y: 250, w: 500, h: 370 }, max: 3, maxPerHunter: 1, respawn: 10, firstAt: 45,
           hp: 25, hpGrowth: 1.06, speed: 35, fleeSpeed: 95, meat: 1, pelt: 2, bountyMul: 0.5,
           hunterDmg: 6, hunterCd: 0.8, hunterRange: 52, hunterCarry: 4, pickup: 46,
           post: { x: 1520, y: 580 }, collectorPost: { x: 1600, y: 640 }, collectorCarry: 6 },   // 야생 곰 사냥터(오른쪽 위)
@@ -122,11 +143,11 @@ const UPG = [
     cost: l => Math.round(90 * Math.pow(1.6, l)),   pad: { x: 840, y: 1300 }, unlock: g => g.lv.bag >= 1 },
 
   { id: 'price',  icon: '💲', name: '목재 가격',  desc: '통나무 판매가 +12%',        max: Infinity,
-    cost: l => Math.round(150 * Math.pow(1.4, l)),  pad: { x: 1140, y: 890 }, unlock: g => g.stats.sales >= 3 },
+    cost: l => Math.round(150 * Math.pow(1.4, l)),  pad: { x: 1140, y: 890 }, martPad: { x: 1140, y: 2110 }, unlock: g => g.stats.sales >= 3 },
   { id: 'promo',  icon: '📣', name: '홍보',       desc: '모든 가게 손님 +11%, 3레벨마다 구매량 +1, 재고칸 +10', max: Infinity,
-    cost: l => Math.round(120 * Math.pow(1.45, l)), pad: { x: 1300, y: 1100 }, unlock: g => g.lv.price >= 1 },
+    cost: l => Math.round(120 * Math.pow(1.45, l)), pad: { x: 1300, y: 1100 }, martPad: { x: 1720, y: 2080 }, unlock: g => g.lv.price >= 1 },
   { id: 'cashier', icon: '🧾', name: '계산원',    desc: '모든 가게 돈 자동 수금, 판매 2배 빠름', max: 1,
-    cost: () => 450,                                pad: { x: 900, y: 880 }, unlock: g => g.lv.price >= 2 && g.lv.worker >= 2 },
+    cost: () => 450,                                pad: { x: 900, y: 880 }, martPad: { x: 1900, y: 2120 }, unlock: g => g.lv.price >= 2 && g.lv.worker >= 2 },
 
   // ---- 사냥 · 고기 ----
   { id: 'butcher', icon: '🥩', name: '정육점 열기', desc: '고기를 파는 가게. 목장·도축장과 이어집니다', max: 1,
@@ -136,11 +157,13 @@ const UPG = [
   { id: 'hunter', icon: '🏹', name: '사냥꾼 고용', desc: '사냥터의 곰을 잡아 모피를 나릅니다', max: 6,
     cost: l => [300, 700, 1500, 3200, 6500, 13000][l], pad: { x: 1480, y: 680 }, unlock: g => g.lv.furShop >= 1 },
   { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '바닥에 남은 고기·모피를 주워 가게에 나릅니다', max: 3,
-    cost: l => [350, 900, 2200][l],                pad: { x: 1640, y: 690 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
+    cost: l => [350, 900, 2200][l],                pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
+  { id: 'traps',  icon: '🪤', name: '덫',         desc: '사냥터 곰 +1마리, 리젠 7% 단축. 모피 생산량이 늘어납니다', max: Infinity,
+    cost: l => Math.round(600 * Math.pow(1.45, l)), pad: { x: 1950, y: 1000 }, unlock: g => g.lv.hunter >= 1 },
   { id: 'peltPrice', icon: '🏷️', name: '모피 가격', desc: '모피 판매가 +12%',          max: Infinity,
-    cost: l => Math.round(350 * Math.pow(1.4, l)),  pad: { x: 1800, y: 680 }, unlock: g => g.lv.furShop >= 1 },
+    cost: l => Math.round(350 * Math.pow(1.4, l)),  pad: { x: 1800, y: 680 }, martPad: { x: 1260, y: 2450 }, unlock: g => g.lv.furShop >= 1 },
   { id: 'meatPrice', icon: '🍖', name: '고기 가격', desc: '고기 판매가 +12%',          max: Infinity,
-    cost: l => Math.round(300 * Math.pow(1.4, l)),  pad: { x: 1430, y: 1150 }, unlock: g => g.lv.butcher >= 1 },
+    cost: l => Math.round(300 * Math.pow(1.4, l)),  pad: { x: 1430, y: 1150 }, martPad: { x: 1140, y: 2230 }, unlock: g => g.lv.butcher >= 1 },
 
   // ---- 목장 ----
   { id: 'ranch',  icon: '🦌', name: '목장',       desc: '순록 +2마리. 자라면 옆에 서서 고기를 얻습니다. 꾸준한 고기 공급원', max: 10,
@@ -166,18 +189,45 @@ const UPG = [
   { id: 'fisher', icon: '🛶', name: '어부 고용',   desc: '강가에서 낚시해 생선을 나릅니다', max: 4,
     cost: l => [350, 800, 1800, 4000][l],           pad: { x: 760, y: 480 }, unlock: g => g.lv.fishShop >= 1 },
   { id: 'fishPrice', icon: '🍣', name: '생선 가격', desc: '생선 판매가 +12%',          max: Infinity,
-    cost: l => Math.round(220 * Math.pow(1.4, l)),  pad: { x: 1200, y: 300 }, unlock: g => g.lv.fishShop >= 1 },
+    cost: l => Math.round(220 * Math.pow(1.4, l)),  pad: { x: 1200, y: 300 }, martPad: { x: 1140, y: 2350 }, unlock: g => g.lv.fishShop >= 1 },
 
   // ---- 마트 ----
-  { id: 'mart',   icon: '🏪', name: '마트',       desc: '1레벨: 건설(모든 손님이 마트로, 묶음 구매 ×1.3) · 이후: 계산대 +1(최대 3), 재고 +30, 손님 +10%', max: Infinity,
-    cost: l => l < 3 ? [12000, 20000, 35000][l] : Math.round(35000 * Math.pow(1.4, l - 2)), pad: { x: 1500, y: 2150 },
+  { id: 'mart',   icon: '🏪', name: '마트',       desc: '1레벨: 건설(가게들이 마트로 합쳐지고 묶음 구매 ×1.3) · 이후: 재고 +40, 손님 +10%, 외형 확장', max: Infinity,
+    cost: l => Math.round(12000 * Math.pow(1.45, l)), pad: { x: 1500, y: 2150 },
     unlock: g => g.lv.butcher >= 1 && g.lv.fishShop >= 1 && g.lv.price >= 3 },
+  { id: 'martLanes', icon: '🛒', name: '계산대 추가', desc: '마트 계산대 +1줄(최대 5줄). 손님을 동시에 더 받습니다', max: 4,
+    cost: l => [8000, 16000, 32000, 64000][l],     pad: { x: 1900, y: 2360 }, unlock: g => g.lv.mart >= 1 },
+  { id: 'martGoods', icon: '📦', name: '품목 확장', desc: '1: 🪑 가구 · 2: 🍲 요리 · 3: 🧥 의복을 마트에서도 팝니다. 공방 직원이 남는 완제품을 마트로 나릅니다', max: 3,
+    cost: l => [10000, 25000, 60000][l],           pad: { x: 1900, y: 2480 }, unlock: g => g.lv.mart >= 1 },
+  { id: 'martBulk', icon: '🛍️', name: '묶음 구매', desc: '마트 손님이 품목마다 +1개씩 더 삽니다', max: 6,
+    cost: l => Math.round(5000 * Math.pow(1.6, l)), pad: { x: 1900, y: 2240 }, unlock: g => g.lv.mart >= 1 },
+
+  // ---- 마트 이후 새 컨텐츠 ----
+  { id: 'restaurant', icon: '🍲', name: '식당', desc: '1레벨: 건설(🍣 생선회) · 2: 🍲 순록 스튜 · 3: 🥘 해물탕 · 4: 🍱 잔치 상차림. 생선·고기를 요리로', max: 4,
+    cost: l => [3000, 7000, 15000, 32000][l],      pad: { x: 980, y: 1000 }, unlock: g => g.lv.mart >= 1 },
+  { id: 'cook',   icon: '👨‍🍳', name: '요리사 고용', desc: '화덕에서 요리를 계속 만듭니다', max: 3,
+    cost: l => [900, 2200, 5000][l],               pad: { x: 780, y: 1130 }, unlock: g => g.lv.restaurant >= 1 },
+  { id: 'dishPrice', icon: '🍽️', name: '요리 가격', desc: '요리 판매가 +12%',          max: Infinity,
+    cost: l => Math.round(500 * Math.pow(1.4, l)),  pad: { x: 1150, y: 880 }, unlock: g => g.lv.restaurant >= 1 },
+  { id: 'tailor', icon: '🧵', name: '재단소',     desc: '1레벨: 건설(🧤 가죽 장갑) · 2: 🧥 모피 코트 · 3: 🧣 모피 망토 · 4: 👘 왕실 예복. 모피를 옷으로', max: 4,
+    cost: l => [2500, 6000, 14000, 30000][l],      pad: { x: 1780, y: 800 }, unlock: g => g.lv.mart >= 1 && g.lv.furShop >= 1 },
+  { id: 'tailorman', icon: '🪡', name: '재단사 고용', desc: '재봉대에서 옷을 계속 만듭니다', max: 2,
+    cost: l => [800, 2000][l],                     pad: { x: 1720, y: 690 }, unlock: g => g.lv.tailor >= 1 },
+  { id: 'clothPrice', icon: '🏷️', name: '의복 가격', desc: '의복 판매가 +12%',          max: Infinity,
+    cost: l => Math.round(450 * Math.pow(1.4, l)),  pad: { x: 1850, y: 690 }, unlock: g => g.lv.tailor >= 1 },
+  { id: 'inn',    icon: '🏨', name: '여관',       desc: '객실 +1. 돈과 함께 공방의 🛏️ 침대 1 · 🪑 의자 1이 필요합니다. 손님이 묵고 숙박비를 냅니다', max: 12,
+    cost: l => Math.round(6000 * Math.pow(1.35, l)), pad: { x: 1560, y: 1000 }, unlock: g => g.lv.mart >= 1 && g.lv.workshop >= 3,
+    needs: { bed: 1, chair: 1 } },
+  { id: 'innPrice', icon: '🛎️', name: '숙박비',   desc: '숙박비 +12%',                max: Infinity,
+    cost: l => Math.round(600 * Math.pow(1.4, l)),  pad: { x: 1430, y: 1150 }, unlock: g => g.lv.inn >= 1 },
+  { id: 'trade',  icon: '🚢', name: '무역 계약',  desc: '무역선이 머무는 동안 계약하면 마트 재고를 비싸게 삽니다', max: Infinity,
+    cost: () => 0,                                 pad: { x: 980, y: 330 }, unlock: g => g.ship.state === 'docked' && !g.ship.done },
 
   // ---- 가구 공방 ----
   { id: 'workshop', icon: '🔨', name: '가구 공방', desc: '1레벨: 공방 건설(🪑 의자) · 2: 🛋️ 소파 · 3: 🛏️ 침대 · 4: 🗄️ 옷장 · 5: 🎹 피아노', max: 5,
     cost: l => [1500, 3000, 6500, 14000, 30000][l], pad: { x: 900, y: 1800 },
     unlock: g => g.lv.worker >= 3 || g.stats.sales >= 60 },
-  { id: 'tools',  icon: '🧰', name: '공구',       desc: '가구 제작 속도 +12%',        max: Infinity,
+  { id: 'tools',  icon: '🧰', name: '공구',       desc: '가구·요리·의복 제작 속도 +12%', max: Infinity,
     cost: l => Math.round(200 * Math.pow(1.4, l)),  pad: { x: 720, y: 1900 }, unlock: g => g.lv.workshop >= 1 },
   { id: 'craftsman', icon: '👨‍🔧', name: '목수 고용', desc: '작업대에서 가구를 계속 만듭니다', max: 3,
     cost: l => [600, 1600, 4000][l],                pad: { x: 1080, y: 2000 }, unlock: g => g.lv.workshop >= 1 },
@@ -232,7 +282,9 @@ const TIERS = {
   tower: [{ at: 1, name: '망루' }, { at: 4, name: '감시탑' }, { at: 8, name: '석탑' }],
   stall: [{ at: 0, name: '좌판' }, { at: 3, name: '천막 가게' }, { at: 7, name: '목재 상점' }],
   workshop: [{ at: 1, name: '작업 헛간' }, { at: 2, name: '가구 공방' }, { at: 4, name: '대형 공방' }],
-  mart:  [{ at: 1, name: '동네 마트' }, { at: 2, name: '마트' }, { at: 3, name: '대형 마트' }],
+  mart:  [{ at: 1, name: '동네 마트' }, { at: 3, name: '마트' }, { at: 6, name: '대형 마트' }, { at: 10, name: '백화점' }],
+  rest: [{ at: 1, name: '포장마차' }, { at: 2, name: '식당' }, { at: 4, name: '연회장' }],
+  tailor: [{ at: 1, name: '재단소' }, { at: 3, name: '양장점' }],
   ranch: [{ at: 1, name: '울타리 목장' }, { at: 4, name: '축사' }, { at: 8, name: '대형 축사' }],
   village: [{ at: 0, name: '개척지' }, { at: 1, name: '마을' }, { at: 3, name: '큰 마을' }, { at: 6, name: '읍내' }, { at: 10, name: '도시' }],
   axe:   [{ at: 0, name: '쇠도끼', color: '#9aa7b5' }, { at: 3, name: '강철 도끼', color: '#6fa8dc' }, { at: 6, name: '황금 도끼', color: '#f1c40f' }, { at: 10, name: '수정 도끼', color: '#b388ff' }],
@@ -286,6 +338,8 @@ const TIPS = [
   { id: 'mart',    when: g => g.padVisible(UPG.find(u => u.id === 'mart')), text: '🏪 마트를 지을 수 있어요! 모든 손님이 한곳에 모이고, 목재·고기·생선·모피를 묶음으로 1.3배 가격에 사 갑니다' },
   { id: 'workpad', when: g => g.padVisible(UPG.find(u => u.id === 'workshop')), text: '목재가 남나요? 🔨 가구 공방(왼쪽 아래)을 지으면 목재로 가구를 만들어 훨씬 비싸게 팝니다' },
   { id: 'workshop', when: g => g.lv.workshop >= 1,                 text: '공방 개업! 공방 왼쪽 위 칸에 목재를 내려놓고 작업대 앞에 서면 🪑 의자를 만듭니다. 👨‍🔧 목수를 고용하면 자동! 벌목꾼도 목재가 남으면 공방으로 나릅니다' },
+  { id: 'martsites', when: g => g.lv.mart >= 1, text: '가게들이 마트로 합쳐지면서 비워진 자리에 새 건물을 지을 수 있어요: 🍲 식당(옛 판매대), 🧵 재단소(옛 모피 상점), 🏨 여관(옛 정육점), 🚢 무역 부두(옛 어물전). 가격·홍보 원은 마트 옆으로 옮겨졌습니다' },
+  { id: 'ship', when: g => g.ship.state === 'docked', text: '🚢 무역선 입항! 60초 안에 강가 부두(옛 어물전 자리)의 계약 원에 서면 마트 재고를 1.6배 가격에 대량으로 사 갑니다' },
   { id: 'townhall', when: g => g.padVisible(UPG.find(u => u.id === 'townhall')), text: '마을이 커졌어요! 🏛️ 마을 회관(캠프 위쪽)을 지으면 모두의 작업 효율과 판매가가 오르고, 🪖 마을 방위대와 🔥 봉화대가 열립니다. 비싸지만 마을을 지키는 투자예요' },
   { id: 'martopen', when: g => g.lv.mart >= 1,                       text: '마트 개업! 이제 목재·고기·생선·모피를 마트 왼쪽 칸에 내려놓으세요. 가게 재고는 마트로 옮겨졌습니다(가구 공방과 도축장은 그대로)' },
 ];

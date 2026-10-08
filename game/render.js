@@ -459,15 +459,16 @@ function drawMart(ctx, g, time) {
   ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - w / 2 + 14, y - h + 56, w - 28, 8);
   // 선반에 진열된 재고
   const st = g.shops.mart.stock, cap = g.shopCap('mart');
-  const shelves = [['wood', '🪵'], ['meat', '🥩'], ['fish', '🐟'], ['pelt', '🧥']];
-  shelves.forEach(([gd, em], i) => { const sx = x - w / 2 + 36 + i * ((w - 72) / 3); ctx.fillStyle = '#5b4636'; ctx.fillRect(sx - 28, y - 30, 56, 3); ctx.fillRect(sx - 28, y - 52, 56, 3); emoji(ctx, sx, y - 40, em, 16); pill(ctx, sx, y - 14, `${st[gd]}`, st[gd] >= cap ? '#c0392b' : 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); });
+  const shelves = [['wood', '🪵'], ['meat', '🥩'], ['fish', '🐟'], ['pelt', '🧥']].concat(g.martCategories().map(c => [c, c === 'furn' ? '🪑' : c === 'rest' ? '🍲' : '🧥']));
+  const catCount = c => g.shopGoods(c).reduce((a, gd) => a + st[gd], 0);
+  shelves.forEach(([gd, em], i) => { const sx = x - w / 2 + 36 + i * ((w - 72) / Math.max(1, shelves.length - 1)); if (!(gd in st)) { ctx.fillStyle = '#5b4636'; ctx.fillRect(sx - 28, y - 30, 56, 3); ctx.fillRect(sx - 28, y - 52, 56, 3); emoji(ctx, sx, y - 40, em, 16); pill(ctx, sx, y - 14, `${catCount(gd)}`, 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); return; } ctx.fillStyle = '#5b4636'; ctx.fillRect(sx - 28, y - 30, 56, 3); ctx.fillRect(sx - 28, y - 52, 56, 3); emoji(ctx, sx, y - 40, em, 16); pill(ctx, sx, y - 14, `${st[gd]}`, st[gd] >= cap ? '#c0392b' : 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); });
   // 간판
   ctx.fillStyle = tier >= 2 ? '#e74c3c' : '#f5e6c8'; rrect(ctx, x - 90 - tier * 10, y - h + 2, 180 + tier * 20, 30, 6);
   ctx.fillStyle = tier >= 2 ? '#fff' : PAL.ink; ctx.font = `bold ${15 + tier}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🏪 ${TIERS.mart[tier].name}`, x, y - h + 17);
   if (tier >= 2) { ctx.fillStyle = `rgba(255,80,80,${0.25 + Math.sin(time * 4) * 0.15})`; rrect(ctx, x - 96 - tier * 10, y - h - 4, 192 + tier * 20, 42, 10); }
   // 계산대(열린 줄마다)
   for (let i = 0; i < g.martLanes; i++) { const ln = sh.lanes[i]; const cx = ln.x - 40, cy = ln.y - 10; ctx.fillStyle = PAL.woodDark; ctx.fillRect(cx - 18, cy - 8, 36, 16); ctx.fillStyle = PAL.wood; ctx.fillRect(cx - 18, cy - 30, 36, 24); ctx.fillStyle = '#2c3e50'; rrect(ctx, cx - 8, cy - 44, 16, 14, 3); pill(ctx, cx, cy - 56, `계산대 ${i + 1}`, 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); }
-  pill(ctx, x, y + 46, `총 ${st.wood + st.meat + st.fish + st.pelt} / ${cap}개 · 가격 ×${sh.mul}`, 'rgba(20,30,45,0.75)');
+  pill(ctx, x, y + 46, `총 ${g.shopGoods('mart').reduce((a, gd) => a + st[gd], 0)} / ${cap}개 · 가격 ×${sh.mul} · 계산대 ${g.martLanes}줄`, 'rgba(20,30,45,0.75)');
   ctx.restore();
 }
 function drawWorkshop(ctx, g, time) {
@@ -495,20 +496,103 @@ function drawWorkshop(ctx, g, time) {
   drawSign(ctx, x + w / 2 + 22 * open.length + 40, y + 60, '가구 매장', `${open.map(gd => CFG.goods[gd].emoji + '$' + fmtMoney(g.price(gd))).join(' ')}`);
   ctx.restore();
 }
-function drawBench(ctx, g, b, worker, time) {
+function drawBench(ctx, g, b, worker, time, shopId) {
   shadow(ctx, b.x, b.y + 4, 26, 8);
-  ctx.fillStyle = PAL.woodDark; ctx.fillRect(b.x - 22, b.y - 6, 5, 14); ctx.fillRect(b.x + 17, b.y - 6, 5, 14);
-  ctx.fillStyle = PAL.wood; rrect(ctx, b.x - 26, b.y - 22, 52, 16, 3); ctx.fillStyle = PAL.woodLight; ctx.fillRect(b.x - 24, b.y - 20, 48, 3);
-  ctx.fillStyle = '#7f8c8d'; rrect(ctx, b.x + 10, b.y - 30, 12, 9, 2);   // 바이스
+  if (shopId === 'rest') {   // 화덕
+    ctx.fillStyle = PAL.stoneDark; rrect(ctx, b.x - 24, b.y - 22, 48, 26, 5); ctx.fillStyle = PAL.stone; rrect(ctx, b.x - 22, b.y - 20, 44, 8, 3);
+    ctx.fillStyle = '#2b3442'; ellipse(ctx, b.x, b.y - 26, 16, 6); ctx.fillStyle = '#5b4636'; ellipse(ctx, b.x, b.y - 28, 12, 4);
+    for (let i = 0; i < 3; i++) { const h = 8 + Math.sin(time * 9 + i + b.x) * 3; ctx.fillStyle = i === 0 ? '#ff8c42' : i === 1 ? '#ffb347' : '#ffe08a'; tri(ctx, b.x - 10 + i * 4, b.y - 4, b.x + (i - 1) * 4, b.y - 6 - h, b.x + 10 - i * 4, b.y - 4); }
+    if (worker && worker.craft) { const k = ((time * 0.7) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k)})`; circle(ctx, b.x + Math.sin(k * 6) * 4, b.y - 36 - k * 24, 4 + k * 6); }
+  } else if (shopId === 'tailor') {   // 재봉대
+    ctx.fillStyle = PAL.woodDark; ctx.fillRect(b.x - 22, b.y - 6, 5, 14); ctx.fillRect(b.x + 17, b.y - 6, 5, 14);
+    ctx.fillStyle = '#d9c7a8'; rrect(ctx, b.x - 26, b.y - 22, 52, 16, 3);
+    ctx.fillStyle = '#2c3e50'; rrect(ctx, b.x - 4, b.y - 38, 22, 16, 4); ctx.fillStyle = '#95a5a6'; ctx.fillRect(b.x + 12, b.y - 30, 3, 10);   // 재봉틀
+    ctx.fillStyle = '#8d6a4a'; ellipse(ctx, b.x - 14, b.y - 26, 8, 4);
+  } else {
+    ctx.fillStyle = PAL.woodDark; ctx.fillRect(b.x - 22, b.y - 6, 5, 14); ctx.fillRect(b.x + 17, b.y - 6, 5, 14);
+    ctx.fillStyle = PAL.wood; rrect(ctx, b.x - 26, b.y - 22, 52, 16, 3); ctx.fillStyle = PAL.woodLight; ctx.fillRect(b.x - 24, b.y - 20, 48, 3);
+    ctx.fillStyle = '#7f8c8d'; rrect(ctx, b.x + 10, b.y - 30, 12, 9, 2);   // 바이스
+  }
   const e = worker;
-  if (e && e.craft) { const G = CFG.goods[e.craft.good]; emoji(ctx, b.x - 6, b.y - 32, G.emoji, 16); bar(ctx, b.x - 22, b.y - 48, 44, 5, e.craft.t / e.craft.need, '#f1c40f'); }
-  else if (e && e.craftWait === 'wood') drawBubble(ctx, b.x, b.y - 40, '🪵 부족');
-  else if (e && e.craftWait === 'full') drawBubble(ctx, b.x, b.y - 40, '진열대 가득');
+  if (e && e.craft) { const G = CFG.goods[e.craft.good]; emoji(ctx, b.x - 6, b.y - 44, G.emoji, 16); bar(ctx, b.x - 22, b.y - 58, 44, 5, e.craft.t / e.craft.need, '#f1c40f'); }
+  else if (e && e.craftWait === 'full') drawBubble(ctx, b.x, b.y - 48, '진열대 가득');
+  else if (e && e.craftWait) drawBubble(ctx, b.x, b.y - 48, `${CFG.goods[e.craftWait] ? CFG.goods[e.craftWait].emoji : ''} 재료 부족`);
+}
+// 식당·재단소(마트 이후 빈 자리에 들어서는 제작 가게)
+function drawCraftHouse(ctx, g, shopId, time) {
+  if (!g.shopOpen(shopId)) return;
+  const sh = CFG.shops[shopId], lvl = g.lv[sh.upg], tier = tierOf(shopId, lvl), x = sh.x, y = sh.y, w = sh.w, h = 76 + tier * 10;
+  const isRest = shopId === 'rest';
+  ctx.save(); const sc = popScale(g, shopId); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
+  shadow(ctx, x, y + 30, w / 2 + 6, 14);
+  ctx.fillStyle = isRest ? '#e8d9b8' : '#cfc3d9'; ctx.fillRect(x - w / 2, y - h + 30, w, h);
+  ctx.fillStyle = 'rgba(0,0,0,0.08)'; for (let i = 0; i < Math.floor(h / 12); i++) ctx.fillRect(x - w / 2, y - h + 32 + i * 12, w, 2);
+  ctx.fillStyle = isRest ? '#b03a2e' : '#5e3b73'; ctx.beginPath(); ctx.moveTo(x - w / 2 - 12, y - h + 32); ctx.lineTo(x, y - h - 24 - tier * 6); ctx.lineTo(x + w / 2 + 12, y - h + 32); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = PAL.treeTop; ctx.beginPath(); ctx.moveTo(x - w / 2 - 4, y - h + 30); ctx.lineTo(x, y - h - 20 - tier * 6); ctx.lineTo(x + w / 2 + 4, y - h + 30); ctx.closePath(); ctx.fill();
+  // 천막/간판 띠
+  for (let i = 0; i < Math.ceil(w / 24); i++) { ctx.fillStyle = i % 2 ? '#f5f0e6' : (isRest ? '#c0392b' : '#8e44ad'); ctx.fillRect(x - w / 2 + i * 24, y - 6, Math.min(24, w - i * 24), 14); }
+  ctx.fillStyle = '#4a2d12'; rrect(ctx, x - 16, y - 2, 32, 32, 4);
+  ctx.fillStyle = '#ffd27d'; rrect(ctx, x - w / 2 + 16, y - h + 50, 26, 20, 3); rrect(ctx, x + w / 2 - 42, y - h + 50, 26, 20, 3);
+  if (isRest) { ctx.fillStyle = '#7f8c8d'; ctx.fillRect(x + w / 2 - 36, y - h - 8, 14, 30); for (let i = 0; i < 3; i++) { const k = ((time * 0.5 + i * 0.33) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k)})`; circle(ctx, x + w / 2 - 29 + Math.sin(k * 6 + i) * 6, y - h - 12 - k * 36, 5 + k * 8); } }
+  if (tier >= 1) { ctx.fillStyle = '#ffd27d'; circle(ctx, x - w / 2 - 6, y - 30, 5); circle(ctx, x + w / 2 + 6, y - 30, 5); ctx.fillStyle = 'rgba(255,210,125,0.15)'; circle(ctx, x - w / 2 - 6, y - 30, 22); circle(ctx, x + w / 2 + 6, y - 30, 22); }
+  // 진열(오른쪽 진열장)
+  const st = g.shops[shopId].stock, open = g.shopGoods(shopId), cap = g.shopCap(shopId);
+  const dx0 = x + w / 2 + 12;
+  ctx.fillStyle = '#5b4636'; ctx.fillRect(dx0, y + 4, 44 * open.length + 8, 6);
+  open.forEach((gd, i) => { const gx = dx0 + 26 + i * 44, gy = y - 2; ctx.fillStyle = 'rgba(255,255,255,0.75)'; rrect(ctx, gx - 19, gy - 34, 38, 34, 6); emoji(ctx, gx, gy - 18, CFG.goods[gd].emoji, 20); pill(ctx, gx, gy + 6, `${st[gd]}`, st[gd] >= cap ? '#c0392b' : st[gd] ? 'rgba(20,30,45,0.7)' : 'rgba(120,60,60,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); });
+  ctx.fillStyle = '#f5e6c8'; rrect(ctx, x - 70, y - h + 34, 140, 26, 5); ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x - 70, y - h + 34, 140, 26, 5); ctx.stroke();
+  ctx.fillStyle = PAL.ink; ctx.font = 'bold 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${isRest ? '🍲' : '🧵'} ${TIERS[shopId][tier].name} Lv${lvl}`, x, y - h + 47);
+  const mats = sh.accepts.map(m => `${CFG.goods[m].emoji} ${st[m]}`).join(' ');
+  pill(ctx, x, y - h + 6, `재료 ${mats} / ${sh.matCap}`, sh.accepts.some(m => st[m] >= sh.matCap) ? '#c0392b' : sh.accepts.every(m => st[m] === 0) ? 'rgba(120,60,60,0.75)' : 'rgba(20,30,45,0.75)');
+  drawSign(ctx, x + w / 2 + 22 * open.length + 40, y + 70, isRest ? '식당 메뉴' : '옷 가게', `${open.map(gd => CFG.goods[gd].emoji + '$' + fmtMoney(g.price(gd))).join(' ')}`);
+  ctx.restore();
+}
+function drawInn(ctx, g, time) {
+  if (!g.shopOpen('inn')) return;
+  const sh = CFG.shops.inn, x = sh.x, y = sh.y, w = sh.w, floors = 1 + Math.min(2, Math.floor((g.lv.inn - 1) / 4)), h = 60 + floors * 34;
+  ctx.save(); const sc = popScale(g, 'inn'); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
+  shadow(ctx, x, y + 30, w / 2 + 6, 14);
+  ctx.fillStyle = '#e3d5c0'; ctx.fillRect(x - w / 2, y - h + 30, w, h);
+  ctx.fillStyle = '#8b5a2b'; for (let f = 0; f < floors; f++) ctx.fillRect(x - w / 2, y - h + 30 + f * 34 + 30, w, 3);
+  ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x - w / 2 - 8, y - h + 22, w + 16, 10); ctx.fillStyle = PAL.treeTop; ctx.fillRect(x - w / 2 - 8, y - h + 16, w + 16, 7);
+  for (let f = 0; f < floors; f++) for (let i = 0; i < 4; i++) { const occupied = f * 4 + i < g.inn.guests.length; ctx.fillStyle = occupied ? '#ffd27d' : '#9ad0ff'; rrect(ctx, x - w / 2 + 14 + i * 38, y - h + 40 + f * 34, 24, 18, 3); }
+  ctx.fillStyle = '#4a2d12'; rrect(ctx, x - 16, y - 2, 32, 32, 4);
+  ctx.fillStyle = '#f5e6c8'; rrect(ctx, x - 60, y - h - 2, 120, 24, 5); ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x - 60, y - h - 2, 120, 24, 5); ctx.stroke();
+  ctx.fillStyle = PAL.ink; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🏨 여관 · 객실 ${g.inn.guests.length}/${g.lv.inn}`, x, y - h + 10);
+  pill(ctx, x, y + 44, `숙박비 $${g.rent} · ${CFG.shops.inn.stay}초 투숙`, 'rgba(20,30,45,0.75)');
+  ctx.restore();
+}
+function drawDock(ctx, g, time) {
+  const D = CFG.ship.dock, R = CFG.river;
+  ctx.fillStyle = PAL.woodDark; ctx.fillRect(D.x - 18, R.y + R.h - 30, 36, D.y - R.y - R.h + 20);
+  ctx.fillStyle = PAL.wood; ctx.fillRect(D.x - 16, R.y + R.h - 32, 32, D.y - R.y - R.h + 20);
+  ctx.fillStyle = PAL.woodDark; for (let yy = R.y + R.h - 26; yy < D.y - 14; yy += 10) ctx.fillRect(D.x - 16, yy, 32, 1.5);
+  ctx.fillStyle = '#5b4636'; ctx.fillRect(D.x - 22, D.y - 40, 6, 36); ctx.fillRect(D.x + 16, D.y - 40, 6, 36);
+  label(ctx, D.x, D.y - 52, '🚢 무역 부두', 12, '#fff');
+  const sp = g.ship;
+  if (sp.state === 'docked') { const parts = Object.keys(sp.demand || {}).map(k => `${CFG.goods[k].emoji}${sp.demand[k]}`).join(' '); pill(ctx, D.x, D.y - 70, sp.done ? '계약 완료 · 출항 대기' : `매입 희망 ${parts} · ${Math.ceil(sp.t)}초`, sp.done ? 'rgba(20,30,45,0.75)' : '#c0392b'); }
+  else pill(ctx, D.x, D.y - 70, `다음 입항 ${Math.ceil(sp.t)}초`, 'rgba(20,30,45,0.75)');
+}
+function drawShip(ctx, g, time) {
+  const B = CFG.ship.berth, sp = g.ship, S = CFG.ship;
+  let x = B.x;
+  if (sp.state === 'away') { const k = 1 - sp.t / S.every; x = k < 0.5 ? B.x + 300 + k * 2 * 1700 : -400 + (k - 0.5) * 2 * (B.x + 400) ; if (sp.t > S.every - 1) x = B.x; }
+  else if (sp.t > S.stay - 1.5) x = B.x + (S.stay - sp.t) / 1.5 * 0 ;
+  const y = B.y + Math.sin(time * 1.5) * 2;
+  if (x < -300 || x > CFG.world.w + 300) return;
+  ctx.fillStyle = 'rgba(20,40,70,0.25)'; ellipse(ctx, x, y + 22, 80, 10);
+  ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.moveTo(x - 80, y); ctx.lineTo(x + 70, y); ctx.lineTo(x + 90, y - 22); ctx.lineTo(x - 90, y - 22); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#8b5a2b'; ctx.fillRect(x - 80, y - 20, 150, 6);
+  ctx.fillStyle = '#d9c7a8'; rrect(ctx, x - 30, y - 50, 60, 28, 4); ctx.fillStyle = '#4a2d12'; rrect(ctx, x - 22, y - 44, 10, 10, 2); rrect(ctx, x + 12, y - 44, 10, 10, 2);
+  ctx.fillStyle = PAL.woodDark; ctx.fillRect(x - 2, y - 120, 4, 100);
+  ctx.fillStyle = '#f5f0e6'; ctx.beginPath(); ctx.moveTo(x + 2, y - 116); ctx.lineTo(x + 60 + Math.sin(time * 3) * 3, y - 80); ctx.lineTo(x + 2, y - 50); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e74c3c'; tri(ctx, x - 2, y - 122, x - 20, y - 116, x - 2, y - 110);
+  if (sp.state === 'docked') { for (let i = 0; i < 3; i++) { ctx.fillStyle = '#b8862e'; rrect(ctx, x - 70 + i * 26, y - 40, 22, 18, 3); ctx.fillStyle = '#8b5a2b'; ctx.fillRect(x - 70 + i * 26, y - 32, 22, 2); } }
 }
 
 function drawDropZone(ctx, g, id, time) {
   const sh = CFG.shops[id], d = sh.drop;
-  const accepts = g.shopAccepts(id).map(gd => CFG.goods[gd].emoji).join('');
+  const acc = g.shopAccepts(id), accepts = (id === 'mart' ? ['wood', 'meat', 'fish', 'pelt'].concat(g.martCategories().map(c => c === 'furn' ? 'chair' : c === 'rest' ? 'stew' : 'coat')) : acc).map(gd => CFG.goods[gd].emoji).join('');
   ctx.save(); ctx.translate(d.x, d.y); ctx.scale(1, 0.72);
   ctx.fillStyle = 'rgba(46,204,113,0.22)'; circle(ctx, 0, 0, d.r);
   ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 4; ctx.setLineDash([14, 10]); ctx.lineDashOffset = -time * 30;
@@ -740,9 +824,10 @@ function drawFishingLine(ctx, e, time) {
 }
 
 function drawPad(ctx, g, u, time) {
-  const x = u.pad.x, y = u.pad.y, r = CFG.pad.r;
-  const cost = g.padCost(u), paid = g.paid[u.id] || 0, k = paid / cost;
-  const active = g.activePad === u.id, afford = g.money + paid >= cost - 1e-6;
+  const pp = g.padPos(u), x = pp.x, y = pp.y, r = CFG.pad.r;
+  const cost = g.padCost(u), paid = g.paid[u.id] || 0, k = cost > 0 ? paid / cost : 0;
+  const needsOk = g.hasNeeds(u);
+  const active = g.activePad === u.id, afford = cost <= 0 || (needsOk && g.money + paid >= cost - 1e-6);
   ctx.save(); ctx.translate(x, y); ctx.scale(1, 0.74);
   ctx.fillStyle = active ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.55)'; circle(ctx, 0, 0, r);
   ctx.strokeStyle = afford ? '#27ae60' : 'rgba(60,90,130,0.45)'; ctx.lineWidth = active ? 5 : 3;
@@ -751,7 +836,7 @@ function drawPad(ctx, g, u, time) {
   if (afford) { ctx.strokeStyle = `rgba(39,174,96,${0.35 + Math.sin(time * 5) * 0.25})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, r + 8, 0, Math.PI * 2); ctx.stroke(); }
   ctx.restore();
   emoji(ctx, x, y - 4, u.icon, 24);
-  pill(ctx, x, y + 20, '$' + fmtMoney(Math.ceil(cost - paid)), afford ? '#27ae60' : '#34495e', '#fff', 'bold 11px system-ui, sans-serif');
+  pill(ctx, x, y + 20, cost <= 0 ? '밟으면 계약' : !needsOk ? Object.keys(u.needs).map(k => `${CFG.goods[k].emoji}${u.needs[k]}`).join(' ') + ' 필요' : '$' + fmtMoney(Math.ceil(cost - paid)), afford ? '#27ae60' : !needsOk ? '#c0392b' : '#34495e', '#fff', 'bold 11px system-ui, sans-serif');
   const lv = g.lv[u.id];
   label(ctx, x, y - 46, u.name + (u.max !== 1 && u.id !== 'repair' && lv > 0 ? ` Lv${lv}` : ''), 11, '#fff');
   if (active) { ctx.font = 'bold 10px system-ui, sans-serif'; const w = Math.min(260, ctx.measureText(u.desc).width + 16); ctx.fillStyle = 'rgba(20,30,45,0.85)'; rrect(ctx, x - w / 2, y - 76, w, 18, 6); ctx.fillStyle = '#ffe08a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(u.desc.length > 44 ? u.desc.slice(0, 43) + '…' : u.desc, x, y - 67); }
@@ -798,7 +883,7 @@ function drawMinimap(ctx, g, cam, ui) {
   const R = (r, c) => { ctx.fillStyle = c; ctx.fillRect(x0 + r.x * k, y0 + r.y * k, r.w * k, r.h * k); };
   R(CFG.river, PAL.water); R(CFG.forest.rect, '#9ad8ac'); R(CFG.hunt.rect, '#d3c3a8'); R(CFG.wild.rect, '#c9cfd6'); R(CFG.camp, '#c9a47a'); if (g.lv.ranch) R(CFG.ranch.rect, '#cfd6b8');
   const dot = (x, y, c, r) => { ctx.fillStyle = c; circle(ctx, x0 + x * k, y0 + y * k, r); };
-  for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id)) dot(CFG.shops[id].x, CFG.shops[id].y, id === 'mart' ? '#e74c3c' : id === 'furn' ? '#d35400' : id === 'meat' ? '#c0392b' : id === 'fish' ? '#2980b9' : id === 'pelt' ? '#6d4c41' : id === 'slaughter' ? '#7b2d26' : '#8b5a2b', 3);
+  for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id)) dot(CFG.shops[id].x, CFG.shops[id].y, id === 'mart' ? '#e74c3c' : id === 'furn' ? '#d35400' : id === 'meat' ? '#c0392b' : id === 'fish' ? '#2980b9' : id === 'pelt' ? '#6d4c41' : id === 'slaughter' ? '#7b2d26' : id === 'rest' ? '#e67e22' : id === 'tailor' ? '#8e44ad' : id === 'inn' ? '#f1c40f' : '#8b5a2b', 3);
   for (const b of g.wild) dot(b.x, b.y, '#a67c52', 2);
   for (const b of g.bears) dot(b.x, b.y, '#e74c3c', b.type === 'yeti' ? 4 : 2.5);
   for (const c of g.customers) dot(c.x, c.y, '#3b82c4', 1.2);
@@ -821,9 +906,9 @@ function render(ctx, g, cam, time, dtv, js, ui) {
 
   drawGround(ctx, g, view, time);
   // 바닥에 붙은 것들
-  for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id) && vis(CFG.shops[id].drop.x, CFG.shops[id].drop.y, 80)) drawDropZone(ctx, g, id, time);
+  for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id) && g.shopAccepts(id).length && CFG.shops[id].drop.r > 0 && vis(CFG.shops[id].drop.x, CFG.shops[id].drop.y, 80)) drawDropZone(ctx, g, id, time);
   if (g.lv.tower && g.bears.length) { ctx.strokeStyle = 'rgba(231,76,60,0.25)'; ctx.lineWidth = 2; ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.ellipse(CFG.tower.x, CFG.tower.y, g.towerRange, g.towerRange * 0.74, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
-  for (const u of UPG) if (g.padVisible(u) && vis(u.pad.x, u.pad.y, 90)) drawPad(ctx, g, u, time);
+  for (const u of UPG) { const pp = g.padPos(u); if (g.padVisible(u) && vis(pp.x, pp.y, 90)) drawPad(ctx, g, u, time); }
   for (const b of g.bills) if (b.state === 'ground' && b.z <= 0.5 && vis(b.x, b.y, 30)) drawBill(ctx, b);
   for (const d of g.drops) if (d.state === 'ground' && d.z <= 0.5 && vis(d.x, d.y, 30)) drawDrop(ctx, d);
   if (ui.autoTarget && !ui.autoTarget.dead) { const t = ui.autoTarget; ctx.strokeStyle = 'rgba(255,209,102,0.9)'; ctx.lineWidth = 3; ctx.setLineDash([6, 6]); ctx.lineDashOffset = -time * 40; ctx.beginPath(); ctx.ellipse(t.x, t.y + 2, 34, 14, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
@@ -843,14 +928,18 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   for (const d of GROUND.dead) if (vis(d.x, d.y, 60)) items.push({ y: d.y, f: () => drawDeadTree(ctx, d, time) });
   items.push({ y: CFG.hunt.rect.y + CFG.hunt.rect.h - 40, f: () => drawCave(ctx) });
   for (const sp of CFG.fishing.spots) if (vis(sp.x, sp.y, 60)) items.push({ y: sp.y, f: () => drawFishingSpot(ctx, sp) });
-  items.push({ y: CFG.shops.wood.y + 10, f: () => drawWoodStall(ctx, g, time) });
-  if (g.lv.butcher) items.push({ y: CFG.shops.meat.y + 10, f: () => drawMeatShop(ctx, g, time) });
-  if (g.lv.fishShop) items.push({ y: CFG.shops.fish.y + 10, f: () => drawFishShop(ctx, g, time) });
-  if (g.lv.furShop) items.push({ y: CFG.shops.pelt.y + 10, f: () => drawFurShop(ctx, g, time) });
+  if (g.shopOpen('wood')) items.push({ y: CFG.shops.wood.y + 10, f: () => drawWoodStall(ctx, g, time) });
+  if (g.shopOpen('meat')) items.push({ y: CFG.shops.meat.y + 10, f: () => drawMeatShop(ctx, g, time) });
+  if (g.shopOpen('fish')) items.push({ y: CFG.shops.fish.y + 10, f: () => drawFishShop(ctx, g, time) });
+  if (g.shopOpen('pelt')) items.push({ y: CFG.shops.pelt.y + 10, f: () => drawFurShop(ctx, g, time) });
+  items.push({ y: CFG.shops.rest.y + 30, f: () => drawCraftHouse(ctx, g, 'rest', time) });
+  items.push({ y: CFG.shops.tailor.y + 30, f: () => drawCraftHouse(ctx, g, 'tailor', time) });
+  items.push({ y: CFG.shops.inn.y + 30, f: () => drawInn(ctx, g, time) });
+  if (g.lv.mart) { items.push({ y: CFG.ship.dock.y + 10, f: () => drawDock(ctx, g, time) }); items.push({ y: CFG.ship.berth.y + 60, f: () => drawShip(ctx, g, time) }); }
   items.push({ y: CFG.shops.slaughter.y + 24, f: () => drawSlaughterhouse(ctx, g, time) });
   items.push({ y: CFG.shops.mart.y + 40, f: () => drawMart(ctx, g, time) });
   items.push({ y: CFG.shops.furn.y + 30, f: () => drawWorkshop(ctx, g, time) });
-  if (g.lv.workshop) CFG.shops.furn.benches.forEach((b, i) => items.push({ y: b.y + 8, f: () => drawBench(ctx, g, b, g.craftsmen[i] || (g.player.crafting && g.nearestBench(g.player.x, g.player.y) === b ? g.player : null), time) }));
+  for (const shopId of ['furn', 'rest', 'tailor']) if (g.shopOpen(shopId)) CFG.shops[shopId].benches.forEach((b, i) => items.push({ y: b.y + 8, f: () => { const nb = g.player.crafting ? g.nearestBench(g.player.x, g.player.y) : null; drawBench(ctx, g, b, g.crafters[shopId][i] || (nb && nb.bench === b ? g.player : null), time, shopId); } }));
   drawRanch(ctx, g, items, vis, time);
   items.push({ y: CFG.hut.y + 26, f: () => drawHut(ctx, g, time) });
   items.push({ y: TOWNHALL.y + 30, f: () => drawTownhall(ctx, g, time) });
@@ -859,15 +948,17 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   items.push({ y: CFG.hut.y + 80, f: () => drawCampfire(ctx, time) });
   items.push({ y: CFG.tower.y, f: () => drawTower(ctx, g, time) });
   // 계산원(열린 가게마다)
-  if (g.lv.cashier) for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id)) { const c = CFG.shops[id].cashier; items.push({ y: c.y, f: () => drawPerson(ctx, { x: c.x, y: c.y, facing: 1, moving: false, anim: 0, swing: 0, down: 0, flash: 0 }, { coat: '#8e44ad', hat: '#f1c40f', pom: '#fff' }, g) }); }
+  if (g.lv.cashier) for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id) && CFG.shops[id].goods.length) { const c = CFG.shops[id].cashier; items.push({ y: c.y, f: () => drawPerson(ctx, { x: c.x, y: c.y, facing: 1, moving: false, anim: 0, swing: 0, down: 0, flash: 0 }, { coat: '#8e44ad', hat: '#f1c40f', pom: '#fff' }, g) }); }
   const p = g.player;
   items.push({ y: p.y, f: () => {
     const sc = popScale(g, 'player');
-    drawPerson(ctx, p, { coat: '#e8d9b8', pants: '#4a3b2a', hood: '#c9b48e', beard: '#f4f4f4', tool: p.fishing ? 'rod' : p.crafting ? 'hammer' : 'axe', belt: '#7a5230', bag: g.lv.bag ? '#7a5230' : null, bagSize: Math.min(g.lv.bag, 6), showInv: true, scale: sc }, g);
+    drawPerson(ctx, p, { coat: '#e8d9b8', pants: '#4a3b2a', hood: '#c9b48e', beard: '#f4f4f4', tool: p.fishing ? 'rod' : p.crafting ? (p.craftShop === 'tailor' ? null : 'hammer') : 'axe', belt: '#7a5230', bag: g.lv.bag ? '#7a5230' : null, bagSize: Math.min(g.lv.bag, 6), showInv: true, scale: sc }, g);
     if (p.fishing) { drawFishingLine(ctx, p, time); bar(ctx, p.x - 18, p.y - 76, 36, 4, p.fishT / g.fishTime, '#5aa9e6'); }
     if (p.tree && p.chopT > 0) bar(ctx, p.x - 18, p.y - 76, 36, 4, p.chopT / (CFG.player.chopTime * g.chopMul), '#f1c40f');
     if (p.harvesting) label(ctx, p.x, p.y - 96, '🦌 데려오는 중…', 11, '#fff');
     if (p.slaughtering) label(ctx, p.x, p.y - 96, '🔪 도축 중…', 11, '#fff');
+    if (p.crafting && p.craftShop === 'rest') label(ctx, p.x, p.y - 96, '🍳 요리 중…', 11, '#fff');
+    if (p.crafting && p.craftShop === 'tailor') label(ctx, p.x, p.y - 96, '🧵 재봉 중…', 11, '#fff');
     if (p.hp < p.maxhp) bar(ctx, p.x - 20, p.y - 70, 40, 5, p.hp / p.maxhp, p.hp / p.maxhp < 0.35 ? '#e74c3c' : '#2ecc71');
     if (p.down > 0) label(ctx, p.x, p.y - 60, `😵 ${Math.ceil(p.down)}`, 14, '#fff');
   } });
@@ -879,7 +970,8 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   for (const fs of g.fishers) if (vis(fs.x, fs.y, 80)) items.push({ y: fs.y, f: () => { drawPerson(ctx, fs, { coat: '#f1c40f', pants: '#2b3a55', cap: '#e67e22', tool: 'rod' }, g); if (fs.fishing) { drawFishingLine(ctx, fs, time); bar(ctx, fs.x - 18, fs.y - 76, 36, 4, fs.fishT / (g.fishTime * CFG.fishing.fisherMul), '#5aa9e6'); } } });
   for (const cl of g.collectors) if (vis(cl.x, cl.y, 80)) items.push({ y: cl.y, f: () => { drawPerson(ctx, cl, { coat: '#7f8c8d', pants: '#2b3a55', cap: '#27ae60', bag: '#b8962e', bagSize: 4 }, g); } });
   for (const sm of g.slaughtermen) if (vis(sm.x, sm.y, 80)) items.push({ y: sm.y, f: () => drawPerson(ctx, sm, { coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', cap: '#7b2d26', tool: 'hammer' }, g) });
-  for (const cm of g.craftsmen) if (vis(cm.x, cm.y, 80)) items.push({ y: cm.y, f: () => drawPerson(ctx, cm, { coat: '#5d6d7e', pants: '#2b3a55', apron: '#8b5a2b', cap: '#c0392b', tool: 'hammer' }, g) });
+  const crafterLook = { furn: { coat: '#5d6d7e', pants: '#2b3a55', apron: '#8b5a2b', cap: '#c0392b', tool: 'hammer' }, rest: { coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', hat: '#fff', pom: '#fff', tool: 'hammer' }, tailor: { coat: '#8e44ad', pants: '#2b3a55', apron: '#f5e6c8', cap: '#5e3b73', tool: null } };
+  for (const shopId of ['furn', 'rest', 'tailor']) for (const cm of g.crafters[shopId]) if (vis(cm.x, cm.y, 80)) items.push({ y: cm.y, f: () => drawPerson(ctx, cm, crafterLook[shopId], g) });
   for (const c of g.customers) if (vis(c.x, c.y, 90)) items.push({ y: c.y, f: () => {
     if (c.big) { drawSled(ctx, c); drawPerson(ctx, c, { coat: c.coat, pants: '#3b2a1a', hat: '#8b1e1e', pom: '#fff', beard: '#d9c7a8' }, g); }
     else drawPerson(ctx, c, { coat: c.coat, pants: '#2b3a55', hat: '#1f4e79', pom: '#fff' }, g);
@@ -888,7 +980,7 @@ function render(ctx, g, cam, time, dtv, js, ui) {
       const wantText = Object.keys(c.want).map(gd => `${CFG.goods[gd].emoji}×${c.want[gd]}`).join(' ');
       drawBubble(ctx, c.x, c.y - 92, ok || c.serveT > 0 ? `${c.big ? '🛷 ' : ''}${wantText}${c.big ? ' (1.5배)' : ''}` : (c.patience < 12 ? '😠' : `… ${wantText}`));
     } else if (c.state === 'leave' && c.got) {
-      const items2 = Object.keys(c.got).map(gd => CFG.goods[gd].emoji + (c.got[gd] > 1 ? c.got[gd] : '')).join(' ');
+      const items2 = Object.keys(c.got).map(gd => gd === 'room' ? '🛎️' : CFG.goods[gd].emoji + (c.got[gd] > 1 ? c.got[gd] : '')).join(' ');
       emoji(ctx, c.x, c.y - 84, items2, 14); if (c.mood > 0) drawBubble(ctx, c.x, c.y - 100, '😊');
     }
   } });
@@ -904,8 +996,8 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   for (const c of g.chips) { ctx.fillStyle = PAL.grain; ctx.fillRect(c.x - 2.5, c.y - 2.5, 5, 5); }
   for (const s of g.sparks) { const k = s.t / s.life; ctx.globalAlpha = 1 - k; ctx.fillStyle = s.color; ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(k * 6); ctx.fillRect(-s.s, -s.s, s.s * 2, s.s * 2); ctx.restore(); ctx.globalAlpha = 1; }
   if (g.activePad && g.padFlow > 0) {
-    const u = UPG.find(u => u.id === g.activePad);
-    for (let i = 0; i < 3; i++) { const k = (time * 2.2 + i / 3) % 1; const bx = lerp(p.x, u.pad.x, k), by = lerp(p.y - 40, u.pad.y, k) - Math.sin(k * Math.PI) * 30; drawBill(ctx, { x: bx, y: by, z: 0, rot: k * 6, state: 'fly' }); }
+    const u = UPG.find(u => u.id === g.activePad), pp = g.padPos(u);
+    for (let i = 0; i < 3; i++) { const k = (time * 2.2 + i / 3) % 1; const bx = lerp(p.x, pp.x, k), by = lerp(p.y - 40, pp.y, k) - Math.sin(k * Math.PI) * 30; drawBill(ctx, { x: bx, y: by, z: 0, rot: k * 6, state: 'fly' }); }
   }
   for (const t of g.texts) { const k = t.t / t.life; ctx.globalAlpha = 1 - k * k; label(ctx, t.x, t.y, t.text, 14, t.color); ctx.globalAlpha = 1; }
   // 안내 화살표
