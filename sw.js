@@ -1,5 +1,5 @@
 // 오프라인 캐시. 파일을 바꾸면 CACHE 이름의 버전을 올린다.
-const CACHE = 'fitlog-v2';
+const CACHE = 'fitlog-v3';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './css/app.css',
@@ -10,7 +10,7 @@ const ASSETS = [
   './icons/icon-192.png', './icons/icon-512.png',
   // 눈보라 벌목장 (game/)
   './game/', './game/index.html', './game/manifest.webmanifest', './game/game.css',
-  './game/config.js', './game/audio.js', './game/sim.js', './game/render.js', './game/main.js',
+  './game/config.js', './game/audio.js', './game/sprites.js', './game/sim.js', './game/render.js', './game/main.js', './game/assets/sprites.json',
   './game/icons/icon-192.png', './game/icons/icon-512.png', './game/icons/apple-touch-icon.png',
 ];
 

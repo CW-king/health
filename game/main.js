@@ -296,5 +296,6 @@
   if ('serviceWorker' in navigator && location.protocol !== 'file:' && !location.hostname.endsWith('claude.ai')) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
   }
+  if (typeof Sprites !== 'undefined') Sprites.load('./assets/sprites.json');
   window.__game = game; // 디버깅/테스트용
 })();
