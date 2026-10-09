@@ -96,14 +96,14 @@ const CFG = {
   hunt: { rect: { x: 1450, y: 250, w: 500, h: 370 }, max: 3, maxPerHunter: 1, respawn: 10, firstAt: 45,
           hp: 25, hpGrowth: 1.06, speed: 35, fleeSpeed: 95, meat: 1, pelt: 2, bountyMul: 0.5,
           hunterDmg: 6, hunterCd: 0.8, hunterRange: 52, hunterCarry: 4, pickup: 46,
-          post: { x: 1520, y: 580 }, collectorPost: { x: 1600, y: 640 }, collectorPostSouth: { x: 640, y: 1700 },   // 수거꾼 초소: 사냥터 입구 + 캠프 옆
+          post: { x: 1520, y: 580 }, collectorPost: { x: 1600, y: 640 }, collectorPostSouth: { x: 615, y: 1790 },   // 수거꾼 초소: 사냥터 입구 + 캠프 옆
           collectorCarry: 6, collectorPickup: 44, sledCarry: 4, sledPickup: 12, sledSpeed: 0.12, baitPer: 1,
           // 전리품 구역(캠프·황무지): 이 안의 드랍은 거리 가중치 zoneMul, 모피는 peltMul, 오래된 드랍은 agePer px/초만큼 먼저 줍는다
           loot: { rect: { x: 0, y: 1300, w: 900, h: 1300 }, zoneMul: 0.5, peltMul: 0.7, agePer: 8, ageMax: 60, sweepRange: 650 } },   // 야생 곰 사냥터(오른쪽 위)
   drops: { max: 150 },                                            // 바닥 드랍 상한(넘으면 전리품 구역 밖의 오래된 것부터 치운다)
   // 양식장: 강 왼쪽 가두리. growTime초 자라면 양식업자가 건져 yield마리를 나른다
   fishFarm: { pens: [{ x: 300, y: 95 }, { x: 390, y: 95 }, { x: 480, y: 95 }, { x: 570, y: 95 }, { x: 660, y: 95 }, { x: 750, y: 95 }],
-              growTime: 40, yield: 6, harvestTime: 1.5, bankY: 174, post: { x: 400, y: 186 }, carry: 6 },
+              growTime: 40, yield: 6, harvestTime: 1.5, bankY: 174, post: { x: 400, y: 186 }, carry: 12 },
   wild: { rect: { x: 20, y: 2020, w: 880, h: 560 } },            // 남쪽 황무지: 습격은 여기서 온다
   // 목장: 순록을 길러 출하한다. 레벨마다 perLevel마리, growTime초 자라면 출하 가능
   ranch: { rect: { x: 1500, y: 1450, w: 400, h: 350 }, barn: { x: 1600, y: 1530 }, perLevel: 2, growTime: 60, meat: 4, harvestTime: 1.0, range: 48,
@@ -167,7 +167,7 @@ const UPG = [
     cost: () => 400,                                pad: { x: 1780, y: 800 }, unlock: g => g.lv.mart < 1 && (g.stats.kills >= 1 || g.lv.hunter >= 1) },
   { id: 'hunter', icon: '🏹', name: '사냥꾼 고용', desc: '사냥터의 곰을 잡아 모피를 나릅니다', max: 6,
     cost: l => [300, 700, 1500, 3200, 6500, 13000][l], pad: { x: 1480, y: 680 }, unlock: g => g.lv.furShop >= 1 },
-  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '바닥의 고기·모피와 습격 전리품을 맵 전체에서 주워 가게에 나릅니다. 레벨마다 모든 수거꾼 운반 +2·이동 +8%, 2명째부터 캠프 옆 초소에도 대기', max: 5,
+  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 고기·모피·습격 전리품을 주워 가게에 나릅니다', max: 5,
     cost: l => [350, 900, 2200, 5000, 11000][l],   pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
   { id: 'sled',   icon: '🛷', name: '수거 썰매',   desc: '수거꾼 운반량 +4(종류당), 줍는 반경 +12, 이동 속도 +12%. 썰매를 끌고 다닙니다', max: 3,
     cost: l => [700, 1800, 4500][l],               pad: { x: 1340, y: 700 }, unlock: g => g.lv.collector >= 1 },
@@ -198,7 +198,7 @@ const UPG = [
   { id: 'slaughterman', icon: '🧑‍🍳', name: '도축업자 고용', desc: '순록을 고기로 만들고 정육점에 나릅니다', max: 3,
     cost: l => [500, 1200, 3000][l],               pad: { x: 1160, y: 1700 }, unlock: g => g.lv.slaughter >= 1 },
   { id: 'tanning', icon: '🧶', name: '무두질',     desc: '도축한 순록 한 마리당 🧥 모피 +1. 도축업자가 모피 상점·마트·재단소로 나릅니다', max: 3,
-    cost: l => [1800, 6000, 20000][l],             pad: { x: 1300, y: 1660 }, unlock: g => g.lv.slaughter >= 1 && g.lv.slaughterman >= 1 && (g.lv.furShop >= 1 || g.lv.mart >= 1) },
+    cost: l => [1800, 4500, 10000][l],             pad: { x: 1300, y: 1660 }, unlock: g => g.lv.slaughter >= 1 && g.lv.slaughterman >= 1 && (g.lv.furShop >= 1 || g.lv.mart >= 1) },
 
   // ---- 강 · 낚시 ----
   { id: 'fishShop', icon: '🐟', name: '어물전 열기', desc: '강에서 잡은 생선을 파는 가게', max: 1,
@@ -210,11 +210,11 @@ const UPG = [
   { id: 'fishPrice', icon: '🍣', name: '생선 가격', desc: '생선 판매가 +12%',          max: Infinity,
     cost: l => Math.round(220 * Math.pow(1.4, l)),  pad: { x: 1200, y: 300 }, martPad: { x: 1140, y: 2350 }, unlock: g => g.lv.fishShop >= 1 },
   { id: 'fishFarm', icon: '🐠', name: '양식장',   desc: '강에 가두리 +1. 물고기가 다 자라면 양식업자가 그물로 건져 나릅니다', max: 6,
-    cost: l => [1500, 2500, 4000, 6500, 10000, 16000][l], pad: { x: 480, y: 230 }, unlock: g => g.lv.restaurant >= 1 && g.lv.fisher >= 2 && g.lv.rod >= 3 },
+    cost: l => [1500, 2500, 4000, 5500, 7500, 10000][l], pad: { x: 860, y: 300 }, unlock: g => g.lv.restaurant >= 1 && g.lv.fisher >= 2 && g.lv.rod >= 3 },
   { id: 'fishFarmer', icon: '🥅', name: '양식업자 고용', desc: '다 자란 가두리를 건져 생선을 마트·식당에 나릅니다', max: 3,
-    cost: l => [600, 1500, 3500][l],               pad: { x: 300, y: 230 }, unlock: g => g.lv.fishFarm >= 1 },
+    cost: l => [600, 1500, 3500][l],               pad: { x: 860, y: 420 }, unlock: g => g.lv.fishFarm >= 1 },
   { id: 'fishFeed', icon: '🫧', name: '어분 사료', desc: '양식 성장 속도 +12%, 2레벨마다 가두리당 생선 +1', max: Infinity,
-    cost: l => Math.round(250 * Math.pow(1.4, l)),  pad: { x: 620, y: 220 }, unlock: g => g.lv.fishFarm >= 1 },
+    cost: l => Math.round(250 * Math.pow(1.4, l)),  pad: { x: 880, y: 560 }, unlock: g => g.lv.fishFarm >= 1 },
 
   // ---- 마트 ----
   { id: 'mart',   icon: '🏪', name: '마트',       desc: '1레벨: 건설(가게들이 마트로 합쳐지고 묶음 구매 ×1.3) · 이후: 재고 +40, 손님 +10%, 외형 확장', max: Infinity,
@@ -356,13 +356,13 @@ const HINTS = [
 const TIPS = [
   { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. 잡으면 🧥 모피! ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
   { id: 'pelt',    when: g => g.drops.some(d => d.kind === 'pelt'),  text: '🧥 모피가 떨어졌어요! 주워 두세요. 사냥터 옆 모피 상점을 열면 비싸게 팝니다' },
-  { id: 'collector', when: g => g.padVisible(UPG.find(u => u.id === 'collector')) && g.drops.length >= 4, text: '바닥에 고기·모피가 남아 있어요. 🧺 수거꾼(사냥터 입구)을 고용하면 맵 전체를 돌며 주워 가게에 나릅니다. 습격 때 떨어진 전리품도 가져옵니다' },
+  { id: 'collector', when: g => g.padVisible(UPG.find(u => u.id === 'collector')) && g.drops.length >= 4, text: '바닥에 고기·모피가 남아 있어요. 🧺 수거꾼(사냥터 입구)을 고용하면 맵 전체를 돌며 주워 가게에 나릅니다. 2명째부터는 캠프 옆 초소에서 습격 전리품을 기다립니다' },
   { id: 'sled',    when: g => g.lv.sled >= 1, text: '🛷 썰매 장착! 수거꾼이 한 번에 더 많이 싣고, 지나가며 넓게 줍고, 더 빨리 달립니다' },
   { id: 'skinning', when: g => g.padVisible(UPG.find(u => u.id === 'skinning')), text: '🗡️ 가죽 손질(사냥터 입구)을 배우면 곰 한 마리에서 모피를 더 벗깁니다. 습격 온 곰·늑대·설인도 마찬가지라 수거꾼이 가져올 전리품이 늘어요' },
   { id: 'bait',    when: g => g.padVisible(UPG.find(u => u.id === 'bait')), text: '덫을 놓아도 곰은 한 마리씩만 나오네요. 🐟 미끼(사냥터 안)를 두면 한 번에 여러 마리가 몰려와 사냥꾼이 바빠집니다' },
   { id: 'tanning', when: g => g.lv.tanning >= 1, text: '무두질 시작! 도축한 순록마다 🧥 모피가 나옵니다. 도축업자가 모피 상점·마트·재단소로 나르고, 고기 받기 칸에서 직접 받을 수도 있어요' },
   { id: 'grovepad', when: g => g.padVisible(UPG.find(u => u.id === 'grove')), text: '공방이 목재를 기다리나요? 🌲 남쪽 숲 개간(숲 아래쪽)을 하면 공방 가까이에 벌목지가 생겨 벌목꾼 동선이 짧아집니다' },
-  { id: 'fishfarmpad', when: g => g.padVisible(UPG.find(u => u.id === 'fishFarm')), text: '낚시만으로는 생선이 모자라나요? 🐠 양식장(강 왼쪽)을 열면 가두리에서 물고기를 키워 한 번에 여러 마리씩 건집니다' },
+  { id: 'fishfarmpad', when: g => g.padVisible(UPG.find(u => u.id === 'fishFarm')), text: '낚시만으로는 생선이 모자라나요? 🐠 양식장(낚싯대 원 옆)을 열면 강 왼쪽 가두리에서 물고기를 키워 한 번에 여러 마리씩 건집니다. 어분 사료와 양식업자 수만큼 늘어납니다' },
   { id: 'fishfarm', when: g => g.lv.fishFarm >= 1, text: '양식장 개업! 가두리가 다 자라면 🐟 수확 표시가 뜹니다. 강가에 서면 직접 건질 수 있고, 🥅 양식업자를 고용하면 자동으로 건져 나릅니다' },
   { id: 'furShop', when: g => g.lv.furShop >= 1, text: '모피 상점 개업! 모피는 상점 왼쪽 칸에 내려놓으세요. 🏹 사냥꾼을 고용하면 자동으로 사냥해 나릅니다' },
   { id: 'butcher', when: g => g.lv.butcher >= 1,                     text: '정육점 개업! 고기는 정육점 위쪽 칸에 내려놓으세요. 꾸준한 고기는 🦌 목장(정육점 아래)에서 나옵니다' },

@@ -455,6 +455,8 @@ class Game {
   // 날아오는 중인(이미 주운) 드랍 수. 가방 상한 계산에 넣어야 넘치지 않는다
   inflight(c, kind) { let n = 0; for (const d of this.drops) if (d.state === 'fly' && d.to === c && d.kind === kind) n++; return n; }
   release(c) { if (c.target && c.target.claim === c) c.target.claim = null; c.target = null; }
+  // 그 종류를 내려놓을 가게에 자리가 있나
+  roomFor(k) { const d = this.destFor(k); if (!d) return false; const cap = CRAFT_SHOPS.includes(d) ? CFG.shops[d].matCap : this.shopCap(d); return this.shops[d].stock[k] < cap; }
   // 수거 대상 고르기: 거리 점수가 가장 낮은 드랍. 전리품 구역(캠프·황무지) 안은 zoneMul, 모피는 peltMul 배로 가깝게 치고, 오래된 드랍은 agePer px/초만큼 우대
   // who가 고르면 예약(claim)해서 둘이 같은 드랍으로 달려가지 않는다. range 안, center가 있으면 그 둘레 sweepRange 안만 본다
   nearestAnyDrop(x, y, cap, inv, who, range, center) {
@@ -489,13 +491,14 @@ class Game {
       }
       const carriedKinds = ['meat', 'pelt'].filter(k => c.inv[k] > 0 && this.destFor(k));
       if (c.state === 'find') {
-        const carrying = carriedKinds.length > 0, full = carriedKinds.some(k => c.inv[k] >= cap);
+        const carrying = carriedKinds.length > 0, full = carriedKinds.some(k => c.inv[k] >= cap && this.roomFor(k));   // 가득 찬 종류를 실제로 내려놓을 수 있을 때만 배달 우선
         const campDuty = raid && !(c.i === 0 && this.collectors.length >= 2);   // 습격 경보 중엔 0번만 사냥터에 남고 나머지는 캠프 초소로
         const d = full ? null : this.nearestAnyDrop(c.x, c.y, cap, c.inv, c, carrying ? 700 : null, campDuty ? this.hut : null);
         if (d) { c.target = d; c.state = 'go'; }
-        else if (carrying && c.holdT <= 0) { c.dest = this.destFor(carriedKinds.sort((a, b) => c.inv[b] - c.inv[a])[0]); c.state = 'toShop'; }
+        else if (carrying && c.holdT <= 0) { const k = carriedKinds.sort((a, b) => c.inv[b] - c.inv[a]).find(k => this.roomFor(k)); if (k) { c.dest = this.destFor(k); c.state = 'toShop'; } else c.holdT = 3; }   // 자리 있는 가게부터
         else if (carrying) { /* 가게가 가득: 잠시 기다린다 */ }
-        else if (campDuty) { c.wait = 'raid'; moveToward(c, PS.x + Math.floor(c.i / 2) * 26 + (c.i % 2 ? 0 : 13), PS.y, speed, dt); }
+        else if (campDuty) { c.wait = 'raid'; const k = this.collectors.length >= 2 ? c.i - 1 : 0; moveToward(c, PS.x, PS.y + k * 26, speed, dt); }
+        else if (c.home === PS) moveToward(c, PS.x, PS.y + Math.floor(c.i / 2) * 26, speed, dt);
         else moveToward(c, c.home.x + Math.floor(c.i / 2) * 26, c.home.y, speed, dt);
       } else if (c.state === 'go') {
         const d = c.target;
@@ -509,7 +512,10 @@ class Game {
         if (!c.dest || !this.shopOpen(c.dest)) { c.state = 'find'; continue; }
         if (dist(c.x, c.y, CFG.shops[c.dest].drop.x, CFG.shops[c.dest].drop.y) > CFG.shops[c.dest].drop.r + 40) { c.state = 'toShop'; continue; }
         if (!this.deposit(c, c.dest, dt, CFG.worker.dropRate)) { c.dest = null; c.state = 'find'; }
-        else if (this.shopFull(c, c.dest)) { c.dest = null; c.state = 'find'; c.holdT = 3; }   // 가득 찼으면 3초 뒤 다시 시도(그동안 근처 드랍은 줍는다)
+        else if (this.shopFull(c, c.dest)) {   // 가득 찼으면 다른 종류를 받는 가게로, 없으면 3초 뒤 다시 시도(그동안 근처 드랍은 줍는다)
+          const alt = ['meat', 'pelt'].filter(k => c.inv[k] > 0 && this.roomFor(k)).sort((a, b) => c.inv[b] - c.inv[a])[0];
+          if (alt && this.destFor(alt) !== c.dest) { c.dest = this.destFor(alt); c.state = 'toShop'; } else { c.dest = null; c.state = 'find'; c.holdT = 3; }
+        }
       }
       if (c.moving) c.anim += dt * 11;
     }
@@ -525,14 +531,14 @@ class Game {
     const shop = this.shops.slaughter, cap = this.shopCap('slaughter');
     if (!e.proc) {
       if (shop.stock.animal <= 0) { e.procWait = 'animal'; return; }
-      if (shop.stock.meat + this.meatPerAnimal > cap || shop.stock.pelt + this.peltPerAnimal > cap) { e.procWait = 'full'; return; }
+      if (shop.stock.meat + this.meatPerAnimal > cap) { e.procWait = 'full'; return; }
       shop.stock.animal--; e.proc = { t: 0, need: this.slaughterTime * mul };
     }
     e.procWait = null;
     e.proc.t += dt;
     if (Math.floor(e.proc.t * 1.5) !== Math.floor((e.proc.t - dt) * 1.5)) { e.swing = 1; this.emit('chop', e.x, e.y); }
     if (e.proc.t >= e.proc.need) {
-      e.proc = null; shop.stock.meat += this.meatPerAnimal; shop.stock.pelt += this.peltPerAnimal; this.stats.slaughters++;
+      e.proc = null; shop.stock.meat += this.meatPerAnimal; shop.stock.pelt = Math.min(cap, shop.stock.pelt + this.peltPerAnimal); this.stats.slaughters++;   // 모피 보관함이 꽉 차도 도축은 멈추지 않는다
       this.text(e.x, e.y - 80, `🥩 +${this.meatPerAnimal}${this.peltPerAnimal ? ' 🧥 +' + this.peltPerAnimal : ''}`, '#ffb4b4', 1.1);
       this.emit('harvest', e.x, e.y);
     }
@@ -564,9 +570,11 @@ class Game {
         m.facing = -1;
         this.updateSlaughter(m, dt, 1.2 / this.effMul);
         // 고기가 쌓였거나(용량) 더 할 일이 없으면 정육점으로 나른다
-        if (shopId && (shop.stock.meat >= cap || shop.stock.pelt >= cap || (shop.stock.animal <= 0 && !m.proc && (shop.stock.meat > 0 || shop.stock.pelt > 0)))) {
+        // 모피는 받아 줄 자리(proom)가 있는 만큼만 싣고, 모피만 나르는 길은 한 짐을 다 받아 줄 때만 떠난다(가득 찬 가게와 왕복하지 않도록)
+        const pd = shop.stock.pelt > 0 ? this.destFor('pelt') : null, proom = pd ? (CRAFT_SHOPS.includes(pd) ? CFG.shops[pd].matCap : this.shopCap(pd)) - this.shops[pd].stock.pelt : 0;
+        if (shopId && (shop.stock.meat >= cap || (shop.stock.pelt >= cap && proom >= cap) || (shop.stock.animal <= 0 && !m.proc && (shop.stock.meat > 0 || (shop.stock.pelt > 0 && proom > 0))))) {
           const take = Math.min(cap, shop.stock.meat); shop.stock.meat -= take; m.inv.meat += take;
-          const tp = Math.min(cap, shop.stock.pelt); shop.stock.pelt -= tp; m.inv.pelt += tp;   // 무두질 모피도 함께 싣는다
+          const tp = Math.min(cap, shop.stock.pelt, Math.max(0, proom)); shop.stock.pelt -= tp; m.inv.pelt += tp;   // 무두질 모피도 함께 싣는다
           m.state = 'toShop'; m.dest = m.inv.meat > 0 ? this.destFor('meat') : this.destFor('pelt');
         }
       } else if (m.state === 'toShop') {
@@ -828,7 +836,7 @@ class Game {
         if (p.fishT >= this.fishTime) { p.fishT = 0; this.catchFish(p, spot.x, spot.y - 50); }
       } else if (pen && p.inv.fish < this.carryCap && !p.moving) {
         p.fishing = true; p.facing = 1; p.swing = Math.max(p.swing, 0.5); p.harvestPen = pen;
-        this.harvestPen(pen, p, dt);
+        this.harvestPen(pen, p, dt, this.carryCap);
       } else if (bench && !p.moving) {
         p.crafting = true; p.craftShop = bench.shop; p.facing = -1; this.updateCraft(p, dt, 1, bench.shop);
       } else if (animal && p.inv.animal < this.animalCap && !p.moving) {
@@ -930,7 +938,13 @@ class Game {
   }
   updateWild(dt) {
     this.wildT -= dt;
-    if (this.wildT <= 0 && this.wild.length < this.wildMax) { this.wildT = this.wildRespawn * rnd(0.8, 1.2); const n = Math.min(1 + CFG.hunt.baitPer * this.lv.bait, this.wildMax - this.wild.length); for (let i = 0; i < n; i++) this.spawnWild(); }   // 미끼: 한 번에 여러 마리
+    if (this.wildT <= 0 && this.wild.length < this.wildMax) {
+      this.wildT = this.wildRespawn * rnd(0.8, 1.2);
+      // 미끼: 한 번에 여러 마리. 단 모피 받는 곳이 거의 찼으면(80%) 미끼 효과를 쉬어 모피가 바닥에 썩지 않게 한다
+      const ps = this.destFor('pelt'), peltFull = ps && this.shops[ps].stock.pelt >= 0.8 * (CRAFT_SHOPS.includes(ps) ? CFG.shops[ps].matCap : this.shopCap(ps));
+      const n = Math.min(peltFull ? 1 : 1 + CFG.hunt.baitPer * this.lv.bait, this.wildMax - this.wild.length);
+      for (let i = 0; i < n; i++) this.spawnWild();
+    }
     const R = CFG.hunt.rect;
     for (const b of this.wild) {
       b.moving = false; b.flash = Math.max(0, b.flash - dt * 6); b.lunge = Math.max(0, b.lunge - dt * 3);
@@ -1025,17 +1039,20 @@ class Game {
     const i = this.fishFarmers.length, P = CFG.fishFarm.post;
     this.fishFarmers.push({ x: P.x + i * 28, y: P.y, inv: emptyInv(), state: 'find', target: null, dest: null, dropT: 0, swing: 0, facing: 1, moving: false, anim: 0, i });
   }
-  nearestReadyPen(x, y, range) {
+  nearestReadyPen(x, y, range, who) {
     let best = null, bd = range;
-    for (const p of this.pens) { if (p.grow < 1) continue; const d = dist(x, y, p.x, CFG.fishFarm.bankY); if (d < bd) { bd = d; best = p; } }
+    for (const p of this.pens) { if (p.grow < 1 || (who && p.claim && p.claim !== who)) continue; const d = dist(x, y, p.x, CFG.fishFarm.bankY); if (d < bd) { bd = d; best = p; } }
     return best;
   }
-  // 다 자란 가두리를 건진다. true면 수확 완료
-  harvestPen(pen, who, dt) {
+  // 다 자란 가두리를 건진다. 가방에 들어갈 만큼만 건지고 나머지는 가두리에 남는다. true면 한 번 건짐
+  harvestPen(pen, who, dt, cap) {
+    if (pen.left == null || pen.left <= 0) pen.left = this.fishPerPen;
+    const n = Math.min(pen.left, Math.max(0, cap - who.inv.fish));
+    if (n <= 0) return false;
     pen.harvestT += dt;
     if (pen.harvestT < CFG.fishFarm.harvestTime) return false;
-    pen.harvestT = 0; pen.grow = 0;
-    const n = this.fishPerPen; who.inv.fish += n; this.stats.farmed += n; this.stats.fish += n;
+    pen.harvestT = 0; pen.left -= n; if (pen.left <= 0) { pen.left = 0; pen.grow = 0; }
+    who.inv.fish += n; this.stats.farmed += n; this.stats.fish += n;
     this.text(pen.x, pen.y - 36, `🐟 +${n}`, '#9ad0ff', 1.1);
     for (let i = 0; i < 3; i++) this.splashes.push({ x: pen.x + rnd(-16, 16), y: pen.y + rnd(-8, 8), t: 0 });
     this.emit('harvest', pen.x, pen.y);
@@ -1051,14 +1068,14 @@ class Game {
       f.moving = false; f.swing = Math.max(0, f.swing - dt * 4);
       if (f.state === 'find') {
         if (f.inv.fish >= cap && shopId) { f.dest = shopId; f.state = 'toShop'; continue; }
-        const pen = shopId ? this.nearestReadyPen(f.x, f.y, Infinity) : null;
-        if (pen && f.inv.fish < cap) { f.target = pen; f.state = 'go'; }
+        const pen = shopId ? this.nearestReadyPen(f.x, f.y, Infinity, f) : null;
+        if (pen && f.inv.fish < cap) { pen.claim = f; f.target = pen; f.state = 'go'; }
         else if (f.inv.fish > 0 && shopId) { f.dest = shopId; f.state = 'toShop'; }
         else moveToward(f, F.post.x + f.i * 28, F.post.y, this.workerSpeed, dt);
       } else if (f.state === 'go') {
         const pen = f.target;
-        if (!pen || pen.grow < 1) { f.target = null; f.state = 'find'; continue; }
-        if (moveToward(f, pen.x, F.bankY, this.workerSpeed, dt)) { f.facing = 1; f.swing = 1; if (this.harvestPen(pen, f, dt * this.effMul)) { f.target = null; f.state = 'find'; } }
+        if (!pen || pen.grow < 1 || f.inv.fish >= cap) { if (pen && pen.claim === f) pen.claim = null; f.target = null; f.state = 'find'; continue; }
+        if (moveToward(f, pen.x, F.bankY, this.workerSpeed, dt)) { f.facing = 1; f.swing = 1; if (this.harvestPen(pen, f, dt * this.effMul, cap)) { if (pen.claim === f) pen.claim = null; f.target = null; f.state = 'find'; } }
       } else if (f.state === 'toShop') {
         if (!shopId) { f.state = 'find'; continue; }
         const dz = CFG.shops[shopId].drop, ang = (f.i / 3) * Math.PI * 2 + 3;
@@ -1366,7 +1383,7 @@ class Game {
     else if (id === 'rancher') { const r = this.ranchers[this.ranchers.length - 1]; if (r) this.sparkle(r.x, r.y - 40, 10, '#fff'); }
     else if (id === 'slaughter') { this.pops.slaughter = 1; this.sparkle(CFG.shops.slaughter.x, CFG.shops.slaughter.y - 50, 18, '#ffb4b4'); }
     else if (id === 'slaughterman') { const m = this.slaughtermen[this.slaughtermen.length - 1]; if (m) this.sparkle(m.x, m.y - 40, 10, '#fff'); }
-    else if (id === 'collector') { const c = this.collectors[this.collectors.length - 1]; if (c) this.sparkle(c.x, c.y - 40, 10, '#fff'); }
+    else if (id === 'collector') { const c = this.collectors[this.collectors.length - 1]; if (c) { this.sparkle(c.x, c.y - 40, 10, '#fff'); this.text(c.x, c.y - 70, `🧺 수거꾼 Lv${lv} — 모두 운반 +2·이동 +8%`, '#ffd166', 2); } }
     else if (id === 'furShop' || id === 'peltPrice') { this.pops.pelt = 1; this.sparkle(CFG.shops.pelt.x, CFG.shops.pelt.y - 40, 16, '#d9a86c'); }
     else if (id === 'restaurant' || id === 'dishPrice' || id === 'cook') { this.pops.rest = 1; this.sparkle(CFG.shops.rest.x, CFG.shops.rest.y - 50, 16, '#ffb347'); if (id === 'restaurant' && changed) { this.text(CFG.shops.rest.x, CFG.shops.rest.y - 140, `🍲 ${TIERS.rest[tierOf('rest', lv)].name}으로 확장!`, '#ffd166', 2.4); this.emit('tierUp'); } }
     else if (id === 'tailor' || id === 'clothPrice' || id === 'tailorman') { this.pops.tailor = 1; this.sparkle(CFG.shops.tailor.x, CFG.shops.tailor.y - 50, 16, '#d9a86c'); }

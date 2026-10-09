@@ -659,10 +659,11 @@ function drawDock(ctx, g, time) {
   if (sp.state === 'docked') { const parts = Object.keys(sp.demand || {}).map(k => `${CFG.goods[k].emoji}${sp.demand[k]}`).join(' '); pill(ctx, D.x, D.y - 70, sp.done ? '계약 완료 · 출항 대기' : `매입 희망 ${parts} · ${Math.ceil(sp.t)}초`, sp.done ? 'rgba(20,30,45,0.75)' : '#c0392b'); }
   else pill(ctx, D.x, D.y - 70, `다음 입항 ${Math.ceil(sp.t)}초`, 'rgba(20,30,45,0.75)');
 }
+// 무역선: 동쪽으로 떠나 동쪽에서 돌아온다(왼쪽 가두리 위를 지나지 않게)
 function drawShip(ctx, g, time) {
   const B = CFG.ship.berth, sp = g.ship, S = CFG.ship;
   let x = B.x;
-  if (sp.state === 'away') { const k = 1 - sp.t / S.every; x = k < 0.5 ? B.x + 300 + k * 2 * 1700 : -400 + (k - 0.5) * 2 * (B.x + 400) ; if (sp.t > S.every - 1) x = B.x; }
+  if (sp.state === 'away') { const k = 1 - sp.t / S.every; x = k < 0.5 ? B.x + 300 + k * 2 * 1700 : CFG.world.w + 400 - (k - 0.5) * 2 * (CFG.world.w + 400 - B.x) ; if (sp.t > S.every - 1) x = B.x; }
   else if (sp.t > S.stay - 1.5) x = B.x + (S.stay - sp.t) / 1.5 * 0 ;
   const y = B.y + Math.sin(time * 1.5) * 2;
   if (x < -300 || x > CFG.world.w + 300) return;
@@ -915,6 +916,19 @@ function drawFishingLine(ctx, e, time) {
   ctx.fillStyle = '#e74c3c'; circle(ctx, bx, by, 3.5); ctx.fillStyle = '#fff'; circle(ctx, bx, by - 2, 1.5);
 }
 
+// 밟고 있는 결제 원의 설명(맨 위에 그려 캐릭터에 가려지지 않게). 2~3줄로 접는다
+function drawPadDesc(ctx, g, u) {
+  const pp = g.padPos(u), x = pp.x, y = pp.y;
+  ctx.font = 'bold 10px system-ui, sans-serif';
+  const lines = [], words = u.desc.split(/(?<=[·,.])\s*|\s+/); let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > 240 && cur) { lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur);
+  if (lines.length > 3) { lines.length = 3; lines[2] = lines[2].slice(0, 28) + '…'; }
+  const w = Math.min(260, Math.max(...lines.map(l => ctx.measureText(l).width)) + 16), h = 12 * lines.length + 6, top = y - 64 - h;
+  ctx.fillStyle = 'rgba(20,30,45,0.85)'; rrect(ctx, x - w / 2, top, w, h, 6);
+  ctx.fillStyle = '#ffe08a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, x, top + 9 + i * 12));
+}
 function drawPad(ctx, g, u, time) {
   const pp = g.padPos(u), x = pp.x, y = pp.y, r = CFG.pad.r;
   const cost = g.padCost(u), paid = g.paid[u.id] || 0, k = cost > 0 ? paid / cost : 0;
@@ -931,7 +945,6 @@ function drawPad(ctx, g, u, time) {
   pill(ctx, x, y + 20, cost <= 0 ? '밟으면 계약' : !needsOk ? Object.keys(u.needs).map(k => `${CFG.goods[k].emoji}${u.needs[k]}`).join(' ') + ' 필요' : '$' + fmtMoney(Math.ceil(cost - paid)), afford ? '#27ae60' : !needsOk ? '#c0392b' : '#34495e', '#fff', 'bold 11px system-ui, sans-serif');
   const lv = g.lv[u.id];
   label(ctx, x, y - 46, u.name + (u.max !== 1 && u.id !== 'repair' && lv > 0 ? ` Lv${lv}` : ''), 11, '#fff');
-  if (active) { ctx.font = 'bold 10px system-ui, sans-serif'; const w = Math.min(260, ctx.measureText(u.desc).width + 16); ctx.fillStyle = 'rgba(20,30,45,0.85)'; rrect(ctx, x - w / 2, y - 76, w, 18, 6); ctx.fillStyle = '#ffe08a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(u.desc.length > 44 ? u.desc.slice(0, 43) + '…' : u.desc, x, y - 67); }
 }
 
 function drawBill(ctx, b) {
@@ -1064,7 +1077,7 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   for (const cl of g.collectors) if (vis(cl.x, cl.y, 90)) items.push({ y: cl.y, f: () => {
     if (g.lv.sled) drawCollectorSled(ctx, cl);
     drawPerson(ctx, cl, { sprite: 'collector', coat: '#7f8c8d', pants: '#2b3a55', cap: '#27ae60', bag: '#b8962e', bagSize: 4 + g.lv.sled }, g);
-    if (cl.sweepT > 0) drawBubble(ctx, cl.x, cl.y - 86, '🧺 청소!'); else if (cl.wait === 'raid') drawBubble(ctx, cl.x, cl.y - 86, '🧺 대기');
+    if (cl.sweepT > 0) drawBubble(ctx, cl.x, cl.y - 86, '🧺 청소!'); else if (cl.wait === 'raid' && cl === g.collectors.find(o => o.wait === 'raid')) drawBubble(ctx, cl.x, cl.y - 86, '🧺 전리품 대기');
   } });
   for (const pen of g.pens) if (vis(pen.x, pen.y, 70)) items.push({ y: pen.y + 22, f: () => drawPen(ctx, pen, g, time) });
   for (const ff of g.fishFarmers) if (vis(ff.x, ff.y, 80)) items.push({ y: ff.y, f: () => { drawPerson(ctx, ff, { sprite: 'fishFarmer', coat: '#16a085', pants: '#2b3a55', cap: '#1abc9c', belt: '#5b4636' }, g); if (ff.target && ff.swing > 0) drawNet(ctx, ff, time); } });
@@ -1100,6 +1113,7 @@ function render(ctx, g, cam, time, dtv, js, ui) {
     const u = UPG.find(u => u.id === g.activePad), pp = g.padPos(u);
     for (let i = 0; i < 3; i++) { const k = (time * 2.2 + i / 3) % 1; const bx = lerp(p.x, pp.x, k), by = lerp(p.y - 40, pp.y, k) - Math.sin(k * Math.PI) * 30; drawBill(ctx, { x: bx, y: by, z: 0, rot: k * 6, state: 'fly' }); }
   }
+  if (g.activePad) { const u = UPG.find(u => u.id === g.activePad); if (u && g.padVisible(u)) drawPadDesc(ctx, g, u); }
   for (const t of g.texts) { const k = t.t / t.life; ctx.globalAlpha = 1 - k * k; label(ctx, t.x, t.y, t.text, 14, t.color); ctx.globalAlpha = 1; }
   // 안내 화살표
   const hint = HINTS[g.tutorial];

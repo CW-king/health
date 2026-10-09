@@ -130,7 +130,7 @@
   function showMenu() {
     modal(`<h2>메뉴</h2>
       <p>${game.wave.n}차 습격까지 버팀 · 누적 $${fmt(game.earned)} · 경과 ${fmtTime(game.t)}</p>
-      <p class="dim">잡은 곰 ${game.stats.kills} · 순록 출하 ${game.stats.harvests} · 도축 ${game.stats.slaughters} · 투숙객 ${game.stats.guests} · 무역 ${game.stats.trades}회 · 낚은 생선 ${game.stats.fish} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
+      <p class="dim">잡은 곰 ${game.stats.kills} · 순록 출하 ${game.stats.harvests} · 도축 ${game.stats.slaughters} · 투숙객 ${game.stats.guests} · 무역 ${game.stats.trades}회 · 생선 ${game.stats.fish}(양식 ${game.stats.farmed || 0}) · 수거 ${game.stats.collected || 0} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
       <p class="dim">최고 기록 ${game.meta.bestWave}웨이브 · 눈송이 ❄ ${game.meta.snowflakes} (수입 +${Math.round((game.bonus - 1) * 100)}%) · ${game.meta.runs}번째 판</p>`,
       [{ label: '계속하기', cls: 'primary' },
        { label: '도움말', onClick: () => setTimeout(showHelp, 0) },
