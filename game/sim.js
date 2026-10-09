@@ -952,16 +952,16 @@ class Game {
     const H = CFG.hunt, cap = H.hunterCarry + Math.floor(this.lv.bag / 2);
     for (const h of this.hunters) {
       const shopId = this.destFor('pelt');
-      h.moving = false; h.atkT -= dt; h.swing = Math.max(0, h.swing - dt * 4);
-      // 근처 고기 줍기
+      h.moving = false; h.atkT -= dt; h.swing = Math.max(0, h.swing - dt * 4); h.holdT = Math.max(0, (h.holdT || 0) - dt);
+      // 근처 모피 줍기
       if (shopId) for (const d of this.drops) if (d.kind === 'pelt' && d.state === 'ground' && h.inv.pelt < cap && dist(d.x, d.y, h.x, h.y) < H.pickup) { d.state = 'fly'; d.to = h; }
       if (h.state === 'find') {
-        if (h.inv.pelt >= cap && shopId) { h.state = 'toShop'; continue; }
+        if (h.inv.pelt >= cap && shopId && h.holdT <= 0) { h.state = 'toShop'; continue; }
         const b = this.nearestWild(h.x, h.y, Infinity);
-        const drop = shopId ? this.nearestDrop('pelt', h.x, h.y, 260) : null;
+        const drop = shopId && h.inv.pelt < cap ? this.nearestDrop('pelt', h.x, h.y, 260) : null;
         if (drop) { h.target = drop; h.state = 'collect'; }
         else if (b) { h.target = b; h.state = 'chase'; }
-        else if (h.inv.pelt > 0 && shopId) h.state = 'toShop';
+        else if (h.inv.pelt > 0 && shopId && h.holdT <= 0) h.state = 'toShop';
         else moveToward(h, H.post.x + (h.i % 3) * 30, H.post.y + Math.floor(h.i / 3) * 26, this.guardSpeed, dt);
       } else if (h.state === 'chase') {
         const b = h.target;
@@ -980,6 +980,7 @@ class Game {
         if (!shopId) { h.state = 'find'; continue; }
         if (dist(h.x, h.y, CFG.shops[shopId].drop.x, CFG.shops[shopId].drop.y) > CFG.shops[shopId].drop.r + 40) { h.state = 'toShop'; continue; }
         if (!this.deposit(h, shopId, dt, CFG.worker.dropRate)) h.state = 'find';
+        else if (this.shopFull(h, shopId)) { h.state = 'find'; h.holdT = 8; }   // 가게가 가득: 모피를 든 채 8초 동안 사냥(현상금)부터
       }
       if (h.moving) h.anim += dt * 11;
     }
