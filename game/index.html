@@ -13,6 +13,8 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
 <link rel="stylesheet" href="./game.css">
 </head>
 <body>
@@ -41,6 +43,18 @@
       <div id="tip" hidden><span class="tip-badge">새 소식</span><span id="tip-text"></span></div>
       <div id="hint" hidden><span id="hint-text"></span></div>
       <button class="hunt-btn" id="btn-hunt" hidden>⚔️ 사냥</button>
+    </div>
+  </div>
+  <div id="title" hidden>
+    <div class="title-card">
+      <div class="title-logo"><span class="title-snow">❄</span><h1>눈보라 벌목장</h1><p class="title-sub">목재를 팔고 마을을 키우고, 북극곰을 막아라</p></div>
+      <div class="title-buttons">
+        <button class="tbtn primary" id="t-continue" hidden><span class="tbtn-main">이어서 하기</span><span class="tbtn-sub" id="t-continue-sub"></span></button>
+        <button class="tbtn" id="t-new"><span class="tbtn-main">새로 시작</span><span class="tbtn-sub" id="t-new-sub">처음부터 캠프를 세웁니다</span></button>
+        <button class="tbtn" id="t-help"><span class="tbtn-main">도움말</span></button>
+        <button class="tbtn" id="t-sound"><span class="tbtn-main">🔊 소리 켜짐</span></button>
+      </div>
+      <div class="title-meta" id="t-meta"></div>
     </div>
   </div>
   <div id="modal-root"></div>

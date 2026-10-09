@@ -23,6 +23,8 @@
   Sfx.muted = !!(saved && saved.muted);
   let offlineGain = 0;
   if (saved && saved.run && saved.savedAt) offlineGain = game.applyOffline((Date.now() - saved.savedAt) / 1000);
+  let onTitle = true;   // 시작 화면이 떠 있는 동안은 게임이 멈추고 카메라만 마을을 천천히 돈다
+  const titleEl = $('title'), hudEl = $('hud');
 
   // ---- 카메라 / 크기 ----
   const cam = { x: game.player.x, y: game.player.y, w: 1, h: 1, scale: 1, dpr: 1 };
@@ -43,7 +45,7 @@
   let auto = false;   // ⚔️ 사냥 버튼: 가까운 적에게 알아서 걸어간다
   canvas.addEventListener('pointerdown', e => {
     Sfx.init();
-    if (js.active) return;
+    if (js.active || onTitle) return;
     js.active = true; js.id = e.pointerId; js.ox = e.clientX; js.oy = e.clientY; js.x = 0; js.y = 0;
     canvas.setPointerCapture(e.pointerId);
   });
@@ -105,8 +107,8 @@
   const fmt = n => fmtMoney(n);
   const fmtTime = s => `${Math.floor(s / 60)}분 ${Math.floor(s % 60)}초`;
 
-  function showHelp() {
-    modal(`<h2>눈보라 벌목장</h2>
+  function helpHtml() {
+    return `<h2>눈보라 벌목장</h2>
       <p>눈 덮인 산속에서 목재를 팔아 캠프를 키우세요. 가만히 있으면 북극곰이 찾아옵니다.</p>
       <ul>
         <li><b>이동</b> 화면 아무 곳이나 누른 채 드래그(또는 WASD · 방향키). 왼쪽 아래 미니맵으로 위치를 확인하세요</li>
@@ -121,9 +123,9 @@
         <li><b>마트 이후</b> 판매대·정육점·어물전·모피 상점은 마트로 합쳐져 사라지고, 빈 자리에 🍲 식당(생선·고기 요리), 🧵 재단소(모피 옷), 🏨 여관(침대·의자로 객실), 🚢 무역 부두(3분마다 무역선이 마트 재고를 대량 매입)가 들어섭니다. 마트는 계산대·품목 확장·묶음 구매로 키웁니다</li>
         <li><b>눈송이 ❄</b> 끝나도 격퇴한 습격 3번마다 눈송이 1개. 다음 판 수입이 영구히 +3%씩</li>
       </ul>
-      <p class="dim">자리를 비우면 일꾼들이 최대 2시간까지 대신 벌어 두고, 곰은 그동안 오지 않습니다. 3초마다 자동 저장됩니다.</p>`,
-      [{ label: '시작!', cls: 'primary' }]);
+      <p class="dim">자리를 비우면 일꾼들이 최대 2시간까지 대신 벌어 두고, 곰은 그동안 오지 않습니다. 3초마다 자동 저장됩니다.</p>`;
   }
+  function showHelp() { modal(helpHtml(), [{ label: '시작!', cls: 'primary' }]); }
   function showMenu() {
     modal(`<h2>메뉴</h2>
       <p>${game.wave.n}차 습격까지 버팀 · 누적 $${fmt(game.earned)} · 경과 ${fmtTime(game.t)}</p>
@@ -131,6 +133,7 @@
       <p class="dim">최고 기록 ${game.meta.bestWave}웨이브 · 눈송이 ❄ ${game.meta.snowflakes} (수입 +${Math.round((game.bonus - 1) * 100)}%) · ${game.meta.runs}번째 판</p>`,
       [{ label: '계속하기', cls: 'primary' },
        { label: '도움말', onClick: () => setTimeout(showHelp, 0) },
+       { label: '시작 화면으로', onClick: () => { save(); setTimeout(showTitle, 0); } },
        { label: '이번 판 포기', cls: 'danger', onClick: () => setTimeout(confirmRestart, 0) },
        { label: '모든 기록 삭제', cls: 'danger', onClick: () => setTimeout(confirmReset, 0) }]);
   }
@@ -154,7 +157,8 @@
       </div>
       <p>눈송이 ❄ <b>+${r.flakes}</b> (총 ${game.meta.snowflakes}개 → 다음 판 수입 +${Math.round(game.meta.snowflakes * CFG.meta.bonusPer * 100)}%)</p>
       <p class="dim">최고 기록 ${game.meta.bestWave}웨이브</p>`,
-      [{ label: '다시 시작', cls: 'primary', onClick: () => { game.newRun(null); snapCam(); save(); } }]);
+      [{ label: '다시 시작', cls: 'primary', onClick: () => { game.newRun(null); snapCam(); save(); } },
+       { label: '시작 화면으로', onClick: () => { game.newRun(null); save(); setTimeout(showTitle, 0); } }]);
   }
   function showWelcomeBack(gain) {
     modal(`<h2>다녀오셨군요</h2><p>자리를 비운 동안 일꾼들이 <b>$${fmt(gain)}</b>를 벌어 뒀습니다. 곰들은 조용했습니다.</p>`,
@@ -162,10 +166,33 @@
   }
   function snapCam() { cam.x = game.player.x; cam.y = game.player.y; }
 
+  // ---- 시작 화면 ----
+  function showTitle() {
+    onTitle = true; paused = true; titleEl.hidden = false; hudEl.hidden = true; modalRoot.innerHTML = '';
+    const hasRun = !game.over && (game.t > 5 || game.earned > 0 || Object.values(game.lv).some(v => v > 0));
+    $('t-continue').hidden = !hasRun;
+    if (hasRun) $('t-continue-sub').textContent = `${game.wave.n}차 습격까지 버팀 · $${fmt(game.earned)} · ${fmtTime(game.t)}`;
+    $('t-new-sub').textContent = hasRun ? '지금 진행은 사라집니다 (눈송이는 유지)' : '처음부터 캠프를 세웁니다';
+    const m = game.meta;
+    $('t-meta').textContent = m.runs > 0 || m.snowflakes > 0 ? `❄ 눈송이 ${m.snowflakes} (수입 +${Math.round((game.bonus - 1) * 100)}%) · 최고 ${m.bestWave}웨이브 · ${m.runs}판` : '화면을 드래그해 움직이고, 나무 옆에 서면 벌목합니다';
+    updateSoundBtn();
+  }
+  function startPlay() { onTitle = false; paused = false; titleEl.hidden = true; hudEl.hidden = false; snapCam(); last = performance.now(); }
+  function updateSoundBtn() { const t = Sfx.muted ? '🔇 소리 꺼짐' : '🔊 소리 켜짐'; $('t-sound').querySelector('.tbtn-main').textContent = t; hud.sound.textContent = Sfx.muted ? '🔇' : '🔊'; }
+  $('t-continue').onclick = () => { Sfx.init(); startPlay(); if (offlineGain > 0) { showWelcomeBack(offlineGain); offlineGain = 0; } };
+  $('t-new').onclick = () => {
+    Sfx.init();
+    const hasRun = !$('t-continue').hidden;
+    const begin = () => { const first = !saved; game.newRun(null); save(); startPlay(); offlineGain = 0; if (first) showHelp(); };
+    if (hasRun) { titleEl.hidden = true; modal(`<h2>새로 시작할까요?</h2><p>지금 진행 중인 캠프는 사라집니다. 눈송이와 최고 기록은 남습니다.</p>`, [{ label: '새로 시작', cls: 'danger', onClick: begin }, { label: '취소', onClick: () => setTimeout(showTitle, 0) }]); }
+    else begin();
+  };
+  $('t-help').onclick = () => { Sfx.init(); titleEl.hidden = true; modal(helpHtml(), [{ label: '닫기', cls: 'primary', onClick: () => setTimeout(showTitle, 0) }]); };
+  $('t-sound').onclick = () => { Sfx.init(); Sfx.muted = !Sfx.muted; updateSoundBtn(); save(); };
+
   $('btn-help').onclick = () => { Sfx.init(); showHelp(); };
   $('btn-menu').onclick = () => { Sfx.init(); showMenu(); };
-  hud.sound.onclick = () => { Sfx.init(); Sfx.muted = !Sfx.muted; hud.sound.textContent = Sfx.muted ? '🔇' : '🔊'; save(); };
-  hud.sound.textContent = Sfx.muted ? '🔇' : '🔊';
+  hud.sound.onclick = () => { Sfx.init(); Sfx.muted = !Sfx.muted; updateSoundBtn(); save(); };
 
   // ---- 이벤트 → 효과음 ----
   function drainEvents() {
@@ -244,13 +271,15 @@
       saveT += dt; if (saveT > 3) { saveT = 0; save(); }
     }
     const k = 1 - Math.pow(0.002, dt);
-    cam.x += (game.player.x - cam.x) * k; cam.y += (game.player.y - 20 - cam.y) * k;
+    if (onTitle) { const tx = CFG.world.w / 2 + Math.sin(time * 0.07) * 520, ty = CFG.world.h / 2 + Math.cos(time * 0.05) * 560; cam.x += (tx - cam.x) * Math.min(1, dt * 0.6); cam.y += (ty - cam.y) * Math.min(1, dt * 0.6); }
+    else { cam.x += (game.player.x - cam.x) * k; cam.y += (game.player.y - 20 - cam.y) * k; }
     const hw = cam.w / 2 / cam.scale, hh = cam.h / 2 / cam.scale;
     const topPad = ui.topPad / cam.scale, botPad = ui.bottomPad / cam.scale;   // HUD에 가려지는 띠만큼 더 보여 준다
     cam.x = hw * 2 >= CFG.world.w ? CFG.world.w / 2 : clamp(cam.x, hw, CFG.world.w - hw);
     cam.y = hh * 2 >= CFG.world.h + topPad + botPad ? CFG.world.h / 2 : clamp(cam.y, hh - topPad, CFG.world.h - hh + botPad);
+    ui.onTitle = onTitle;
     render(ctx, game, cam, time, dt, js, ui);
-    updateHud();
+    if (!onTitle) updateHud();
   }
 
   let hiddenAt = 0;
@@ -261,9 +290,8 @@
   window.addEventListener('pagehide', save);
   window.addEventListener('beforeunload', save);
 
-  snapCam();
-  if (!saved) showHelp();
-  else if (offlineGain > 0) showWelcomeBack(offlineGain);
+  cam.x = CFG.world.w / 2; cam.y = CFG.world.h / 2;
+  showTitle();
   requestAnimationFrame(frame);
   if ('serviceWorker' in navigator && location.protocol !== 'file:' && !location.hostname.endsWith('claude.ai')) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });

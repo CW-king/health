@@ -720,11 +720,16 @@ class Game {
     let ix = this.input.x, iy = this.input.y;
     const len = Math.hypot(ix, iy);
     if (len > 1) { ix /= len; iy /= len; }
-    p.moving = len > 0.08;
-    if (p.moving) {
-      p.x += ix * this.playerSpeed * dt; p.y += iy * this.playerSpeed * dt;
-      if (Math.abs(ix) > 0.15) p.facing = ix < 0 ? -1 : 1;
-      p.anim += dt * 11;
+    if (len < 0.08) { ix = 0; iy = 0; }
+    // 가속·감속으로 부드럽게 움직인다
+    const k = Math.min(1, dt * 14), sp = this.playerSpeed;
+    p.vx = (p.vx || 0) + (ix * sp - (p.vx || 0)) * k; p.vy = (p.vy || 0) + (iy * sp - (p.vy || 0)) * k;
+    const v = Math.hypot(p.vx, p.vy);
+    p.moving = v > sp * 0.12;
+    if (v > 1) {
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (Math.abs(p.vx) > sp * 0.15) p.facing = p.vx < 0 ? -1 : 1;
+      p.anim += dt * 11 * Math.min(1, v / sp);
     }
     this.collide(p, 13);
     p.x = clamp(p.x, 18, CFG.world.w - 18); p.y = clamp(p.y, 30, CFG.world.h - 14);
