@@ -57,14 +57,22 @@
   });
   const endJs = e => { if (e.pointerId !== js.id) return; js.active = false; js.x = 0; js.y = 0; };
   canvas.addEventListener('pointerup', endJs); canvas.addEventListener('pointercancel', endJs);
+  // 한글 IME 상태에서도 되도록 e.code로 본다
+  const KEYMAP = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'arrowup', ArrowDown: 'arrowdown', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright', Space: ' ', KeyF: 'f' };
+  const keyOf = e => KEYMAP[e.code] || e.key.toLowerCase();
   window.addEventListener('keydown', e => {
-    const k = e.key.toLowerCase(); keys[k] = true;
+    if (paused) return;
+    const k = keyOf(e);
     if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
+    if (e.repeat) return;
+    keys[k] = true;
     if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) auto = false;
     if (k === ' ' || k === 'f') toggleHunt();
     Sfx.init();
   });
-  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  window.addEventListener('keyup', e => { keys[keyOf(e)] = false; });
+  const clearKeys = () => { for (const k of Object.keys(keys)) keys[k] = false; };
+  window.addEventListener('blur', clearKeys);
   function toggleHunt() { auto = !auto; if (auto && !game.nearestEnemy(game.player.x, game.player.y, Infinity)) auto = false; }
   hud.hunt.onclick = () => { Sfx.init(); toggleHunt(); };
   function readInput() {
@@ -128,7 +136,7 @@
   }
   function confirmRestart() {
     modal(`<h2>이번 판을 포기할까요?</h2><p>눈송이는 격퇴한 습격 수 기준으로 받습니다. 캠프는 처음부터 다시 시작합니다.</p>`,
-      [{ label: '포기하고 새로 시작', cls: 'danger', onClick: () => { game.gameOver(); setTimeout(showGameOver, 0); } }, { label: '취소' }]);
+      [{ label: '포기하고 새로 시작', cls: 'danger', onClick: () => { game.gameOver(); game.events.length = 0; setTimeout(showGameOver, 0); } }, { label: '취소' }]);
   }
   function confirmReset() {
     modal(`<h2>모든 기록을 지울까요?</h2><p>눈송이와 최고 기록까지 전부 사라집니다. 되돌릴 수 없습니다.</p>`,
@@ -247,7 +255,7 @@
 
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { save(); hiddenAt = Date.now(); }
+    if (document.hidden) { save(); hiddenAt = Date.now(); clearKeys(); }
     else if (hiddenAt) { const gain = game.applyOffline((Date.now() - hiddenAt) / 1000); hiddenAt = 0; last = performance.now(); if (gain > 0) showWelcomeBack(gain); }
   });
   window.addEventListener('pagehide', save);
