@@ -63,9 +63,9 @@ function fmtMoney(n) {
 // 눈 바닥의 점, 장식(바위·고목)은 매번 같은 자리에 찍히도록 미리 만들어 둔다
 const GROUND = (() => {
   let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const dots = []; for (let i = 0; i < 520; i++) dots.push({ x: r() * CFG.world.w, y: 160 + r() * (CFG.world.h - 160), s: 2 + r() * 5, a: 0.25 + r() * 0.35 });
+  const dots = []; for (let i = 0; i < 520; i++) dots.push({ x: r() * (CFG.world.w + CFG.east.w), y: 160 + r() * (CFG.world.h - 160), s: 2 + r() * 5, a: 0.25 + r() * 0.35 });
   const flakes = []; for (let i = 0; i < 70; i++) flakes.push({ x: r(), y: r(), s: 1 + r() * 2.2, v: 18 + r() * 30, w: r() * 6.28 });
-  const floes = []; for (let i = 0; i < 14; i++) floes.push({ x: r() * CFG.world.w, y: CFG.river.y + 20 + r() * (CFG.river.h - 40), w: 24 + r() * 40, h: 12 + r() * 10, v: 8 + r() * 10 });
+  const floes = []; for (let i = 0; i < 14; i++) floes.push({ x: r() * (CFG.world.w + CFG.east.w), y: CFG.river.y + 20 + r() * (CFG.river.h - 40), w: 24 + r() * 40, h: 12 + r() * 10, v: 8 + r() * 10 });
   const H = CFG.hunt.rect, rocks = []; for (let i = 0; i < 7; i++) rocks.push({ x: H.x + 30 + r() * (H.w - 60), y: H.y + 30 + r() * (H.h - 60), s: 10 + r() * 14 });
   const W = CFG.wild.rect, dead = []; for (let i = 0; i < 10; i++) dead.push({ x: W.x + 30 + r() * (W.w - 60), y: W.y + 40 + r() * (W.h - 80), s: 0.7 + r() * 0.6, k: r() });
   return { dots, flakes, floes, rocks, dead };
@@ -79,6 +79,7 @@ function drawGround(ctx, g, view, time) {
   ctx.fillStyle = PAL.wildSnow; rrect(ctx, W.x, W.y, W.w, W.h, 40);
   if (g.lv.ranch) { const Rr = CFG.ranch.rect; ctx.fillStyle = '#e3e6d6'; rrect(ctx, Rr.x, Rr.y, Rr.w, Rr.h, 18); }
   if (g.lv.grove) { const Gr = CFG.grove.rect; ctx.fillStyle = PAL.snow2; rrect(ctx, Gr.x, Gr.y, Gr.w, Gr.h, 24); }
+  if (g.lv.expandEast) { const E = CFG.east; ctx.fillStyle = '#e4ebf2'; ctx.fillRect(E.x, 160, E.w, CFG.world.h - 160); ctx.strokeStyle = PAL.path; ctx.lineWidth = 50; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(E.x - 40, E.road.y); ctx.lineTo(E.x + 520, E.road.y); ctx.moveTo(E.x + 330, E.road.y); ctx.lineTo(E.x + 330, 700); ctx.moveTo(E.x + 330, E.road.y); ctx.lineTo(E.x + 330, 1330); ctx.stroke(); }
   ctx.fillStyle = PAL.snowShade; rrect(ctx, C.x - 16, C.y - 16, C.w + 32, C.h + 32, 22);
   ctx.fillStyle = PAL.snow2; rrect(ctx, C.x - 8, C.y - 8, C.w + 16, C.h + 16, 18);
   // 길
@@ -654,18 +655,18 @@ function drawBench(ctx, g, b, worker, time, shopId) {
 function drawCraftHouse(ctx, g, shopId, time) {
   if (!g.shopOpen(shopId)) return;
   const sh = CFG.shops[shopId], lvl = g.lv[sh.upg], tier = tierOf(shopId, lvl), x = sh.x, y = sh.y, w = sh.w, h = 76 + tier * 10;
-  const isRest = shopId === 'rest';
+  const isRest = shopId === 'rest', ST = { rest: { wall: '#e8d9b8', roof: '#b03a2e', band: '#c0392b', emo: '🍲', sign: '식당 메뉴', chimney: true }, tailor: { wall: '#cfc3d9', roof: '#5e3b73', band: '#8e44ad', emo: '🧵', sign: '옷 가게' }, smoke: { wall: '#d9c7a8', roof: '#5b3a1a', band: '#8b5a2b', emo: '🐠', sign: '훈제 가게', chimney: true }, meatproc: { wall: '#e8cfcf', roof: '#7b2d26', band: '#c0392b', emo: '🌭', sign: '육가공 매장' } }[shopId];
   ctx.save(); const sc = popScale(g, shopId); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
   shadow(ctx, x, y + 30, w / 2 + 6, 14);
-  ctx.fillStyle = isRest ? '#e8d9b8' : '#cfc3d9'; ctx.fillRect(x - w / 2, y - h + 30, w, h);
+  ctx.fillStyle = ST.wall; ctx.fillRect(x - w / 2, y - h + 30, w, h);
   ctx.fillStyle = 'rgba(0,0,0,0.08)'; for (let i = 0; i < Math.floor(h / 12); i++) ctx.fillRect(x - w / 2, y - h + 32 + i * 12, w, 2);
-  ctx.fillStyle = isRest ? '#b03a2e' : '#5e3b73'; ctx.beginPath(); ctx.moveTo(x - w / 2 - 12, y - h + 32); ctx.lineTo(x, y - h - 24 - tier * 6); ctx.lineTo(x + w / 2 + 12, y - h + 32); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = ST.roof; ctx.beginPath(); ctx.moveTo(x - w / 2 - 12, y - h + 32); ctx.lineTo(x, y - h - 24 - tier * 6); ctx.lineTo(x + w / 2 + 12, y - h + 32); ctx.closePath(); ctx.fill();
   ctx.fillStyle = PAL.treeTop; ctx.beginPath(); ctx.moveTo(x - w / 2 - 4, y - h + 30); ctx.lineTo(x, y - h - 20 - tier * 6); ctx.lineTo(x + w / 2 + 4, y - h + 30); ctx.closePath(); ctx.fill();
   // 천막/간판 띠
-  for (let i = 0; i < Math.ceil(w / 24); i++) { ctx.fillStyle = i % 2 ? '#f5f0e6' : (isRest ? '#c0392b' : '#8e44ad'); ctx.fillRect(x - w / 2 + i * 24, y - 6, Math.min(24, w - i * 24), 14); }
+  for (let i = 0; i < Math.ceil(w / 24); i++) { ctx.fillStyle = i % 2 ? '#f5f0e6' : ST.band; ctx.fillRect(x - w / 2 + i * 24, y - 6, Math.min(24, w - i * 24), 14); }
   ctx.fillStyle = '#4a2d12'; rrect(ctx, x - 16, y - 2, 32, 32, 4);
   ctx.fillStyle = '#ffd27d'; rrect(ctx, x - w / 2 + 16, y - h + 50, 26, 20, 3); rrect(ctx, x + w / 2 - 42, y - h + 50, 26, 20, 3);
-  if (isRest) { ctx.fillStyle = '#7f8c8d'; ctx.fillRect(x + w / 2 - 36, y - h - 8, 14, 30); for (let i = 0; i < 3; i++) { const k = ((time * 0.5 + i * 0.33) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k)})`; circle(ctx, x + w / 2 - 29 + Math.sin(k * 6 + i) * 6, y - h - 12 - k * 36, 5 + k * 8); } }
+  if (ST.chimney) { ctx.fillStyle = '#7f8c8d'; ctx.fillRect(x + w / 2 - 36, y - h - 8, 14, 30); for (let i = 0; i < 3; i++) { const k = ((time * 0.5 + i * 0.33) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k)})`; circle(ctx, x + w / 2 - 29 + Math.sin(k * 6 + i) * 6, y - h - 12 - k * 36, 5 + k * 8); } }
   if (tier >= 1) { ctx.fillStyle = '#ffd27d'; circle(ctx, x - w / 2 - 6, y - 30, 5); circle(ctx, x + w / 2 + 6, y - 30, 5); ctx.fillStyle = 'rgba(255,210,125,0.15)'; circle(ctx, x - w / 2 - 6, y - 30, 22); circle(ctx, x + w / 2 + 6, y - 30, 22); }
   // 진열(오른쪽 진열장)
   const st = g.shops[shopId].stock, open = g.shopGoods(shopId), cap = g.shopCap(shopId);
@@ -673,10 +674,10 @@ function drawCraftHouse(ctx, g, shopId, time) {
   ctx.fillStyle = '#5b4636'; ctx.fillRect(dx0, y + 4, 44 * open.length + 8, 6);
   open.forEach((gd, i) => { const gx = dx0 + 26 + i * 44, gy = y - 2; ctx.fillStyle = 'rgba(255,255,255,0.75)'; rrect(ctx, gx - 19, gy - 34, 38, 34, 6); emoji(ctx, gx, gy - 18, CFG.goods[gd].emoji, 20); pill(ctx, gx, gy + 6, `${st[gd]}`, st[gd] >= cap ? '#c0392b' : st[gd] ? 'rgba(20,30,45,0.7)' : 'rgba(120,60,60,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); });
   ctx.fillStyle = '#f5e6c8'; rrect(ctx, x - 70, y - h + 34, 140, 26, 5); ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x - 70, y - h + 34, 140, 26, 5); ctx.stroke();
-  ctx.fillStyle = PAL.ink; ctx.font = 'bold 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${isRest ? '🍲' : '🧵'} ${TIERS[shopId][tier].name} Lv${lvl}`, x, y - h + 47);
+  ctx.fillStyle = PAL.ink; ctx.font = 'bold 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${ST.emo} ${TIERS[shopId][tier].name} Lv${lvl}`, x, y - h + 47);
   const mats = sh.accepts.map(m => `${CFG.goods[m].emoji} ${st[m]}`).join(' ');
   pill(ctx, x, y - h + 6, `재료 ${mats} / ${sh.matCap}`, sh.accepts.some(m => st[m] >= sh.matCap) ? '#c0392b' : sh.accepts.every(m => st[m] === 0) ? 'rgba(120,60,60,0.75)' : 'rgba(20,30,45,0.75)');
-  drawSign(ctx, x + w / 2 + 22 * open.length + 40, y + 70, isRest ? '식당 메뉴' : '옷 가게', `${open.map(gd => CFG.goods[gd].emoji + '$' + fmtMoney(g.price(gd))).join(' ')}`);
+  drawSign(ctx, x + w / 2 + 22 * open.length + 40, y + 70, ST.sign, `${open.map(gd => CFG.goods[gd].emoji + '$' + fmtMoney(g.price(gd))).join(' ')}`);
   ctx.restore();
 }
 function drawInn(ctx, g, time) {
@@ -828,7 +829,7 @@ function drawInfirmary(ctx, g, time) {
   ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.moveTo(x - w / 2 - 8, y - h + 22); ctx.lineTo(x, y - h - 14); ctx.lineTo(x + w / 2 + 8, y - h + 22); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#e74c3c'; ctx.fillRect(x - 4, y - h + 30, 8, 24); ctx.fillRect(x - 12, y - h + 38, 24, 8);
   ctx.fillStyle = '#5b4636'; rrect(ctx, x + 18, y - 4, 14, 24, 3);
-  label(ctx, x, y - h - 22, `🏥 의무소 · 의무병 ${g.medics.length}`, 11, '#fff');
+  label(ctx, x, y + 32, `🏥 의무소 · 의무병 ${g.medics.length}`, 10, '#fff');
 }
 // 급식소: 긴 식탁과 솥, 식량 창고 수량
 function drawMess(ctx, g, time) {
@@ -844,6 +845,14 @@ function drawMess(ctx, g, time) {
   const fedTxt = g.fed >= 0.5 ? '😋 배부름 +15%' : '😣 굶주림 −20%';
   pill(ctx, x, y - 56, `🍲 ${total}/${M.cap} · ${fedTxt}`, g.fed >= 0.5 ? 'rgba(20,30,45,0.75)' : '#c0392b', '#fff', 'bold 10px system-ui, sans-serif');
   label(ctx, x, y + 26, '급식소', 10, '#fff');
+}
+// 동쪽 벌판 팻말
+function drawEastSign(ctx, g, time) {
+  const E = CFG.east, x = E.x + 60, y = E.road.y - 40;
+  shadow(ctx, x, y + 2, 14, 5);
+  ctx.fillStyle = PAL.woodDark; ctx.fillRect(x - 3, y - 50, 6, 52);
+  ctx.fillStyle = PAL.wood; rrect(ctx, x - 44, y - 62, 88, 22, 4);
+  ctx.fillStyle = PAL.ink; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🧭 ${E.name}`, x, y - 51);
 }
 function drawTownhall(ctx, g, time) {
   if (!g.lv.townhall) return;
@@ -921,7 +930,8 @@ function drawTower(ctx, g, time, site, idx) {
   for (let i = 0; i < 1 + tier; i++) { const ax = x - 10 * tier + i * 20; ctx.fillStyle = '#2c3e50'; rrect(ctx, ax - 6, top - 2, 12, 13, 4); ctx.fillStyle = '#f1c9a5'; circle(ctx, ax, top - 7, 5); ctx.strokeStyle = '#5b4636'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ax + 8, top - 4, 8, -1.2, 1.2); ctx.stroke(); }
   ctx.fillStyle = '#e74c3c'; tri(ctx, x + 28, top - 40, x + 46 + Math.sin(time * 5) * 2, top - 33, x + 28, top - 26);
   ctx.fillStyle = PAL.woodDark; ctx.fillRect(x + 27, top - 42, 2, 30);
-  pill(ctx, x, top - 54, `${D.shot === 'cannon' ? '💣' : D.shot === 'bullet' || D.shot === 'mg' ? '🔫' : '🏹'} ${D.name} Lv${g.lv.tower}${g.towerCount > 1 ? ` ${idx + 1}호` : ''} · ${D.shot === 'cannon' ? '포탄' : D.shot === 'bolt' ? '쇠뇌' : D.shot === 'bullet' || D.shot === 'mg' ? '탄' : '화살'} ${g.towerArrows}발`, 'rgba(20,30,45,0.75)');
+  if (idx === 0) pill(ctx, x, top - 54, `${D.shot === 'cannon' ? '💣' : D.shot === 'bullet' || D.shot === 'mg' ? '🔫' : '🏹'} ${D.name} Lv${g.lv.tower} · ${D.shot === 'cannon' ? '포탄' : D.shot === 'bolt' ? '쇠뇌' : D.shot === 'bullet' || D.shot === 'mg' ? '탄' : '화살'} ${g.towerArrows}발`, 'rgba(20,30,45,0.75)');
+  else label(ctx, x, top - 50, `${idx + 1}호`, 10, '#fff');   // 다른 탑은 작은 번호만(글자 가림 줄이기)
   ctx.restore();
 }
 
@@ -1062,13 +1072,14 @@ function drawJoystick(ctx, js, dpr) {
 
 // 미니맵(화면 왼쪽 아래)
 function drawMinimap(ctx, g, cam, ui) {
-  const W = 92, H = Math.round(W * CFG.world.h / CFG.world.w), x0 = 10, y0 = ui.topPad + 8;
-  const k = W / CFG.world.w;
+  const W = 92, H = Math.round(W * CFG.world.h / g.worldW), x0 = 10, y0 = ui.topPad + 8;
+  const k = W / g.worldW;
   ctx.save(); ctx.setTransform(cam.dpr, 0, 0, cam.dpr, 0, 0); ctx.globalAlpha = 0.9;
   ctx.fillStyle = '#dfe8f1'; rrect(ctx, x0 - 3, y0 - 3, W + 6, H + 6, 8);
   ctx.fillStyle = PAL.snow; ctx.fillRect(x0, y0, W, H);
   const R = (r, c) => { ctx.fillStyle = c; ctx.fillRect(x0 + r.x * k, y0 + r.y * k, r.w * k, r.h * k); };
-  R(CFG.river, PAL.water); R(CFG.forest.rect, '#9ad8ac'); if (g.lv.grove) R(CFG.grove.rect, '#9ad8ac'); R(CFG.hunt.rect, '#d3c3a8'); R(CFG.wild.rect, '#c9cfd6'); R(CFG.camp, '#c9a47a'); if (g.lv.ranch) R(CFG.ranch.rect, '#cfd6b8');
+  if (g.lv.expandEast) R({ x: CFG.east.x, y: 160, w: CFG.east.w, h: CFG.world.h - 160 }, '#e4ebf2');
+  R({ x: 0, y: CFG.river.y, w: g.worldW, h: CFG.river.h }, PAL.water); R(CFG.forest.rect, '#9ad8ac'); if (g.lv.grove) R(CFG.grove.rect, '#9ad8ac'); R(CFG.hunt.rect, '#d3c3a8'); R(CFG.wild.rect, '#c9cfd6'); R(CFG.camp, '#c9a47a'); if (g.lv.ranch) R(CFG.ranch.rect, '#cfd6b8');
   const dot = (x, y, c, r) => { ctx.fillStyle = c; circle(ctx, x0 + x * k, y0 + y * k, r); };
   for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id)) dot(CFG.shops[id].x, CFG.shops[id].y, id === 'mart' ? '#e74c3c' : id === 'furn' ? '#d35400' : id === 'meat' ? '#c0392b' : id === 'fish' ? '#2980b9' : id === 'pelt' ? '#6d4c41' : id === 'slaughter' ? '#7b2d26' : id === 'rest' ? '#e67e22' : id === 'tailor' ? '#8e44ad' : id === 'inn' ? '#f1c40f' : '#8b5a2b', 3);
   for (const b of g.wild) dot(b.x, b.y, '#a67c52', 2);
@@ -1122,12 +1133,15 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   if (g.shopOpen('pelt')) items.push({ y: CFG.shops.pelt.y + 10, f: () => drawFurShop(ctx, g, time) });
   items.push({ y: CFG.shops.rest.y + 30, f: () => drawCraftHouse(ctx, g, 'rest', time) });
   items.push({ y: CFG.shops.tailor.y + 30, f: () => drawCraftHouse(ctx, g, 'tailor', time) });
+  items.push({ y: CFG.shops.smoke.y + 30, f: () => drawCraftHouse(ctx, g, 'smoke', time) });
+  items.push({ y: CFG.shops.meatproc.y + 30, f: () => drawCraftHouse(ctx, g, 'meatproc', time) });
+  if (g.lv.expandEast) items.push({ y: CFG.east.road.y - 40, f: () => drawEastSign(ctx, g, time) });
   items.push({ y: CFG.shops.inn.y + 30, f: () => drawInn(ctx, g, time) });
   if (g.lv.mart) { items.push({ y: CFG.ship.dock.y + 10, f: () => drawDock(ctx, g, time) }); items.push({ y: CFG.ship.berth.y + 60, f: () => drawShip(ctx, g, time) }); }
   items.push({ y: CFG.shops.slaughter.y + 24, f: () => drawSlaughterhouse(ctx, g, time) });
   items.push({ y: CFG.shops.mart.y + 40, f: () => drawMart(ctx, g, time) });
   items.push({ y: CFG.shops.furn.y + 30, f: () => drawWorkshop(ctx, g, time) });
-  for (const shopId of ['furn', 'rest', 'tailor']) if (g.shopOpen(shopId)) CFG.shops[shopId].benches.forEach((b, i) => items.push({ y: b.y + 8, f: () => { const nb = g.player.crafting ? g.nearestBench(g.player.x, g.player.y) : null; drawBench(ctx, g, b, g.crafters[shopId][i] || (nb && nb.bench === b ? g.player : null), time, shopId); } }));
+  for (const shopId of CRAFT_SHOPS) if (g.shopOpen(shopId)) CFG.shops[shopId].benches.forEach((b, i) => items.push({ y: b.y + 8, f: () => { const nb = g.player.crafting ? g.nearestBench(g.player.x, g.player.y) : null; drawBench(ctx, g, b, g.crafters[shopId][i] || (nb && nb.bench === b ? g.player : null), time, shopId); } }));
   drawRanch(ctx, g, items, vis, time);
   items.push({ y: CFG.hut.y + 26, f: () => drawHut(ctx, g, time) });
   items.push({ y: TOWNHALL.y + 30, f: () => drawTownhall(ctx, g, time) });
@@ -1172,11 +1186,21 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   if (g.lv.collector) for (const P of [CFG.hunt.collectorPost, CFG.hunt.collectorPostSouth]) if ((P === CFG.hunt.collectorPost || g.collectors.length >= 2) && vis(P.x, P.y, 60)) items.push({ y: P.y - 30, f: () => drawCollectorPost(ctx, P) });
   if (g.lv.bait) { const B = CFG.hunt.rect; const bx = B.x + B.w / 2 + 40, by = B.y + 40; if (vis(bx, by, 40)) items.push({ y: by, f: () => { shadow(ctx, bx, by + 2, 18, 6); for (let i = 0; i < 3; i++) fishShape(ctx, bx - 10 + i * 10, by - 6 - (i % 2) * 5, 0.9); } }); }
   for (const sm of g.slaughtermen) if (vis(sm.x, sm.y, 80)) items.push({ y: sm.y, f: () => drawPerson(ctx, sm, { sprite: 'slaughterman', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', cap: '#7b2d26', tool: 'hammer' }, g) });
-  const crafterLook = { furn: { sprite: 'craftsman', coat: '#5d6d7e', pants: '#2b3a55', apron: '#8b5a2b', cap: '#c0392b', tool: 'hammer' }, rest: { sprite: 'cook', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', hat: '#fff', pom: '#fff', tool: 'hammer' }, tailor: { sprite: 'tailor', coat: '#8e44ad', pants: '#2b3a55', apron: '#f5e6c8', cap: '#5e3b73', tool: null } };
-  for (const shopId of ['furn', 'rest', 'tailor']) for (const cm of g.crafters[shopId]) if (vis(cm.x, cm.y, 80)) items.push({ y: cm.y, f: () => drawPerson(ctx, cm, crafterLook[shopId], g) });
+  const crafterLook = { furn: { sprite: 'craftsman', coat: '#5d6d7e', pants: '#2b3a55', apron: '#8b5a2b', cap: '#c0392b', tool: 'hammer' }, rest: { sprite: 'cook', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', hat: '#fff', pom: '#fff', tool: 'hammer' }, tailor: { sprite: 'tailor', coat: '#8e44ad', pants: '#2b3a55', apron: '#f5e6c8', cap: '#5e3b73', tool: null }, smoke: { sprite: 'smoker', coat: '#8b5a2b', pants: '#2b3a55', apron: '#5b4636', cap: '#e67e22', tool: 'hammer' }, meatproc: { sprite: 'meatworker', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', cap: '#c0392b', tool: 'hammer' } };
+  for (const shopId of CRAFT_SHOPS) for (const cm of g.crafters[shopId]) if (vis(cm.x, cm.y, 80)) items.push({ y: cm.y, f: () => drawPerson(ctx, cm, crafterLook[shopId], g) });
   for (const c of g.customers) if (vis(c.x, c.y, 90)) items.push({ y: c.y, f: () => {
     if (c.big) { drawSled(ctx, c); drawPerson(ctx, c, { sprite: 'bigbuyer', coat: c.coat, pants: '#3b2a1a', hat: '#8b1e1e', pom: '#fff', beard: '#d9c7a8' }, g); }
-    else drawPerson(ctx, c, { sprite: 'customer', coat: c.coat, pants: '#2b3a55', hat: '#1f4e79', pom: '#fff' }, g);
+    else {   // 계급별 차림: 마을 사람 → 나그네(목도리·배낭) → 상인(검은 모자·큰 가방) → 귀족(모피 후드·금띠) → 왕족(왕관·망토)
+      const cls = c.cls || 0, look = [
+        { sprite: 'customer', coat: c.coat, pants: '#2b3a55', hat: '#1f4e79', pom: '#fff' },
+        { sprite: 'customer', coat: c.coat, pants: '#2b3a55', hat: '#1f4e79', pom: '#fff', belt: '#c0392b', bag: '#8b5a2b', bagSize: 2 },
+        { sprite: 'customer', coat: '#3d3d4e', pants: '#1b2631', hat: '#111', hatBand: '#c0392b', bag: '#5b4636', bagSize: 4, belt: '#b8862e' },
+        { sprite: 'customer', coat: '#4a235a', pants: '#1b2631', hood: '#e8d9b8', belt: '#f1c40f', bag: '#6d4c41', bagSize: 2 },
+        { sprite: 'customer', coat: '#7b1e3a', pants: '#1b2631', hat: '#f1c40f', hatBand: '#e74c3c', belt: '#f1c40f', armor: '#f5e6c8' },
+      ][cls];
+      drawPerson(ctx, c, look, g);
+      if (cls >= 3 && c.state === 'queue') label(ctx, c.x, c.y - 74, cls === 4 ? '👑 왕족' : '🎩 귀족', 10, '#ffd166');
+    }
     if (c.state === 'queue' && c.wait) {
       const ok = Object.keys(c.want).every(gd => g.shops[c.shop].stock[gd] >= c.want[gd]);
       const wantText = Object.keys(c.want).map(gd => `${CFG.goods[gd].emoji}×${c.want[gd]}`).join(' ');

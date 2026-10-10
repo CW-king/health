@@ -23,7 +23,7 @@ const CFG = {
   weapon: { dmgPer: 2 },
   // 감시탑: 남문 앞이 첫 탑. per레벨마다 sites 순서대로 탑이 하나씩 더 선다(서쪽 담 밖 → 동쪽 담 밖 → 황무지 전진 초소)
   tower:  { x: 330, y: 1920, cd: 1.1, dmg: 6, dmgPer: 5, range: 320, rangePer: 14, per: 6,
-            sites: [{ x: 330, y: 1920 }, { x: 50, y: 1720 }, { x: 610, y: 1650 }, { x: 160, y: 2110 }] },   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
+            sites: [{ x: 330, y: 1920 }, { x: 50, y: 1720 }, { x: 740, y: 1600 }, { x: 60, y: 2160 }] },   // 결제 원·글자를 가리지 않는 자리   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
 
   tree:   { logs: 3, regrow: 8, range: 50 },
   // 남쪽 숲: 공방 가까운 벌목지. 개간 레벨마다 perLevel그루가 열린다
@@ -52,6 +52,16 @@ const CFG = {
     coat:    { name: '모피 코트', emoji: '🧥', base: 320,  priceUp: 'clothPrice', shop: 'tailor', inputs: { pelt: 3 }, time: 10, tier: 2 },
     cloak:   { name: '모피 망토', emoji: '🧣', base: 700,  priceUp: 'clothPrice', shop: 'tailor', inputs: { pelt: 5 }, time: 16, tier: 3 },
     robe:    { name: '왕실 예복', emoji: '👘', base: 1600, priceUp: 'clothPrice', shop: 'tailor', inputs: { pelt: 8 }, time: 26, tier: 4 },
+    // 훈제장(동쪽): 생선 + 장작
+    smoked:  { name: '훈제 생선', emoji: '🐠', base: 95,   priceUp: 'smokePrice', shop: 'smoke', inputs: { fish: 2, wood: 1 }, time: 6,  tier: 1 },
+    canned:  { name: '생선 통조림', emoji: '🥫', base: 220, priceUp: 'smokePrice', shop: 'smoke', inputs: { fish: 4, wood: 1 }, time: 10, tier: 2 },
+    caviar:  { name: '캐비어',   emoji: '🫙', base: 520,  priceUp: 'smokePrice', shop: 'smoke', inputs: { fish: 8 },          time: 16, tier: 3 },
+    seaset:  { name: '해산물 선물 세트', emoji: '🎁', base: 1200, priceUp: 'smokePrice', shop: 'smoke', inputs: { fish: 12, wood: 2 }, time: 26, tier: 4 },
+    // 육가공소(동쪽): 고기
+    sausage: { name: '소시지',   emoji: '🌭', base: 70,   priceUp: 'procPrice', shop: 'meatproc', inputs: { meat: 2 },  time: 5,  tier: 1 },
+    jerky:   { name: '육포',     emoji: '🥓', base: 160,  priceUp: 'procPrice', shop: 'meatproc', inputs: { meat: 4 },  time: 9,  tier: 2 },
+    ham:     { name: '햄',       emoji: '🍖', base: 360,  priceUp: 'procPrice', shop: 'meatproc', inputs: { meat: 7 },  time: 15, tier: 3 },
+    meatset: { name: '특제 소시지 세트', emoji: '🎁', base: 900, priceUp: 'procPrice', shop: 'meatproc', inputs: { meat: 12 }, time: 24, tier: 4 },
   },
   // 가게. drop = 물건을 내려놓는 칸, lanes = 손님 줄(시작점·방향), rate = 손님 방문 간격 배수, mul = 가격 배수
   shops: {
@@ -85,6 +95,14 @@ const CFG = {
             drop: { x: 1680, y: 830, r: 48 }, moneySpot: { x: 1780, y: 960 }, cashier: { x: 1830, y: 756 },
             lanes: [{ x: 1890, y: 835, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.0,
             benches: [{ x: 1740, y: 890 }, { x: 1820, y: 890 }], benchRange: 42, upg: 'tailor', worker: 'tailorman' },
+    smoke: { name: '훈제장', goods: ['smoked', 'canned', 'caviar', 'seaset'], accepts: ['fish', 'wood'], x: 2330, y: 520, w: 190, cap: 10, matCap: 60, rate: 1.4, mul: 1,
+            drop: { x: 2200, y: 560, r: 50 }, moneySpot: { x: 2330, y: 690 }, cashier: { x: 2390, y: 476 },
+            lanes: [{ x: 2450, y: 560, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.0,
+            benches: [{ x: 2280, y: 610 }, { x: 2370, y: 610 }], benchRange: 42, upg: 'smoke', worker: 'smoker' },
+    meatproc: { name: '육가공소', goods: ['sausage', 'jerky', 'ham', 'meatset'], accepts: ['meat'], x: 2330, y: 1150, w: 190, cap: 10, matCap: 60, rate: 1.4, mul: 1,
+            drop: { x: 2200, y: 1190, r: 50 }, moneySpot: { x: 2330, y: 1320 }, cashier: { x: 2390, y: 1106 },
+            lanes: [{ x: 2450, y: 1190, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.0,
+            benches: [{ x: 2280, y: 1240 }, { x: 2370, y: 1240 }], benchRange: 42, upg: 'meatproc', worker: 'meatworker' },
     inn: { name: '여관', goods: [], accepts: [], x: 1560, y: 1000, w: 170, cap: 0, rate: 1.2, mul: 1, stay: 40, rent: 25,
             drop: { x: 1560, y: 900, r: 0 }, moneySpot: { x: 1470, y: 1085 }, cashier: { x: 1615, y: 956 }, door: { x: 1560, y: 1050 },
             lanes: [{ x: 1660, y: 1070, dx: 0.25, dy: 0.97 }], gap: 46, max: 8, serve: 0.5 },
@@ -98,7 +116,9 @@ const CFG = {
   },
   counter: { dropRate: 0.07 },
   ship: { every: 180, stay: 60, mul: 1.6, dock: { x: 980, y: 300 }, berth: { x: 980, y: 110 }, minDemand: 10, maxDemand: 30 },   // 무역선: 마트가 있으면 3분마다 입항
-  river: { x: 0, y: 30, w: 2000, h: 120 },                        // 강(맨 위)
+  river: { x: 0, y: 30, w: 2760, h: 120 },                        // 강(맨 위, 동쪽 지대까지 이어진다)
+  // 동쪽 지대: 🧭 동쪽 개척을 사면 세계가 오른쪽으로 넓어지고 훈제장·육가공소가 들어선다
+  east: { x: 2000, w: 760, name: '동쪽 벌판', road: { y: 1250 } },
   fishing: { spots: [{ x: 820, y: 190 }, { x: 940, y: 190 }, { x: 1060, y: 190 }, { x: 1180, y: 190 }],
              range: 42, time: 3.0, fisherMul: 1.3, carry: 4 },   // 낚시: 3초에 한 마리, 낚싯대 레벨당 ×0.89
   hunt: { rect: { x: 1450, y: 250, w: 500, h: 370 }, max: 3, maxPerHunter: 1, respawn: 10, firstAt: 45,
@@ -133,6 +153,9 @@ const CFG = {
     cashierMul: 0.5,
     patience: 45,
     bigEvery: 170, bigAfter: 150, bigMul: 1.5, bigPatience: 80,   // 대량 구매자: 150초 이후 170초마다, 1.5배 가격
+    // 손님 계급: 마을 등급(회관)과 평판에 따라 올라간다. 계급마다 값을 더 치르고 더 많이 사며 오래 기다린다
+    classes: [{ name: '마을 사람', mul: 1, want: 0, patience: 0 }, { name: '나그네', mul: 1.06, want: 1, patience: 10 }, { name: '상인', mul: 1.14, want: 2, patience: 20 }, { name: '귀족', mul: 1.25, want: 3, patience: 30 }, { name: '왕족', mul: 1.4, want: 4, patience: 40 }],
+    tipChance: 0.15, tipMul: 0.2,
   },
   price: { growth: 1.12 },
   combat: { knockback: 12, hitText: true, engageRange: 58, disengageRange: 95, foeDmgMul: 0.6 },   // 적이 경비병·플레이어를 공격하는 거리와 피해 배수
@@ -249,7 +272,7 @@ const UPG = [
     unlock: g => g.lv.butcher >= 1 && g.lv.fishShop >= 1 && g.lv.price >= 3 },
   { id: 'martLanes', icon: '🛒', name: '계산대 추가', desc: '마트 계산대 +1줄(최대 5줄). 손님을 동시에 더 받습니다', max: 4,
     cost: l => [8000, 16000, 32000, 64000][l],     pad: { x: 1900, y: 2360 }, unlock: g => g.lv.mart >= 1 },
-  { id: 'martGoods', icon: '📦', name: '품목 확장', desc: '1: 🪑 가구 · 2: 🍲 요리 · 3: 🧥 의복을 마트에서도 팝니다. 공방 직원이 남는 완제품을 마트로 나릅니다', max: 3,
+  { id: 'martGoods', icon: '📦', name: '품목 확장', desc: '1: 🪑 가구 · 2: 🍲 요리 · 3: 🧥 의복 · 4: 🐠 훈제 · 5: 🌭 육가공을 마트에서도 팝니다. 공방 직원이 남는 완제품을 마트로 나릅니다', max: 5,
     cost: l => [10000, 25000, 60000][l],           pad: { x: 1900, y: 2480 }, unlock: g => g.lv.mart >= 1 },
   { id: 'martBulk', icon: '🛍️', name: '묶음 구매', desc: '마트 손님이 품목마다 +1개씩 더 삽니다', max: 6,
     cost: l => Math.round(5000 * Math.pow(1.6, l)), pad: { x: 1900, y: 2240 }, unlock: g => g.lv.mart >= 1 },
@@ -289,7 +312,7 @@ const UPG = [
   // ---- 작업 효율 · 마을 ----
   { id: 'training', icon: '🎓', name: '일꾼 훈련', desc: '벌목꾼·사냥꾼·어부·목수 작업 효율 +10%', max: Infinity,
     cost: l => Math.round(500 * Math.pow(1.5, l)),  pad: { x: 720, y: 1000 }, unlock: g => g.lv.worker >= 2 },
-  { id: 'townhall', icon: '🏛️', name: '마을 회관', desc: '마을 단위 투자. 모두의 작업 효율 +8%, 판매가 +5%, 마을 등급 상승. 방위대·봉화대가 열립니다', max: Infinity,
+  { id: 'townhall', icon: '🏛️', name: '마을 회관', desc: '마을 단위 투자. 모두의 작업 효율 +8%, 판매가 +5%, 마을 등급 상승(손님 계급이 올라 더 비싸게·많이 삽니다). 방위대·봉화대가 열립니다', max: Infinity,
     cost: l => Math.round(20000 * Math.pow(1.45, l)), pad: { x: 460, y: 1420 },
     unlock: g => g.lv.mart >= 1 || g.lv.workshop >= 3 || (g.lv.butcher >= 1 && g.lv.fishShop >= 1 && g.lv.worker >= 5) },
   { id: 'militia', icon: '🪖', name: '마을 방위대', desc: '황무지 경계를 지키는 정예 병사(체력 2.2배, 공격 1.6배)', max: 6,
@@ -311,6 +334,23 @@ const UPG = [
     cost: tbl([700, 1800, 4000, 9000], 1.8),       pad: { x: 270, y: 1470 }, unlock: g => g.lv.infirmary >= 1 },
   { id: 'mess',   icon: '🍲', name: '급식소',     desc: '직원들이 고기·생선을 먹습니다(1인당 분당 0.15). 배부르면 모두의 작업 효율 +15%, 굶으면 −20%. 수거꾼이 식량 창고에 나릅니다', max: 1,
     cost: () => 2500,                              pad: { x: 590, y: 1460 }, unlock: g => (g.lv.butcher >= 1 || g.lv.fishShop >= 1 || g.lv.mart >= 1) && g.lv.worker >= 3 },
+  // ---- 동쪽 지대(첫 확장) ----
+  { id: 'expandEast', icon: '🧭', name: '동쪽 개척', desc: '세계가 동쪽으로 넓어집니다. 🐠 훈제장(생선 가공)과 🌭 육가공소(고기 가공)를 지을 수 있습니다. 생선·고기가 오래 남아돌면 일찍 열립니다', max: 1,
+    cost: () => 40000,                             pad: { x: 1960, y: 1900 }, unlock: g => g.lv.mart >= 1 && (g.lv.townhall >= 1 || g.longGlut('fish') || g.longGlut('meat')) },
+  { id: 'smoke',  icon: '🐠', name: '훈제장',     desc: '1레벨: 건설(🐠 훈제 생선) · 2: 🥫 통조림 · 3: 🫙 캐비어 · 4: 🎁 해산물 세트. 생선과 장작을 비싼 상품으로', max: 4,
+    cost: tbl([6000, 14000, 30000, 60000], 2),      pad: { x: 2330, y: 760 }, unlock: g => g.lv.expandEast >= 1 },
+  { id: 'smoker', icon: '🧑‍🍳', name: '훈제공 고용', desc: '훈제장에서 생선을 계속 가공합니다', max: 4,
+    cost: tbl([1200, 3000, 7000, 15000], 1.8),     pad: { x: 2200, y: 760 }, unlock: g => g.lv.smoke >= 1 },
+  { id: 'smokePrice', icon: '🏷️', name: '훈제품 가격', desc: '훈제품 판매가 +12%',   max: Infinity,
+    cost: l => Math.round(700 * Math.pow(1.4, l)),  pad: { x: 2560, y: 640 }, unlock: g => g.lv.smoke >= 1 },
+  { id: 'meatproc', icon: '🌭', name: '육가공소',  desc: '1레벨: 건설(🌭 소시지) · 2: 🥓 육포 · 3: 🍖 햄 · 4: 🎁 소시지 세트. 남는 고기를 비싼 상품으로', max: 4,
+    cost: tbl([6000, 14000, 30000, 60000], 2),      pad: { x: 2330, y: 1390 }, unlock: g => g.lv.expandEast >= 1 && g.lv.butcher >= 1 },
+  { id: 'meatworker', icon: '🧑‍🍳', name: '가공공 고용', desc: '육가공소에서 고기를 계속 가공합니다', max: 4,
+    cost: tbl([1200, 3000, 7000, 15000], 1.8),     pad: { x: 2200, y: 1390 }, unlock: g => g.lv.meatproc >= 1 },
+  { id: 'procPrice', icon: '🏷️', name: '육가공품 가격', desc: '육가공품 판매가 +12%', max: Infinity,
+    cost: l => Math.round(600 * Math.pow(1.4, l)),  pad: { x: 2560, y: 1270 }, unlock: g => g.lv.meatproc >= 1 },
+  { id: 'coldstore', icon: '❄️', name: '냉동 창고', desc: '도축장 보관함 +40, 대기 순록 +3. 도축장이 막히지 않게', max: 5,
+    cost: tbl([3000, 6000, 12000, 24000, 48000], 2), pad: { x: 1440, y: 1700 }, unlock: g => g.lv.slaughter >= 2 },
   { id: 'manager', icon: '🧑‍💼', name: '관리인 고용', desc: '📊 수급 현황을 읽고 막힌 곳(생산 부족·운반 지연·과잉·방어)에 알아서 투자합니다. 돈의 25%는 남겨 둡니다. 📊 창에서 켜고 끕니다', max: 1,
     cost: () => 15000,                             pad: { x: 560, y: 1340 }, unlock: g => g.lv.townhall >= 1 },
   { id: 'repair', icon: '🔧', name: '본부 수리',  desc: '본부 내구도 전부 회복',     max: Infinity,
@@ -334,11 +374,11 @@ const BOSS = [
 ];
 // 수급 현황 추천: 부족(more)·운반 지연(haul)·과잉(sell)일 때 권하는 업그레이드 id. 지금 보이는 결제 원만 보여 준다
 const ADVICE = {
-  more: { wood: ['worker', 'axe', 'forest', 'grove', 'training'], meat: ['ranch', 'slaughterman', 'breed', 'feed', 'rancher', 'hunter'],
+  more: { wood: ['worker', 'axe', 'forest', 'grove', 'training'], meat: ['ranch', 'slaughterman', 'coldstore', 'breed', 'feed', 'rancher', 'hunter'],
           fish: ['fisher', 'rod', 'fishFarm', 'fishFarmer', 'fishFeed'], pelt: ['traps', 'bait', 'skinning', 'tanning', 'hunter'] },
   haul: ['collector', 'sled', 'runner_tailor', 'runner_rest', 'runner_furn', 'shoes'],
-  sell: { wood: ['promo', 'workshop', 'craftsman', 'mart', 'martLanes'], meat: ['promo', 'restaurant', 'cook', 'mart', 'martLanes'],
-          fish: ['promo', 'restaurant', 'cook', 'mart', 'martLanes'], pelt: ['promo', 'tailor', 'tailorman', 'mart', 'martLanes'] },
+  sell: { wood: ['promo', 'workshop', 'craftsman', 'smoke', 'mart', 'martLanes'], meat: ['meatproc', 'meatworker', 'expandEast', 'restaurant', 'cook', 'promo', 'mart', 'martLanes'],
+          fish: ['smoke', 'smoker', 'expandEast', 'restaurant', 'cook', 'promo', 'mart', 'martLanes'], pelt: ['tailor', 'tailorman', 'promo', 'mart', 'martLanes'] },
 };
 const bossTier = n => Math.min(BOSS.length - 1, Math.max(0, Math.floor(n / 10) - 1));
 const ENRAGE = { at: 0.35, speed: 1.5, dmg: 1.4 };   // 체력 35% 이하에서 분노
@@ -368,6 +408,8 @@ const TIERS = {
   rest: [{ at: 1, name: '포장마차' }, { at: 2, name: '식당' }, { at: 4, name: '연회장' }],
   tailor: [{ at: 1, name: '재단소' }, { at: 3, name: '양장점' }],
   inn: [{ at: 1, name: '여관' }, { at: 8, name: '객잔' }, { at: 16, name: '호텔' }, { at: 30, name: '그랜드 호텔' }, { at: 50, name: '리조트' }],
+  smoke: [{ at: 1, name: '훈제 오두막' }, { at: 3, name: '훈제장' }],
+  meatproc: [{ at: 1, name: '가공 작업장' }, { at: 3, name: '육가공소' }],
   ranch: [{ at: 1, name: '울타리 목장' }, { at: 4, name: '축사' }, { at: 8, name: '대형 축사' }],
   village: [{ at: 0, name: '개척지' }, { at: 1, name: '마을' }, { at: 3, name: '큰 마을' }, { at: 6, name: '읍내' }, { at: 10, name: '도시' }],
   axe:   [{ at: 0, name: '쇠도끼', color: '#9aa7b5' }, { at: 3, name: '강철 도끼', color: '#6fa8dc' }, { at: 6, name: '황금 도끼', color: '#f1c40f' }, { at: 10, name: '수정 도끼', color: '#b388ff' }],
@@ -438,6 +480,10 @@ const TIPS = [
   { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. 잡으면 🧥 모피! ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
   { id: 'pelt',    when: g => g.drops.some(d => d.kind === 'pelt'),  text: '🧥 모피가 떨어졌어요! 주워 두세요. 사냥터 옆 모피 상점을 열면 비싸게 팝니다' },
   { id: 'collector', when: g => g.padVisible(UPG.find(u => u.id === 'collector')) && g.drops.length >= 4, text: '바닥에 고기·모피가 남아 있어요. 🧺 수거꾼(사냥터 입구)을 고용하면 맵 전체를 돌며 주워 가게에 나릅니다. 2명째부터는 캠프 옆 초소에서 습격 전리품을 기다립니다' },
+  { id: 'classes', when: g => g.lv.townhall >= 1, text: '👥 마을이 커지면 손님도 발전합니다: 마을 사람 → 나그네 → 상인 → 귀족 → 왕족. 계급이 높을수록 비싸게·많이 사고 팁도 줍니다. 손님을 화나게 하면 평판이 떨어져 낮은 계급이 늘어요(📊 창에서 평판 확인)' },
+  { id: 'expandpad', when: g => g.padVisible(UPG.find(u => u.id === 'expandEast')), text: '🧭 동쪽 개척(목장 아래 오른쪽 끝)을 사면 세계가 동쪽으로 넓어지고 훈제장·육가공소를 지을 수 있어요. 생선·고기가 남아돌 때의 답입니다' },
+  { id: 'expand', when: g => g.lv.expandEast >= 1, text: '🧭 동쪽 벌판이 열렸어요! 오른쪽으로 가 보세요. 🐠 훈제장은 생선+장작, 🌭 육가공소는 고기를 비싼 상품으로 만듭니다. 마트 품목 확장 4·5단계로 마트에서도 팝니다' },
+  { id: 'coldstore', when: g => g.padVisible(UPG.find(u => u.id === 'coldstore')), text: '도축장이 자주 막히나요? ❄️ 냉동 창고(도축장 아래)는 보관함과 대기 순록 자리를 늘립니다' },
   { id: 'manager', when: g => g.lv.manager >= 1, text: '🧑‍💼 관리인 고용! 20초마다 수급·방어를 살펴 가장 급한 업그레이드를 알아서 삽니다(돈의 25%는 남김). 📊 수급 현황 창에서 자동 투자를 끌 수 있어요' },
   { id: 'infirmary', when: g => g.padVisible(UPG.find(u => u.id === 'infirmary')), text: '⚠️ 쓰러진 경비병은 30초 안에 치료받지 못하면 전사하고 경비병 레벨이 깎입니다. 🏥 의무소(캠프 북서쪽)를 짓고 🩺 의무병을 두세요. 급하면 내가 옆에 서도 치료됩니다' },
   { id: 'mess', when: g => g.lv.mess >= 1, text: '🍲 급식소 개업! 캠프 북동쪽 식량 창고에 고기·생선을 두면 직원들이 먹고 효율이 15% 오릅니다. 비면 20% 떨어지니 수거꾼이 채우게 두세요' },

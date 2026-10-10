@@ -123,6 +123,7 @@
         <li><b>마트 이후</b> 판매대·정육점·어물전·모피 상점은 마트로 합쳐져 사라지고, 빈 자리에 🍲 식당(생선·고기 요리), 🧵 재단소(모피 옷), 🏨 여관(침대·의자로 객실), 🚢 무역 부두(3분마다 무역선이 마트 재고를 대량 매입)가 들어섭니다. 마트는 계산대·품목 확장·묶음 구매로 키웁니다</li>
         <li><b>모피 · 수거</b> 모피는 사냥터 곰, 습격 온 곰·늑대·설인의 전리품, 🧶 무두질(도축한 순록)에서 나옵니다. 🗡️ 가죽 손질·🐟 미끼로 사냥터 생산을 늘리고, 🧺 수거꾼은 맵 전체의 고기·모피와 습격 전리품을 주워 나릅니다(🛷 썰매로 강화). 🐠 양식장은 식당 이후 강 왼쪽에, 🌲 남쪽 숲은 공방 옆에 열립니다</li>
         <li><b>📊 수급 현황</b> 위쪽 📊 버튼을 누르면 품목별 생산·소비·재고와 무엇을 올려야 하는지 알려 줍니다. 🔴 부족은 생산, 🟠 운반 지연은 수거꾼·썰매, 🟡 과잉은 수요(홍보·제작·마트). 같은 문제가 90초 넘게 이어지면 새 소식으로도 알려 줍니다. 수거꾼은 가게에 모자란 비싼 물건부터 나릅니다</li>
+        <li><b>동쪽 개척</b> 마트와 회관이 있거나 생선·고기가 2분 넘게 남아돌면 🧭 동쪽 개척(목장 아래 오른쪽 끝)이 열립니다. 세계가 동쪽으로 넓어지고 🐠 훈제장(생선+장작 → 훈제·통조림·캐비어)과 🌭 육가공소(고기 → 소시지·육포·햄)가 들어섭니다. ❄️ 냉동 창고는 도축장 병목을 풉니다</li>
         <li><b>부상 · 치료</b> 쓰러진 경비병은 30초 안에 치료받지 못하면 전사하고 경비병 레벨이 깎입니다(다시 고용해 채우세요). 🏥 의무소를 짓고 🩺 의무병을 두면 달려가 치료하고, 급하면 내가 옆에 서도 치료됩니다</li>
         <li><b>급식소 · 배달부</b> 🍲 급식소를 지으면 직원들이 고기·생선을 먹어 배부르면 효율 +15%, 굶으면 −20%. 🚚 공방·식당·재단소 배달부는 더미·마트에서 재료를 직접 가져옵니다. 여관 객실은 무제한(객잔 → 호텔 → 리조트)</li>
         <li><b>운반 분업</b> 수거꾼 2명 이상이면 📦 운반 분업(사냥터 입구)을 열 수 있습니다. 1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미(가죽 더미·생선 바구니·통나무 더미·도축장 보관함)에 쌓으면 수거꾼이 실어 나릅니다. 더미가 차면 직접 나르니 수거꾼·썰매를 함께 늘리세요. 더미 위에 서면 직접 가져갈 수도 있습니다</li>
@@ -139,7 +140,8 @@
       return `<tr><td>${G.emoji} ${G.name}</td><td>${Math.round(a.prod)}</td><td>${Math.round(a.cons)}</td><td>${a.stock}/${a.cap}${a.held ? `<br><span class="dim">쌓임 ${a.held}</span>` : ''}</td><td>${st}${recs ? `<br><span class="dim">${recs}</span>` : ''}</td></tr>`;
     }).join('');
     const mgr = game.lv.manager ? `<p><button class="btn ${game.autoInvest ? 'primary' : ''}" id="btn-auto" style="width:100%">🧑‍💼 관리인 자동 투자: ${game.autoInvest ? '켬' : '끔'}</button></p>${game.managerLog.length ? `<p class="dim">최근 구매<br>${game.managerLog.slice().reverse().join('<br>')}</p>` : ''}` : '';
-    return `<h2>📊 수급 현황</h2>${mgr}
+    const vt = TIERS.village[tierOf('village', game.lv.townhall)].name, repTxt = `<p class="dim">👥 마을 등급 <b>${vt}</b> · 손님 평판 <b>${Math.round(game.rep)}</b>/100 — 평판이 높으면 상인·귀족·왕족이 더 자주 오고 팁을 줍니다. 화나서 돌아가는 손님은 평판을 떨어뜨립니다.</p>`;
+    return `<h2>📊 수급 현황</h2>${repTxt}${mgr}
       <p class="dim">최근 2분 기준 분당 생산·소비입니다. 🔴 부족이면 생산 업그레이드, 🟠 운반 지연이면 수거꾼·썰매, 🟡 과잉이면 수요(홍보·제작·마트)를 올리세요. 90초 넘게 이어지는 문제는 새 소식으로도 알려 줍니다.</p>
       <table class="supply"><tr><th>품목</th><th>생산/분</th><th>소비/분</th><th>가게 재고</th><th>상태 · 추천</th></tr>${rows || '<tr><td colspan="5" class="dim">아직 파는 가게가 없어요</td></tr>'}</table>`;
   }
@@ -318,7 +320,7 @@
     else { cam.x += (game.player.x - cam.x) * k; cam.y += (game.player.y - 20 - cam.y) * k; }
     const hw = cam.w / 2 / cam.scale, hh = cam.h / 2 / cam.scale;
     const topPad = ui.topPad / cam.scale, botPad = ui.bottomPad / cam.scale;   // HUD에 가려지는 띠만큼 더 보여 준다
-    cam.x = hw * 2 >= CFG.world.w ? CFG.world.w / 2 : clamp(cam.x, hw, CFG.world.w - hw);
+    cam.x = hw * 2 >= game.worldW ? game.worldW / 2 : clamp(cam.x, hw, game.worldW - hw);
     cam.y = hh * 2 >= CFG.world.h + topPad + botPad ? CFG.world.h / 2 : clamp(cam.y, hh - topPad, CFG.world.h - hh + botPad);
     ui.onTitle = onTitle;
     render(ctx, game, cam, time, dt, js, ui);
