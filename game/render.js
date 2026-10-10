@@ -321,7 +321,7 @@ function drawPerson(ctx, e, o, g) {
     h += np * 9;
     if (e.inv.animal > 0) { const ax = e.x - (e.facing || 1) * 34; drawReindeer(ctx, { x: ax, y: e.y + 2, grow: 1, facing: e.facing || 1, moving: e.moving, anim: e.anim, harvestT: 0, i: 0, led: true }, 0); ctx.strokeStyle = '#5b4636'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(e.x + (e.facing || 1) * 6, e.y - 30); ctx.lineTo(ax + (e.facing || 1) * 18, e.y - 34); ctx.stroke(); if (e.inv.animal > 1) pill(ctx, ax, e.y - 70, `×${e.inv.animal}`, 'rgba(20,30,45,0.7)'); }
     const parts = [];
-    if (e.inv.wood) parts.push(`🪵${e.inv.wood}`); if (e.inv.meat) parts.push(`🥩${e.inv.meat}`); if (e.inv.fish) parts.push(`🐟${e.inv.fish}`); if (e.inv.pelt) parts.push(`🧥${e.inv.pelt}`); if (e.inv.animal) parts.push(`🦌${e.inv.animal}`);
+    if (e.inv.wood) parts.push(`🪵${e.inv.wood}`); if (e.inv.meat) parts.push(`🥩${e.inv.meat}`); if (e.inv.fish) parts.push(`🐟${e.inv.fish}`); if (e.inv.pelt) parts.push(`🐾${e.inv.pelt}`); if (e.inv.animal) parts.push(`🦌${e.inv.animal}`);
     if (parts.length && o.showInv) pill(ctx, e.x, e.y - bob - h - 12, parts.join(' '), 'rgba(20,30,45,0.7)');
   }
 }
@@ -562,7 +562,7 @@ function drawSlaughterhouse(ctx, g, time) {
     ctx.fillStyle = '#5b4636'; ctx.fillRect(R.x - 26, R.y - 44, 5, 50); ctx.fillRect(R.x + 21, R.y - 44, 5, 50); ctx.fillRect(R.x - 28, R.y - 46, 56, 4);
     const np = Math.min(st.pelt, 3); for (let i = 0; i < np; i++) peltBundle(ctx, R.x - 14 + i * 14, R.y - 30 + (i % 2) * 3, 0.75);
     if (st.pelt === 0) { ctx.fillStyle = '#a67c52'; ellipse(ctx, R.x, R.y - 34, 10, 5); }
-    pill(ctx, R.x, R.y - 60, `🧥 ${st.pelt} · 마리당 +${g.peltPerAnimal}`, 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
+    pill(ctx, R.x, R.y - 60, `🐾 ${st.pelt} · 마리당 +${g.peltPerAnimal}`, 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
   }
   label(ctx, W.x, W.y + 18, '도축대', 10, '#fff');
   // 고기 받기 칸
@@ -577,7 +577,7 @@ function drawSlaughterhouse(ctx, g, time) {
   // 간판
   ctx.fillStyle = '#f5e6c8'; rrect(ctx, x - 50, y - h + 28, 100, 24, 5); ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x - 50, y - h + 28, 100, 24, 5); ctx.stroke();
   ctx.fillStyle = PAL.ink; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🔪 도축장 Lv${g.lv.slaughter}`, x, y - h + 40);
-  pill(ctx, x, y - h + 6, `마리당 ${Math.round(g.slaughterTime * 10) / 10}초 → 🥩${g.meatPerAnimal}${g.peltPerAnimal ? ' 🧥' + g.peltPerAnimal : ''}`, 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
+  pill(ctx, x, y - h + 6, `마리당 ${Math.round(g.slaughterTime * 10) / 10}초 → 🥩${g.meatPerAnimal}${g.peltPerAnimal ? ' 🐾' + g.peltPerAnimal : ''}`, 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
   ctx.restore();
 }
 function drawMart(ctx, g, time) {
@@ -1031,7 +1031,7 @@ function drawPad(ctx, g, u, time) {
   if (afford) { ctx.strokeStyle = `rgba(39,174,96,${0.35 + Math.sin(time * 5) * 0.25})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, r + 8, 0, Math.PI * 2); ctx.stroke(); }
   ctx.restore();
   emoji(ctx, x, y - 4, u.icon, 24);
-  pill(ctx, x, y + 20, cost <= 0 ? '밟으면 계약' : !needsOk ? Object.keys(u.needs).map(k => `${CFG.goods[k].emoji}${u.needs[k]}`).join(' ') + ' 필요' : '$' + fmtMoney(Math.ceil(cost - paid)), afford ? '#27ae60' : !needsOk ? '#c0392b' : '#34495e', '#fff', 'bold 11px system-ui, sans-serif');
+  pill(ctx, x, y + 20, cost <= 0 ? '밟으면 계약' : !needsOk ? Object.keys(u.needs).map(k => `${CFG.goods[k].emoji}${u.needs[k]}`).join(' ') + ' 필요' : '$' + fmtMoney(Math.max(0, Math.ceil(cost - paid))), afford ? '#27ae60' : !needsOk ? '#c0392b' : '#34495e', '#fff', 'bold 11px system-ui, sans-serif');
   const lv = g.lv[u.id];
   label(ctx, x, y - 46, u.name + (u.max !== 1 && u.id !== 'repair' && lv > 0 ? ` Lv${lv}` : ''), 11, '#fff');
 }

@@ -734,7 +734,7 @@ class Game {
     if (Math.floor(e.proc.t * 1.5) !== Math.floor((e.proc.t - dt) * 1.5)) { e.swing = 1; this.emit('chop', e.x, e.y); }
     if (e.proc.t >= e.proc.need) {
       e.proc = null; shop.stock.meat += this.meatPerAnimal; shop.stock.pelt = Math.min(cap, shop.stock.pelt + this.peltPerAnimal); this.stats.slaughters++; this.recordFlow('prod', 'meat', this.meatPerAnimal); this.recordFlow('prod', 'pelt', this.peltPerAnimal);   // 모피 보관함이 꽉 차도 도축은 멈추지 않는다
-      this.text(e.x, e.y - 80, `🥩 +${this.meatPerAnimal}${this.peltPerAnimal ? ' 🧥 +' + this.peltPerAnimal : ''}`, '#ffb4b4', 1.1);
+      this.text(e.x, e.y - 80, `🥩 +${this.meatPerAnimal}${this.peltPerAnimal ? ' 🐾 +' + this.peltPerAnimal : ''}`, '#ffb4b4', 1.1);
       this.emit('harvest', e.x, e.y);
     }
   }
@@ -869,6 +869,7 @@ class Game {
   update(dt) {
     if (this.over) return;
     this.t += dt;
+    if (!(this.money >= 0)) this.money = 0;   // NaN·음수 방지(어떤 경로로든 돈이 깨지면 0으로)
     this.flowTick();
     this.updatePlayer(dt);
     this.updateTrees(dt);
@@ -1527,6 +1528,7 @@ class Game {
       const cost = this.padCost(u), paid = this.paid[u.id] || 0;
       if (cost <= 0) { if (u.id === 'trade') this.trade(); continue; }
       if (u.needs && !this.hasNeeds(u)) continue;
+      if (paid >= cost - 1e-6) { this.money += Math.max(0, paid - cost); this.paid[u.id] = 0; this.buy(u); continue; }   // 가격이 내려가 이미 낸 돈이 더 많으면: 차액 돌려주고 바로 산다(음수 표시로 막히지 않게)
       if (this.money < 0.01) continue;
       const rate = Math.max(CFG.pad.minRate, cost * CFG.pad.rateMul);
       const amt = Math.min(this.money, rate * dt, cost - paid);
@@ -1710,7 +1712,7 @@ class Game {
       this.spawnBills(b.bounty, b.x, b.y, 20, 12, null);
       if (b.meat) this.spawnDrops('meat', b.meat, b.x, b.y);
       if (b.pelt) this.spawnDrops('pelt', b.pelt, b.x, b.y);
-      if (b.pelt >= 3 || b.meat >= 6) this.text(b.x, b.y - 60, `${b.pelt ? '🧥×' + b.pelt : ''}${b.meat ? ' 🥩×' + b.meat : ''}`.trim(), '#d9a86c', 1);
+      if (b.pelt >= 3 || b.meat >= 6) this.text(b.x, b.y - 60, `${b.pelt ? CFG.goods.pelt.emoji + '×' + b.pelt : ''}${b.meat ? ' 🥩×' + b.meat : ''}`.trim(), '#d9a86c', 1);
       this.emit('kill', b.x, b.y);
     }
   }
