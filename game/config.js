@@ -18,11 +18,13 @@ const CFG = {
   worker: { speed: 130, chopMul: 1.5, carry: 4, dropRate: 0.12, idle: { x: 720, y: 900 } },
   guard:  { speed: 155, atkCd: 0.8, range: 55, dmg: 4, hp: 50, hpPerWeapon: 10, downTime: 20, regenTime: 30, bleedOut: 30, healTime: 5, reviveHp: 0.6 },   // 쓰러진 경비병은 bleedOut초 안에 치료받지 못하면 전사한다
   infirmary: { x: 150, y: 1560, post: { x: 150, y: 1600 } },   // 의무소(캠프 북서쪽)
+  repair: { post: { x: 150, y: 1860 }, towerTime: 20, hutTime: 30, fenceTime: 40 },   // 수리공 대기 자리(캠프 남서쪽), 하나를 전부 고치는 데 걸리는 초
   // 급식소: 직원 1인당 분당 perWorker만큼 고기·생선을 먹는다. 배부르면 효율 bonus, 굶으면 penalty
   mess: { x: 490, y: 1560, drop: { x: 480, y: 1630, r: 40 }, cap: 120, perWorker: 0.15, bonus: 1.15, penalty: 0.8 },
   weapon: { dmgPer: 2 },
   // 감시탑: 남문 앞이 첫 탑. per레벨마다 sites 순서대로 탑이 하나씩 더 선다(서쪽 담 밖 → 동쪽 담 밖 → 황무지 전진 초소)
   tower:  { x: 330, y: 1920, cd: 1.1, dmg: 6, dmgPer: 5, range: 320, rangePer: 14, per: 6,
+            hp: 100, hpGrowth: 1.1, regenTime: 150, aggro: 80, bossAggro: 380,   // 탑 내구도(레벨마다 ×1.1). 적은 aggro 안을 지나면, 보스는 bossAggro 안이면 탑부터 부순다. 습격이 끝나면 천천히 자가 회복(부서진 탑은 수리 필요)
             sites: [{ x: 330, y: 1920 }, { x: 50, y: 1720 }, { x: 740, y: 1600 }, { x: 60, y: 2160 }] },   // 결제 원·글자를 가리지 않는 자리   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
 
   tree:   { logs: 3, regrow: 8, range: 50 },
@@ -354,8 +356,10 @@ const UPG = [
     cost: tbl([3000, 6000, 12000, 24000, 48000], 2), pad: { x: 1440, y: 1700 }, unlock: g => g.lv.slaughter >= 2 },
   { id: 'manager', icon: '🧑‍💼', name: '관리인 고용', desc: '📊 수급 현황을 읽고 막힌 곳(생산 부족·운반 지연·과잉·방어)에 알아서 투자합니다. 돈의 25%는 남겨 둡니다. 📊 창에서 켜고 끕니다', max: 1,
     cost: () => 15000,                             pad: { x: 560, y: 1340 }, unlock: g => g.lv.townhall >= 1 },
-  { id: 'repair', icon: '🔧', name: '본부 수리',  desc: '본부 내구도 전부 회복',     max: Infinity,
-    cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 },
+  { id: 'repair', icon: '🔧', name: '수리',  desc: '본부와 감시탑 내구도 전부 회복. 부서진 탑은 고칠 때까지 쏘지 못합니다',     max: Infinity,
+    cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 || g.towerSites().some((S, i) => !(g.towerHp[i] > g.towerMax(g.lv.tower) * 0.6)) },
+  { id: 'repairman', icon: '🔨', name: '수리공 고용', desc: '부서지거나 상한 감시탑·본부·울타리를 돌며 고칩니다(탑 하나 20초). 보스는 탑부터 부수니 꼭 두세요', max: 3,
+    cost: tbl([900, 2400, 6000], 2),              pad: { x: 140, y: 2080 }, unlock: g => g.lv.tower >= 1 && g.lv.fence >= 1 },
 ];
 
 // 적 종류. 웨이브가 오를수록 섞여 나온다.
@@ -486,6 +490,8 @@ const TIPS = [
   { id: 'expand', when: g => g.lv.expandEast >= 1, text: '🧭 동쪽 벌판이 열렸어요! 오른쪽으로 가 보세요. 🐠 훈제장은 생선+장작, 🌭 육가공소는 고기를 비싼 상품으로 만듭니다. 마트 품목 확장 4·5단계로 마트에서도 팝니다' },
   { id: 'coldstore', when: g => g.padVisible(UPG.find(u => u.id === 'coldstore')), text: '도축장이 자주 막히나요? ❄️ 냉동 창고(도축장 아래)는 보관함과 대기 순록 자리를 늘립니다' },
   { id: 'manager', when: g => g.lv.manager >= 1, text: '🧑‍💼 관리인 고용! 20초마다 수급·방어를 살펴 가장 급한 업그레이드를 알아서 삽니다(돈의 25%는 남김). 📊 수급 현황 창에서 자동 투자를 끌 수 있어요' },
+  { id: 'towerhp', when: g => g.towerSites().some((S, i) => g.towerHp[i] < g.towerMax(g.lv.tower) * 0.7), text: '⚠️ 감시탑도 내구도가 있어요. 적이 지나가며 부수고 보스는 탑부터 노립니다. 부서진 탑은 쏘지 못하니 🔧 수리(본부 왼쪽)로 고치거나 🔨 수리공(캠프 남서쪽)을 두세요' },
+  { id: 'repairman', when: g => g.padVisible(UPG.find(u => u.id === 'repairman')) && g.lv.repairman < 1 && g.wave.n >= 6, text: '🔨 수리공(캠프 남서쪽)을 고용하면 습격 뒤 감시탑·본부·울타리를 알아서 고칩니다' },
   { id: 'infirmary', when: g => g.padVisible(UPG.find(u => u.id === 'infirmary')), text: '⚠️ 쓰러진 경비병은 30초 안에 치료받지 못하면 전사하고 경비병 레벨이 깎입니다. 🏥 의무소(캠프 북서쪽)를 짓고 🩺 의무병을 두세요. 급하면 내가 옆에 서도 치료됩니다' },
   { id: 'mess', when: g => g.lv.mess >= 1, text: '🍲 급식소 개업! 캠프 북동쪽 식량 창고에 고기·생선을 두면 직원들이 먹고 효율이 15% 오릅니다. 비면 20% 떨어지니 수거꾼이 채우게 두세요' },
   { id: 'runner', when: g => g.padVisible(UPG.find(u => u.id === 'runner_tailor')) || g.padVisible(UPG.find(u => u.id === 'runner_rest')), text: '🚚 배달부를 두면 식당·재단소·공방이 더미와 마트에서 재료를 직접 가져옵니다. 수거꾼이 바쁠 때 재료 대기를 줄입니다' },

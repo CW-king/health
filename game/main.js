@@ -29,9 +29,12 @@
   // ---- 카메라 / 크기 ----
   const cam = { x: game.player.x, y: game.player.y, w: 1, h: 1, scale: 1, dpr: 1 };
   const ui = { autoTarget: null, bottomPad: 60, topPad: 120 };
+  // 화질 자동 조절: 프레임이 느려지면 해상도(dpr)를 한 단계씩 낮추고, 여유가 생기면 되돌린다
+  const qual = { cap: Math.min(2, window.devicePixelRatio || 1), dpr: 0, ema: 16, slowT: 0, fastT: 0 };
+  qual.dpr = qual.cap;
   function resize() {
     const r = canvas.parentElement.getBoundingClientRect();
-    cam.dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    cam.dpr = qual.dpr;
     cam.w = r.width; cam.h = r.height;
     canvas.width = Math.round(r.width * cam.dpr); canvas.height = Math.round(r.height * cam.dpr);
     canvas.style.width = r.width + 'px'; canvas.style.height = r.height + 'px';
@@ -305,6 +308,12 @@
     let dt = (now - last) / 1000; last = now;
     if (dt > 0.25) dt = 0.25;
     time += dt;
+    if (!paused && !document.hidden) {   // 화질 자동 조절
+      qual.ema += (dt * 1000 - qual.ema) * 0.04;
+      if (qual.ema > 30) { qual.slowT += dt; qual.fastT = 0; if (qual.slowT > 2.5 && qual.dpr > 1) { qual.dpr = Math.max(1, Math.round((qual.dpr - 0.25) * 4) / 4); qual.slowT = 0; qual.ema = 20; resize(); } }
+      else if (qual.ema < 15) { qual.fastT += dt; qual.slowT = 0; if (qual.fastT > 20 && qual.dpr < qual.cap) { qual.dpr = Math.min(qual.cap, qual.dpr + 0.25); qual.fastT = 0; qual.ema = 20; resize(); } }
+      else { qual.slowT = 0; qual.fastT = 0; }
+    }
     if (!paused && !game.over) {
       readInput();
       acc += dt;

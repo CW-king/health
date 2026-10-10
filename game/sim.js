@@ -108,6 +108,16 @@ class Game {
   get towerArrows() { return this.towerTierDef.shots; }
   get towerCount() { return this.lv.tower ? Math.min(CFG.tower.sites.length, 1 + Math.floor(this.lv.tower / CFG.tower.per)) : 0; }
   towerSites() { return CFG.tower.sites.slice(0, this.towerCount); }
+  towerMax(l) { return Math.round(CFG.tower.hp * Math.pow(CFG.tower.hpGrowth, Math.min(l, 50)) * (1 + 0.05 * Math.max(0, l - 50))); }   // 탑 내구도(50레벨 뒤엔 완만하게)
+  towerAlive(i) { return this.towerHp[i] > 0; }
+  get towersAlive() { return this.towerSites().filter((S, i) => this.towerAlive(i)).length; }
+  // 적이 탑을 때린다. 0이 되면 수리할 때까지 쏘지 못한다
+  hitTower(i, dmg, by) {
+    if (!(this.towerHp[i] > 0)) return;
+    this.towerHp[i] = Math.max(0, this.towerHp[i] - dmg);
+    this.emit('hitFence', by.x, by.y);
+    if (this.towerHp[i] <= 0) { const S = CFG.tower.sites[i]; this.text(S.x, S.y - 150, `${i + 1}호 감시탑이 부서졌다! 🔧 수리 필요`, '#ff8a80', 2.2); this.emit('fenceBroken', S.x, S.y); this.shake = Math.max(this.shake, 0.6); this.stats.towersBroken = (this.stats.towersBroken || 0) + 1; }
+  }
   get weaponDef() { return TIERS.weapon[tierOf('weapon', this.lv.weapon)]; }
   get guardRange() { return this.weaponDef.range || CFG.guard.range; }       // 총 단계면 멀리서 쏜다
   get playerRange() { return this.weaponDef.range || CFG.player.atkRange; }
@@ -229,6 +239,7 @@ class Game {
     this.fence.hp = s.fenceHp != null ? Math.min(s.fenceHp, this.fence.maxhp) : this.fence.maxhp;
     this.hut = { x: CFG.hut.x, y: CFG.hut.y, maxhp: this.hutMax(this.lv.fence) };
     this.hut.hp = s.hutHp != null ? Math.max(1, Math.min(s.hutHp, this.hut.maxhp)) : this.hut.maxhp;
+    this.towerHp = []; { const m = this.towerMax(this.lv.tower); for (let i = 0; i < CFG.tower.sites.length; i++) this.towerHp[i] = s.towerHp && s.towerHp[i] != null ? Math.max(0, Math.min(m, s.towerHp[i])) : m; }
     this.wave = { n: s.waveN || 0, nextAt: s.waveNextAt != null ? s.waveNextAt : CFG.wave.first, warned: false, active: false };
     if (s.waveActive && this.wave.n > 0) { this.wave.n--; this.wave.nextAt = this.t + 30; }   // 습격 도중 저장됐으면 그 웨이브를 30초 뒤 다시 치른다
     else if (this.wave.nextAt < this.t + 20) this.wave.nextAt = this.t + 30;
@@ -260,6 +271,7 @@ class Game {
     this.collectors = []; for (let i = 0; i < this.lv.collector; i++) this.addCollector();
     this.runners = {}; for (const id of CRAFT_SHOPS) this.runners[id] = []; for (const id of CRAFT_SHOPS) for (let i = 0; i < (this.lv['runner_' + id] || 0); i++) this.addRunner(id);
     this.medics = []; for (let i = 0; i < this.lv.medic; i++) this.addMedic();
+    this.repairmen = []; for (let i = 0; i < this.lv.repairman; i++) this.addRepairman();
     this.fed = s.fed != null ? s.fed : 1; this.mealT = 0;
     this.rep = s.rep != null ? s.rep : 50;   // 손님 평판 0~100
     this.autoInvest = s.autoInvest != null ? !!s.autoInvest : true; this.managerT = 12; this.managerLog = (s.managerLog || []).slice(-6);
@@ -297,7 +309,7 @@ class Game {
     for (const e of this.slaughtermen.concat([this.player])) if (e.proc) add('slaughter', 'animal', 1);
     return {
       t: this.t, money: this.money, earned: this.earned, lv: this.lv, paid: this.paid,
-      fenceHp: this.fence.hp, hutHp: this.hut.hp, waveN: this.wave.n, waveNextAt: this.wave.nextAt, waveActive: this.wave.active,
+      fenceHp: this.fence.hp, hutHp: this.hut.hp, towerHp: this.towerHp.slice(), waveN: this.wave.n, waveNextAt: this.wave.nextAt, waveActive: this.wave.active,
       bills: this.bills.filter(b => b.state === 'ground').map(b => ({ x: Math.round(b.x), y: Math.round(b.y), amount: b.amount, shop: b.shop })),
       drops: this.drops.filter(d => d.state === 'ground').map(d => ({ kind: d.kind, x: Math.round(d.x), y: Math.round(d.y) })),
       tipQueue: this.tipQueue.map(t => t.id),
@@ -884,7 +896,7 @@ class Game {
     this.updateSlaughtermen(dt);
     this.updateCollectors(dt);
     this.updateRunners(dt);
-    this.updateMedics(dt);
+    this.updateMedics(dt); this.updateRepairmen(dt);
     this.updateMeals(dt);
     this.updateManager(dt);
     this.updateInn(dt);
@@ -1527,7 +1539,7 @@ class Game {
 
   // ---- 업그레이드 결제 원 ----
   padCost(u) {
-    if (u.id === 'repair') return Math.max(1, Math.ceil((this.hut.maxhp - this.hut.hp) * (2 + this.wave.n * 0.4)));
+    if (u.id === 'repair') { const tm = this.towerMax(this.lv.tower); let d = this.hut.maxhp - this.hut.hp; this.towerSites().forEach((S, i) => { d += (tm - this.towerHp[i]) * 0.5; }); return Math.max(1, Math.ceil(d * (2 + this.wave.n * 0.4))); }
     return softCost(u, this.lv[u.id]);
   }
   padVisible(u) {
@@ -1557,11 +1569,13 @@ class Game {
   hasNeeds(u) { return !u.needs || Object.keys(u.needs).every(g => this.shops.furn.stock[g] >= u.needs[g]); }
   buy(u) {
     if (u.needs) { for (const g of Object.keys(u.needs)) this.shops.furn.stock[g] = Math.max(0, this.shops.furn.stock[g] - u.needs[g]); }
-    if (u.id === 'repair') { this.hut.hp = this.hut.maxhp; this.text(u.pad.x, u.pad.y - 50, '본부 수리 완료!', '#7CFC9A', 1.3); this.emit('buy', u.pad.x, u.pad.y, u); return; }
+    if (u.id === 'repair') { this.hut.hp = this.hut.maxhp; const tm = this.towerMax(this.lv.tower); this.towerSites().forEach((S, i) => { this.towerHp[i] = tm; }); this.text(u.pad.x, u.pad.y - 50, '본부·감시탑 수리 완료!', '#7CFC9A', 1.3); this.emit('buy', u.pad.x, u.pad.y, u); return; }
     if (u.id === 'trade') return;
     this.lv[u.id]++;
     if (u.id === 'worker') this.addWorker();
     else if (u.id === 'guard') this.addGuard(false);
+    else if (u.id === 'repairman') this.addRepairman();
+    else if (u.id === 'tower') { const nm = this.towerMax(this.lv.tower), om = this.towerMax(this.lv.tower - 1); for (let i = 0; i < CFG.tower.sites.length; i++) this.towerHp[i] = this.towerHp[i] > 0 ? Math.min(nm, this.towerHp[i] + nm - om) : nm; }   // 증축하며 부서진 탑도 다시 세운다
     else if (u.id === 'militia') this.addGuard(true);
     else if (u.id === 'hunter') this.addHunter();
     else if (u.id === 'fisher') this.addFisher();
@@ -1785,6 +1799,25 @@ class Game {
         else if (b.atkT <= 0) { b.atkT = 1; b.lunge = 1; this.hurt(f, b.dmg, b.foeIsPlayer); }
         continue;
       }
+      // 감시탑: 지나가다 가까우면(보스는 멀리서도) 탑부터 부순다
+      if (b.state === 'walk') {
+        b.towerT = (b.towerT || 0) - dt;
+        if (b.towerT <= 0) {
+          b.towerT = 0.5;
+          const ag = b.bossName ? CFG.tower.bossAggro : CFG.tower.aggro, sites = this.towerSites();
+          let best = null, bd = ag;
+          for (let i = 0; i < sites.length; i++) { if (!this.towerAlive(i)) continue; const d = dist(b.x, b.y, sites[i].x, sites[i].y); if (d < bd) { bd = d; best = i; } }
+          if (best != null) { b.state = 'tower'; b.tower = best; }
+        }
+      }
+      if (b.state === 'tower') {
+        const S = CFG.tower.sites[b.tower];
+        if (b.tower == null || b.tower >= this.towerCount || !this.towerAlive(b.tower)) { b.state = 'walk'; b.tower = null; continue; }
+        const side = b.x < S.x ? -1 : 1, px = S.x + side * (36 + b.r * 0.4), py = S.y + 8;
+        if (dist(b.x, b.y, px, py) > 10) { moveToward(b, px, py, b.speed, dt); b.anim += dt * 8; b.facing = S.x < b.x ? -1 : 1; }
+        else if (b.atkT <= 0) { b.atkT = 1; b.lunge = 1; b.facing = S.x < b.x ? -1 : 1; this.hitTower(b.tower, b.dmg, b); }
+        continue;
+      }
       if (b.state === 'walk') {
         const d = dist(b.x, b.y, b.tx, b.ty);
         if (d <= 6) { b.state = 'hut'; continue; }
@@ -1889,13 +1922,65 @@ class Game {
       if (m.moving) m.anim += dt * 11;
     }
   }
+  // ---- 수리공: 부서진 감시탑 → 본부 → 상한 탑 → 울타리 순으로 돌며 고친다 ----
+  addRepairman() {
+    const i = this.repairmen.length, P = CFG.repair.post;
+    this.repairmen.push({ x: P.x + i * 26, y: P.y, state: 'find', target: null, swing: 0, facing: 1, moving: false, anim: 0, working: false, i });
+  }
+  repairJobs() {
+    const jobs = [], tm = this.towerMax(this.lv.tower), alive = this.bears.filter(b => !b.dead);
+    const danger = (x, y) => alive.some(b => dist(b.x, b.y, x, y) < 170);   // 적이 바로 옆에 있으면 고치지 않는다(고치는 족족 부서진다)
+    this.towerSites().forEach((S, i) => { const hp = this.towerHp[i]; if (hp < tm - 0.5 && !danger(S.x, S.y)) jobs.push({ kind: 'tower', i, x: S.x, y: S.y, pri: hp <= 0 ? 0 : 2 + hp / tm }); });
+    if (this.hut.hp < this.hut.maxhp - 0.5 && !danger(this.hut.x, this.hut.y)) jobs.push({ kind: 'hut', i: 0, x: this.hut.x, y: this.hut.y + 44, pri: 1 + this.hut.hp / this.hut.maxhp });
+    if (this.fence.hp < this.fence.maxhp - 0.5 && !alive.some(b => b.state === 'fence')) jobs.push({ kind: 'fence', i: 0, x: CFG.camp.x + CFG.camp.w / 2 + 70, y: CFG.camp.y + CFG.camp.h + 14, pri: 3 + this.fence.hp / this.fence.maxhp });
+    return jobs;
+  }
+  repairNeeded(j) {
+    if (this.bears.some(b => !b.dead && dist(b.x, b.y, j.x, j.y) < 170)) return false;
+    if (j.kind === 'tower') return j.i < this.towerCount && this.towerHp[j.i] < this.towerMax(this.lv.tower) - 0.5;
+    if (j.kind === 'hut') return this.hut.hp < this.hut.maxhp - 0.5;
+    return this.fence.hp < this.fence.maxhp - 0.5;
+  }
+  repairTick(j, dt) {
+    const R = CFG.repair;
+    if (j.kind === 'tower') {
+      const tm = this.towerMax(this.lv.tower), was = this.towerHp[j.i];
+      this.towerHp[j.i] = Math.min(tm, was + (tm / R.towerTime) * dt);
+      if (this.towerHp[j.i] >= tm) { this.text(j.x, j.y - 150, `🔨 ${j.i + 1}호 감시탑 수리 완료`, '#7CFC9A', 1.5); this.sparkle(j.x, j.y - 80, 8, '#7CFC9A'); }
+      else if (was <= 0 && this.towerHp[j.i] > 0) this.text(j.x, j.y - 150, `🔨 ${j.i + 1}호 감시탑 다시 세우는 중…`, '#ffd166', 1.5);
+    } else if (j.kind === 'hut') { this.hut.hp = Math.min(this.hut.maxhp, this.hut.hp + (this.hut.maxhp / R.hutTime) * dt); if (this.hut.hp >= this.hut.maxhp) this.text(j.x, j.y - 120, '🔨 본부 수리 완료', '#7CFC9A', 1.5); }
+    else { this.fence.hp = Math.min(this.fence.maxhp, this.fence.hp + (this.fence.maxhp / R.fenceTime) * dt); }
+  }
+  updateRepairmen(dt) {
+    const P = CFG.repair.post;
+    for (const r of this.repairmen) {
+      r.moving = false; r.working = false; r.swing = Math.max(0, r.swing - dt * 4);
+      if (r.state === 'find') {
+        const jobs = this.repairJobs().filter(j => !this.repairmen.some(o => o !== r && o.target && o.target.kind === j.kind && o.target.i === j.i));
+        jobs.sort((a, b) => a.pri - b.pri || dist(r.x, r.y, a.x, a.y) - dist(r.x, r.y, b.x, b.y));
+        if (jobs.length) { r.target = jobs[0]; r.state = 'go'; }
+        else moveToward(r, P.x + r.i * 26, P.y, this.workerSpeed, dt);
+      } else if (r.state === 'go') {
+        const j = r.target;
+        if (!j || !this.repairNeeded(j)) { r.target = null; r.state = 'find'; continue; }
+        if (moveToward(r, j.x + 32, j.y + 8, this.workerSpeed, dt)) r.state = 'work';
+      } else if (r.state === 'work') {
+        const j = r.target;
+        if (!j || !this.repairNeeded(j)) { r.target = null; r.state = 'find'; continue; }
+        if (dist(r.x, r.y, j.x + 32, j.y + 8) > 30) { r.state = 'go'; continue; }
+        r.working = true; r.facing = -1; r.swing = r.swing <= 0.2 ? 1 : r.swing;
+        this.repairTick(j, dt * this.effMul);
+      }
+      if (r.moving) r.anim += dt * 11;
+    }
+  }
   // ---- 관리인: 수급 현황과 방어 상태를 읽고 가장 급한 업그레이드를 알아서 산다 ----
   // 다음 습격을 지금 전력으로 몇 초에 치울 수 있나(길수록 위험)
   defenseGap() {
     const n = this.wave.n + 1;
     let hp = 0; for (const t of this.waveComposition(n)) hp += this.bearHP(n) * (this.isBossType(t) ? this.bossDef(n).hp : ENEMY[t].hp);
     const D = this.towerTierDef;
-    const dps = this.guards.length * this.guardDmg / CFG.guard.atkCd + (this.lv.tower ? this.towerCount * this.towerDmg * D.dmg * D.shots / (CFG.tower.cd * D.cd) * 0.6 : 0) + this.atkDmg / CFG.player.atkCd * 0.5;
+    const dps = this.guards.length * this.guardDmg / CFG.guard.atkCd + (this.lv.tower ? this.towersAlive * this.towerDmg * D.dmg * D.shots / (CFG.tower.cd * D.cd) * 0.6 : 0) + this.atkDmg / CFG.player.atkCd * 0.5;
     const killTime = hp / Math.max(1, dps);
     const incoming = this.bearCount(n) * this.bearDmg(n) * Math.min(killTime, 40);
     return { killTime, fenceWeak: this.fence.maxhp + this.hut.maxhp < incoming, n };
@@ -1904,6 +1989,8 @@ class Game {
     const reserve = Math.max(1500, this.money * 0.25), budget = this.money - reserve;
     const ok = u => u && this.padVisible(u) && this.hasNeeds(u) && this.padCost(u) > 0 && this.padCost(u) <= budget;
     const U = id => UPG.find(u => u.id === id);
+    // 0) 부서진 탑·상한 본부는 수리부터(수리공이 없을 때)
+    if (!this.repairmen.length) { const r = U('repair'); if (this.padVisible(r) && this.padCost(r) <= budget && (this.hut.hp < this.hut.maxhp * 0.6 || this.towerSites().some((S, i) => !this.towerAlive(i)))) return { u: r, why: '수리' }; }
     // 1) 방어가 모자라면 방어부터
     const g = this.defenseGap();
     if (g.killTime > 18 || g.fenceWeak) {
@@ -1953,7 +2040,7 @@ class Game {
     if (m.moving) m.anim += dt * 11;
   }
   // ---- 급식소: 직원 수만큼 고기·생선을 먹는다. fed = 최근에 얼마나 잘 먹었나(0~1) ----
-  get staffCount() { return this.workers.length + this.hunters.length + this.fishers.length + this.fishFarmers.length + this.collectors.length + this.ranchers.length + this.slaughtermen.length + this.crafters.furn.length + this.crafters.rest.length + this.crafters.tailor.length + this.runners.furn.length + this.runners.rest.length + this.runners.tailor.length + this.medics.length + this.guards.length; }
+  get staffCount() { return this.workers.length + this.hunters.length + this.fishers.length + this.fishFarmers.length + this.collectors.length + this.ranchers.length + this.slaughtermen.length + this.crafters.furn.length + this.crafters.rest.length + this.crafters.tailor.length + this.runners.furn.length + this.runners.rest.length + this.runners.tailor.length + this.medics.length + this.repairmen.length + this.guards.length; }
   updateMeals(dt) {
     if (!this.lv.mess) return;
     this.mealT += dt; if (this.mealT < 10) return; this.mealT -= 10;
@@ -2018,8 +2105,10 @@ class Game {
     if (this.lv.tower <= 0) return;
     const T = CFG.tower, D = this.towerTierDef, tier = tierOf('tower', this.lv.tower);
     if (!this.towerTs) this.towerTs = [];
-    const sites = this.towerSites();
+    const sites = this.towerSites(), tm = this.towerMax(this.lv.tower);
     for (let s = 0; s < sites.length; s++) {
+      if (!this.towerAlive(s)) continue;   // 부서진 탑은 수리 전까지 쏘지 못한다
+      if (!this.bears.length && this.towerHp[s] < tm) this.towerHp[s] = Math.min(tm, this.towerHp[s] + (tm / T.regenTime) * dt);   // 습격이 끝나면 천천히 자가 회복
       this.towerTs[s] = (this.towerTs[s] || 0) - dt;
       if (this.towerTs[s] > 0) continue;
       const S = sites[s], edist = b => Math.hypot(b.x - S.x, (b.y - S.y) / 0.74);

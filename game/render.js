@@ -20,18 +20,41 @@ function bar(ctx, x, y, w, h, k, color) {
   ctx.fillStyle = 'rgba(20,30,45,0.55)'; rrect(ctx, x - 1, y - 1, w + 2, h + 2, 3);
   ctx.fillStyle = color; rrect(ctx, x, y, Math.max(0, w * Math.max(0, Math.min(1, k))), h, 2);
 }
+// ---- 글자 캐시: 글자(특히 이모지) 그리기는 비싸서, 같은 글자는 한 번 그려 둔 이미지를 찍는다 ----
+const TEXT_CACHE = { map: new Map(), max: 700, res: 2, on: typeof document !== 'undefined' };
+function cachedText(ctx, key, w, h, render) {
+  let c = TEXT_CACHE.map.get(key);
+  if (!c) {
+    if (TEXT_CACHE.map.size >= TEXT_CACHE.max) TEXT_CACHE.map.clear();
+    const R = TEXT_CACHE.res, cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(w * R)); cv.height = Math.max(1, Math.ceil(h * R));
+    const cc = cv.getContext('2d'); cc.scale(R, R); render(cc, w, h);
+    c = { cv, w, h }; TEXT_CACHE.map.set(key, c);
+  }
+  return c;
+}
+function textWidth(ctx, text, font) { const k = font + '|' + text; let w = TEXT_W.get(k); if (w == null) { ctx.font = font; w = ctx.measureText(text).width; if (TEXT_W.size > 3000) TEXT_W.clear(); TEXT_W.set(k, w); } return w; }
+const TEXT_W = new Map();
 function pill(ctx, x, y, text, bg, fg, font) {
-  ctx.font = font || 'bold 12px system-ui, sans-serif';
-  const w = ctx.measureText(text).width + 14;
-  ctx.fillStyle = bg; rrect(ctx, x - w / 2, y - 9, w, 18, 9);
-  ctx.fillStyle = fg || '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 1);
+  font = font || 'bold 12px system-ui, sans-serif';
+  const w = textWidth(ctx, text, font) + 14;
+  if (!TEXT_CACHE.on) { ctx.font = font; ctx.fillStyle = bg; rrect(ctx, x - w / 2, y - 9, w, 18, 9); ctx.fillStyle = fg || '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 1); return; }
+  const c = cachedText(ctx, `p|${font}|${bg}|${fg || ''}|${text}`, w + 2, 22, (cc, W, H) => { cc.font = font; cc.fillStyle = bg; rrect(cc, 1, 2, w, 18, 9); cc.fillStyle = fg || '#fff'; cc.textAlign = 'center'; cc.textBaseline = 'middle'; cc.fillText(text, W / 2, 12); });
+  ctx.drawImage(c.cv, x - c.w / 2, y - 11, c.w, c.h);
 }
 function label(ctx, x, y, text, size, color, stroke) {
-  ctx.font = `bold ${size}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.lineWidth = 3; ctx.strokeStyle = stroke || 'rgba(20,30,45,0.75)'; ctx.lineJoin = 'round'; ctx.strokeText(text, x, y);
-  ctx.fillStyle = color || '#fff'; ctx.fillText(text, x, y);
+  const font = `bold ${size}px system-ui, sans-serif`;
+  if (!TEXT_CACHE.on) { ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = stroke || 'rgba(20,30,45,0.75)'; ctx.lineJoin = 'round'; ctx.strokeText(text, x, y); ctx.fillStyle = color || '#fff'; ctx.fillText(text, x, y); return; }
+  const w = textWidth(ctx, text, font) + 8, h = size * 1.5 + 6;
+  const c = cachedText(ctx, `l|${size}|${color || ''}|${stroke || ''}|${text}`, w, h, (cc, W, H) => { cc.font = font; cc.textAlign = 'center'; cc.textBaseline = 'middle'; cc.lineWidth = 3; cc.strokeStyle = stroke || 'rgba(20,30,45,0.75)'; cc.lineJoin = 'round'; cc.strokeText(text, W / 2, H / 2); cc.fillStyle = color || '#fff'; cc.fillText(text, W / 2, H / 2); });
+  ctx.drawImage(c.cv, x - c.w / 2, y - c.h / 2, c.w, c.h);
 }
-function emoji(ctx, x, y, text, size) { ctx.font = `${size}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000'; ctx.fillText(text, x, y); }
+function emoji(ctx, x, y, text, size) {
+  const font = `${size}px system-ui, sans-serif`;
+  if (!TEXT_CACHE.on) { ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000'; ctx.fillText(text, x, y); return; }
+  const w = textWidth(ctx, text, font) + 6, h = size * 1.4 + 4;
+  const c = cachedText(ctx, `e|${size}|${text}`, w, h, (cc, W, H) => { cc.font = font; cc.textAlign = 'center'; cc.textBaseline = 'middle'; cc.fillStyle = '#000'; cc.fillText(text, W / 2, H / 2); });
+  ctx.drawImage(c.cv, x - c.w / 2, y - c.h / 2, c.w, c.h);
+}
 function log(ctx, x, y, w, h) {
   ctx.fillStyle = PAL.wood; rrect(ctx, x - w / 2, y - h / 2, w, h, h / 2);
   ctx.fillStyle = PAL.woodLight; rrect(ctx, x - w / 2 + 2, y - h / 2 + 1, w - 6, h / 3, 2);
@@ -241,19 +264,53 @@ function drawPerson(ctx, e, o, g) {
   const t = e.anim || 0, moving = !!e.moving, now = g ? g.t : 0;
   const breathe = moving ? 0 : Math.sin(now * 2.2 + e.x * 0.05) * 0.8;
   const bob = moving ? Math.abs(Math.sin(t)) * 2.4 : breathe;
-  const leg = moving ? Math.sin(t) * 6 : 0, arm = moving ? Math.sin(t) * 0.5 : 0;
-  const blink = ((now * 0.7 + e.x * 0.01) % 4) > 3.86;
-  const sg = ctx.createRadialGradient(e.x, e.y + 2, 2, e.x, e.y + 2, 16); sg.addColorStop(0, 'rgba(40,70,110,0.28)'); sg.addColorStop(1, 'rgba(40,70,110,0)');
-  ctx.fillStyle = sg; ellipse(ctx, e.x, e.y + 2, 17, 7);
+  ctx.fillStyle = 'rgba(40,70,110,0.16)'; ellipse(ctx, e.x, e.y + 2, 15, 6);
   // 이미지 스프라이트가 있으면 그것을 쓴다
   const state = e.down > 0 ? 'down' : (e.swing > 0 ? 'work' : moving ? 'walk' : 'idle');
   const usedSprite = typeof Sprites !== 'undefined' && o.sprite && Sprites.draw(ctx, o.sprite, state, t, now, e.x, e.y - bob, e.facing || 1, o.scale || 1);
   if (!usedSprite) {
-    ctx.save(); ctx.translate(e.x, e.y - bob);
-    if (e.down > 0) { ctx.rotate(e.facing < 0 ? 1.4 : -1.4); ctx.translate(0, 10); }
-    if (e.facing < 0) ctx.scale(-1, 1);
+    if (PERSON_CACHE.on && !(e.down > 0)) drawPersonCached(ctx, e, o, bob, state, moving, g);
+    else {
+      ctx.save(); ctx.translate(e.x, e.y - bob);
+      if (e.down > 0) { ctx.rotate(e.facing < 0 ? 1.4 : -1.4); ctx.translate(0, 10); }
+      if (e.facing < 0) ctx.scale(-1, 1);
+      if (o.scale) ctx.scale(o.scale, o.scale);
+      drawPersonBody(ctx, e, o, t, moving, now, g);
+      ctx.restore();
+    }
+  }
+  drawPersonCarry(ctx, e, o, bob);
+}
+// 사람 스프라이트 캐시: 같은 차림·동작·걸음 위상은 한 번만 벡터로 그려 두고 이미지로 찍는다(사람이 많아져도 가볍게)
+const PERSON_CACHE = { map: new Map(), max: 480, res: 1.5, on: typeof document !== 'undefined', W: 96, H: 106, base: 94 };   // 칸 96×106(발이 y=94), 1.5배 해상도 → 한 장 약 90KB
+function personKey(e, o, state, ph, sw) {
+  return `${o.sprite}|${o.coat}|${o.pants}|${o.skin}|${o.hat}|${o.hatBand}|${o.pom}|${o.cap}|${o.hood}|${o.fur}|${o.helmet}|${o.beard}|${o.belt}|${o.bag}|${o.bagSize}|${o.vest}|${o.apron}|${o.armor}|${o.shield}|${o.shieldKite}|${o.tool}|${state}|${ph}|${sw}|${e.flash > 0.01 ? 1 : 0}|${o.flashT > 0 ? 1 : 0}`;
+}
+function drawPersonCached(ctx, e, o, bob, state, moving, g) {
+  const TAU = Math.PI * 2, t = e.anim || 0, P = PERSON_CACHE;
+  const ph = moving ? Math.floor((((t % TAU) + TAU) % TAU) / TAU * 8) : 0;   // 걷기 8단계
+  const sw = e.swing > 0 ? Math.min(3, Math.ceil(e.swing * 3)) : 0;          // 휘두르기 3단계
+  const key = personKey(e, o, state, ph, sw);
+  let c = P.map.get(key);
+  if (!c) {
+    if (P.map.size >= P.max) P.map.clear();
+    c = document.createElement('canvas'); c.width = P.W * P.res; c.height = P.H * P.res;
+    const cc = c.getContext('2d'); cc.scale(P.res, P.res); cc.translate(P.W / 2, P.base);
+    const fe = { x: 0, y: 0, anim: moving ? ((ph + 0.5) / 8) * TAU : 0, moving, swing: sw / 3, down: 0, flash: e.flash, facing: 1 };
+    drawPersonBody(cc, fe, o, fe.anim, moving, 0, g);
+    P.map.set(key, c);
+  }
+  const sc = o.scale || 1;
+  ctx.save(); ctx.translate(e.x, e.y - bob); if ((e.facing || 1) < 0) ctx.scale(-1, 1); if (sc !== 1) ctx.scale(sc, sc);
+  ctx.drawImage(c, -P.W / 2, -P.base, P.W, P.H);
+  ctx.restore();
+}
+// 사람 몸통(벡터). 원점이 발 위치, 오른쪽을 본다
+function drawPersonBody(ctx, e, o, t, moving, now, g) {
+  {
+    const leg = moving ? Math.sin(t) * 6 : 0, arm = moving ? Math.sin(t) * 0.5 : 0;
+    const blink = now > 0 && ((now * 0.7 + e.x * 0.01) % 4) > 3.86;
     if (moving) ctx.rotate(0.04);
-    if (o.scale) ctx.scale(o.scale, o.scale);
     const coat = e.flash > 0.01 ? '#ffb4b4' : o.coat, pants = o.pants || '#2b3a55', skin = o.skin || '#f3cfae';
     const parts = [];
     // 다리·신발 (몸통 아래에 겹침)
@@ -302,9 +359,10 @@ function drawPerson(ctx, e, o, g) {
     ctx.save(); ctx.translate(11, -37); ctx.rotate(o.tool ? -0.2 : arm); ctx.fillStyle = skin; circle(ctx, 0, 15, 3.6); ctx.restore();
     ctx.save(); ctx.translate(-9, -37); ctx.rotate(-arm); ctx.fillStyle = skin; circle(ctx, 0, 15, 3.6); ctx.restore();
     if (o.tool) { ctx.save(); ctx.translate(11, -38); drawTool(ctx, { ...o, coat }, e.swing || 0, g); ctx.restore(); }
-    ctx.restore();
   }
-  // 짊어진 물건
+}
+// 짊어진 물건
+function drawPersonCarry(ctx, e, o, bob) {
   if (e.inv && e.down <= 0) {
     let h = 72;
     const nw = Math.min(e.inv.wood, 7);
@@ -327,10 +385,10 @@ function drawPerson(ctx, e, o, g) {
 }
 
 function drawBubble(ctx, x, y, text) {
-  ctx.font = 'bold 13px system-ui, sans-serif';
-  const w = ctx.measureText(text).width + 18;
-  ctx.fillStyle = '#fff'; rrect(ctx, x - w / 2, y - 24, w, 24, 8); tri(ctx, x - 5, y - 1, x + 5, y - 1, x, y + 5);
-  ctx.fillStyle = PAL.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y - 12);
+  const font = 'bold 13px system-ui, sans-serif', w = textWidth(ctx, text, font) + 18;
+  if (!TEXT_CACHE.on) { ctx.font = font; ctx.fillStyle = '#fff'; rrect(ctx, x - w / 2, y - 24, w, 24, 8); tri(ctx, x - 5, y - 1, x + 5, y - 1, x, y + 5); ctx.fillStyle = PAL.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y - 12); return; }
+  const c = cachedText(ctx, `b|${text}`, w + 2, 31, (cc, W, H) => { cc.font = font; cc.fillStyle = '#fff'; rrect(cc, 1, 1, w, 24, 8); tri(cc, W / 2 - 5, 24, W / 2 + 5, 24, W / 2, 30); cc.fillStyle = PAL.ink; cc.textAlign = 'center'; cc.textBaseline = 'middle'; cc.fillText(text, W / 2, 13); });
+  ctx.drawImage(c.cv, x - c.w / 2, y - 25, c.w, c.h);
 }
 
 // ---- 적 ----
@@ -896,8 +954,19 @@ function drawCampfire(ctx, time) {
   for (let i = 0; i < 3; i++) { const h = 18 + Math.sin(time * 9 + i) * 4; ctx.fillStyle = i === 0 ? '#ff8c42' : i === 1 ? '#ffb347' : '#ffe08a'; tri(ctx, x - 9 + i * 3, y - 2, x + (i - 1) * 4, y - h - i * 5, x + 9 - i * 3, y - 2); }
   ctx.fillStyle = 'rgba(255,170,60,0.12)'; circle(ctx, x, y - 6, 40);
 }
+function drawBrokenTower(ctx, g, time, site, idx) {   // 부서진 탑: 밑동과 잔해, 연기
+  const x = site.x, y = site.y, tier = tierOf('tower', g.lv.tower), stone = tier >= 2;
+  shadow(ctx, x, y + 4, 30, 10);
+  ctx.fillStyle = stone ? PAL.stoneDark : PAL.woodDark;
+  ctx.beginPath(); ctx.moveTo(x - 24, y + 2); ctx.lineTo(x - 20, y - 30); ctx.lineTo(x - 6, y - 22); ctx.lineTo(x + 4, y - 38); ctx.lineTo(x + 14, y - 18); ctx.lineTo(x + 24, y - 26); ctx.lineTo(x + 26, y + 2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = stone ? PAL.stone : PAL.wood; ctx.fillRect(x - 18, y - 16, 34, 16);
+  for (let i = 0; i < 4; i++) { ctx.fillStyle = stone ? PAL.stoneDark : PAL.woodDark; rrect(ctx, x - 44 + i * 24 + Math.sin(i * 3) * 4, y - 4 + (i % 2) * 6, 14, 7, 2); }
+  for (let i = 0; i < 3; i++) { const k = ((time * 0.5 + i * 0.33) % 1); ctx.fillStyle = `rgba(90,90,100,${0.45 * (1 - k)})`; circle(ctx, x - 4 + Math.sin(time * 1.3 + i) * 8, y - 36 - k * 46, 7 + k * 9); }
+  label(ctx, x, y - 96, `🔧 ${idx + 1}호 탑 부서짐`, 11, '#ff8a80');
+}
 function drawTower(ctx, g, time, site, idx) {
   if (!g.lv.tower) return;
+  if (!g.towerAlive(idx)) return drawBrokenTower(ctx, g, time, site, idx);
   const x = site.x, y = site.y, tier = tierOf('tower', g.lv.tower), H = 78 + Math.min(2, tier) * 20, D = TIERS.tower[tier];
   ctx.save(); const sc = popScale(g, 'tower'); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
   shadow(ctx, x, y + 4, 28 + tier * 4, 10);
@@ -932,6 +1001,8 @@ function drawTower(ctx, g, time, site, idx) {
   ctx.fillStyle = PAL.woodDark; ctx.fillRect(x + 27, top - 42, 2, 30);
   if (idx === 0) pill(ctx, x, top - 54, `${D.shot === 'cannon' ? '💣' : D.shot === 'bullet' || D.shot === 'mg' ? '🔫' : '🏹'} ${D.name} Lv${g.lv.tower} · ${D.shot === 'cannon' ? '포탄' : D.shot === 'bolt' ? '쇠뇌' : D.shot === 'bullet' || D.shot === 'mg' ? '탄' : '화살'} ${g.towerArrows}발`, 'rgba(20,30,45,0.75)');
   else label(ctx, x, top - 50, `${idx + 1}호`, 10, '#fff');   // 다른 탑은 작은 번호만(글자 가림 줄이기)
+  const tm = g.towerMax(g.lv.tower), thp = g.towerHp[idx];
+  if (thp < tm - 0.5) bar(ctx, x - 22, y + 8, 44, 5, thp / tm, thp / tm < 0.35 ? '#e74c3c' : '#2ecc71');   // 내구도(상했을 때만)
   ctx.restore();
 }
 
@@ -1148,6 +1219,7 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   if (g.lv.infirmary) items.push({ y: CFG.infirmary.y + 14, f: () => drawInfirmary(ctx, g, time) });
   if (g.manager && g.lv.manager && vis(g.manager.x, g.manager.y, 80)) items.push({ y: g.manager.y, f: () => { const m = g.manager; drawPerson(ctx, m, { sprite: 'manager', coat: '#2c3e50', pants: '#1b2631', hat: '#111', hatBand: '#c0392b', belt: '#c0392b' }, g); label(ctx, m.x, m.y - 72, g.autoInvest ? '🧑‍💼 관리인' : '🧑‍💼 관리인(쉼)', 11, '#fff'); if (m.sayT > 0) drawBubble(ctx, m.x, m.y - 86, m.say); } });
   if (g.lv.mess) items.push({ y: CFG.mess.y + 14, f: () => drawMess(ctx, g, time) });
+  for (const r of g.repairmen) if (vis(r.x, r.y, 80)) items.push({ y: r.y, f: () => { drawPerson(ctx, r, { sprite: 'repairman', coat: '#e67e22', vest: '#f1c40f', pants: '#2b3a55', hat: '#f1c40f', belt: '#5b4636', tool: 'hammer' }, g); if (r.working && r.target) { const j = r.target, k = j.kind === 'tower' ? g.towerHp[j.i] / g.towerMax(g.lv.tower) : j.kind === 'hut' ? g.hut.hp / g.hut.maxhp : g.fence.hp / g.fence.maxhp; bar(ctx, r.x - 18, r.y - 76, 36, 5, k, '#f1c40f'); label(ctx, r.x, r.y - 86, '🔨 수리 중', 10, '#fff'); } } });
   for (const m of g.medics) if (vis(m.x, m.y, 80)) items.push({ y: m.y, f: () => { drawPerson(ctx, m, { sprite: 'medic', coat: '#f4f6f8', pants: '#2b3a55', cap: '#e74c3c', belt: '#c0392b', bag: '#e74c3c', bagSize: 2 }, g); if (m.healing && m.target) bar(ctx, m.target.x - 18, m.target.y - 50, 36, 5, (m.target.healT || 0) / CFG.guard.healTime, '#7CFC9A'); } });
   for (const shopId of CRAFT_SHOPS) for (const r of g.runners[shopId]) if (vis(r.x, r.y, 80)) items.push({ y: r.y, f: () => drawPerson(ctx, r, { sprite: 'runner', coat: shopId === 'furn' ? '#a0522d' : shopId === 'rest' ? '#e67e22' : '#8e44ad', pants: '#2b3a55', cap: '#f1c40f', bag: '#b8962e', bagSize: 5 }, g) });
   items.push({ y: BEACON.y, f: () => drawBeacon(ctx, g, time) });
