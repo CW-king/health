@@ -122,18 +122,32 @@
         <li><b>끝없는 성장</b> 정육점 · 🦌 목장 · 🔪 도축장 · 어물전 · 모피 상점 · 가구 공방(의자 → 피아노) · 마트 · 마을 회관(개척지 → 도시) · 방위대 · 봉화대가 차례로 열립니다. 울타리·본부·감시탑·무기는 레벨에 따라 모습이 튼튼해집니다</li>
         <li><b>마트 이후</b> 판매대·정육점·어물전·모피 상점은 마트로 합쳐져 사라지고, 빈 자리에 🍲 식당(생선·고기 요리), 🧵 재단소(모피 옷), 🏨 여관(침대·의자로 객실), 🚢 무역 부두(3분마다 무역선이 마트 재고를 대량 매입)가 들어섭니다. 마트는 계산대·품목 확장·묶음 구매로 키웁니다</li>
         <li><b>모피 · 수거</b> 모피는 사냥터 곰, 습격 온 곰·늑대·설인의 전리품, 🧶 무두질(도축한 순록)에서 나옵니다. 🗡️ 가죽 손질·🐟 미끼로 사냥터 생산을 늘리고, 🧺 수거꾼은 맵 전체의 고기·모피와 습격 전리품을 주워 나릅니다(🛷 썰매로 강화). 🐠 양식장은 식당 이후 강 왼쪽에, 🌲 남쪽 숲은 공방 옆에 열립니다</li>
+        <li><b>📊 수급 현황</b> 위쪽 📊 버튼을 누르면 품목별 생산·소비·재고와 무엇을 올려야 하는지 알려 줍니다. 🔴 부족은 생산, 🟠 운반 지연은 수거꾼·썰매, 🟡 과잉은 수요(홍보·제작·마트). 같은 문제가 90초 넘게 이어지면 새 소식으로도 알려 줍니다. 수거꾼은 가게에 모자란 비싼 물건부터 나릅니다</li>
         <li><b>운반 분업</b> 수거꾼 2명 이상이면 📦 운반 분업(사냥터 입구)을 열 수 있습니다. 1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미(가죽 더미·생선 바구니·통나무 더미·도축장 보관함)에 쌓으면 수거꾼이 실어 나릅니다. 더미가 차면 직접 나르니 수거꾼·썰매를 함께 늘리세요. 더미 위에 서면 직접 가져갈 수도 있습니다</li>
         <li><b>눈송이 ❄</b> 끝나도 격퇴한 습격 3번마다 눈송이 1개. 다음 판 수입이 영구히 +3%씩</li>
       </ul>
       <p class="dim">자리를 비우면 일꾼들이 최대 2시간까지 대신 벌어 두고, 곰은 그동안 오지 않습니다. 3초마다 자동 저장됩니다.</p>`;
   }
   function showHelp() { modal(helpHtml(), [{ label: '시작!', cls: 'primary' }]); }
+  // 수급 현황: 품목별 생산·소비·재고와 상태·추천. 무엇을 올려야 하는지 게임이 알려 준다
+  function supplyHtml() {
+    const rows = game.advice().map(a => {
+      const G = CFG.goods[a.good], st = { ok: '🟢 괜찮음', short: '🔴 생산 부족', stuck: '🟠 운반 지연', glut: '🟡 과잉' }[a.status];
+      const recs = a.recs.slice(0, 3).map(u => `${u.icon} ${u.name}`).join(' · ');
+      return `<tr><td>${G.emoji} ${G.name}</td><td>${Math.round(a.prod)}</td><td>${Math.round(a.cons)}</td><td>${a.stock}/${a.cap}${a.held ? `<br><span class="dim">쌓임 ${a.held}</span>` : ''}</td><td>${st}${recs ? `<br><span class="dim">${recs}</span>` : ''}</td></tr>`;
+    }).join('');
+    return `<h2>📊 수급 현황</h2>
+      <p class="dim">최근 2분 기준 분당 생산·소비입니다. 🔴 부족이면 생산 업그레이드, 🟠 운반 지연이면 수거꾼·썰매, 🟡 과잉이면 수요(홍보·제작·마트)를 올리세요. 90초 넘게 이어지는 문제는 새 소식으로도 알려 줍니다.</p>
+      <table class="supply"><tr><th>품목</th><th>생산/분</th><th>소비/분</th><th>가게 재고</th><th>상태 · 추천</th></tr>${rows || '<tr><td colspan="5" class="dim">아직 파는 가게가 없어요</td></tr>'}</table>`;
+  }
+  function showSupply() { modal(supplyHtml(), [{ label: '닫기', cls: 'primary' }]); }
   function showMenu() {
     modal(`<h2>메뉴</h2>
       <p>${game.wave.n}차 습격까지 버팀 · 누적 $${fmt(game.earned)} · 경과 ${fmtTime(game.t)}</p>
       <p class="dim">잡은 곰 ${game.stats.kills} · 순록 출하 ${game.stats.harvests} · 도축 ${game.stats.slaughters} · 투숙객 ${game.stats.guests} · 무역 ${game.stats.trades}회 · 생선 ${game.stats.fish}(양식 ${game.stats.farmed || 0}) · 수거 ${game.stats.collected || 0} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
       <p class="dim">최고 기록 ${game.meta.bestWave}웨이브 · 눈송이 ❄ ${game.meta.snowflakes} (수입 +${Math.round((game.bonus - 1) * 100)}%) · ${game.meta.runs}번째 판</p>`,
       [{ label: '계속하기', cls: 'primary' },
+       { label: '📊 수급 현황', onClick: () => setTimeout(showSupply, 0) },
        { label: '도움말', onClick: () => setTimeout(showHelp, 0) },
        { label: '시작 화면으로', onClick: () => { save(); setTimeout(showTitle, 0); } },
        { label: '이번 판 포기', cls: 'danger', onClick: () => setTimeout(confirmRestart, 0) },
@@ -193,6 +207,7 @@
   $('t-sound').onclick = () => { Sfx.init(); Sfx.muted = !Sfx.muted; updateSoundBtn(); save(); };
 
   $('btn-help').onclick = () => { Sfx.init(); showHelp(); };
+  $('btn-supply').onclick = () => { Sfx.init(); showSupply(); };
   $('btn-menu').onclick = () => { Sfx.init(); showMenu(); };
   hud.sound.onclick = () => { Sfx.init(); Sfx.muted = !Sfx.muted; updateSoundBtn(); save(); };
 

@@ -240,6 +240,7 @@ class Game {
     this.tipQueue = (s.tipQueue || []).map(id => TIPS.find(t => t.id === id)).filter(Boolean);
     this.stats = Object.assign({ sales: 0, chops: 0, kills: 0, fish: 0, hunts: 0, crafts: 0, harvests: 0, slaughters: 0, guests: 0, trades: 0, farmed: 0, collected: 0 }, s.stats || {});
     this.activePad = null; this.padFlow = 0; this.towerT = 0; this.shake = 0;
+    this.flow = { buckets: [], cur: null }; this.adviceT = 20; this.adviceSince = {}; this.adviceSinceT = {}; this.adviceLast = {};   // 수급 기록(저장 안 함)
   }
 
   serialize() {
@@ -443,11 +444,82 @@ class Game {
     if (sp.state !== 'docked' || sp.done) return;
     let amount = 0; const parts = [];
     const mul = S.mul + 0.05 * this.lv.mart;
-    for (const g of Object.keys(sp.demand)) { const n = Math.min(sp.demand[g], m[g]); if (n <= 0) continue; m[g] -= n; amount += n * this.price(g) * mul; parts.push(`${CFG.goods[g].emoji}${n}`); }
+    for (const g of Object.keys(sp.demand)) { const n = Math.min(sp.demand[g], m[g]); if (n <= 0) continue; m[g] -= n; amount += n * this.price(g) * mul; parts.push(`${CFG.goods[g].emoji}${n}`); this.recordFlow('cons', g, n); }
     amount = Math.round(amount); sp.done = true; this.stats.trades++;
     if (amount > 0) { this.money += amount; this.earned += amount; this.text(S.dock.x, S.dock.y - 60, `무역 계약! ${parts.join(' ')} → +$${amount}`, '#7CFC9A', 3); this.sparkle(S.dock.x, S.dock.y - 30, 24, '#ffd166'); this.emit('clear', S.dock.x, S.dock.y); }
     else this.text(S.dock.x, S.dock.y - 60, '마트에 팔 재고가 없어요', '#ff8a80', 2);
   }
+  // ---- 수급 기록: 원재료별 생산·소비를 10초 단위로 최근 2분간 기록한다 ----
+  flowTick() {
+    const F = this.flow;
+    if (!F.cur || this.t - F.cur.t >= 10) { F.cur = { prod: {}, cons: {}, t: this.t }; F.buckets.push(F.cur); if (F.buckets.length > 12) F.buckets.shift(); }
+  }
+  recordFlow(kind, good, n) {
+    if (!n || !CFG.goods[good] || CFG.goods[good].tier || good === 'animal') return;
+    if (!this.flow.cur) this.flowTick();
+    this.flow.cur[kind][good] = (this.flow.cur[kind][good] || 0) + n;
+  }
+  flowRate(good) {
+    const B = this.flow.buckets; if (!B.length) return { prod: 0, cons: 0, secs: 0 };
+    const secs = Math.max(10, this.t - B[0].t);
+    let p = 0, c = 0; for (const b of B) { p += b.prod[good] || 0; c += b.cons[good] || 0; }
+    return { prod: p / secs * 60, cons: c / secs * 60, secs };
+  }
+  // 그 물건을 받는 가게가 얼마나 비었나(0 가득 ~ 1 텅 빔). 수거꾼이 부족한 것부터 나르는 데 쓴다
+  scarcity(k) {
+    const d = this.destFor(k); if (!d) return 0;
+    const cap = CRAFT_SHOPS.includes(d) ? CFG.shops[d].matCap : this.shopCap(d);
+    return 1 - Math.min(1, this.shops[d].stock[k] / cap);
+  }
+  // 수급 현황: 원재료별 생산·소비 속도, 가게 재고, 더미·바닥에 묶인 양, 상태와 추천 업그레이드
+  // short 생산 부족 / stuck 운반 지연(쌓여 있는데 가게는 빔) / glut 과잉(가게 가득) / ok
+  advice() {
+    const out = [];
+    for (const good of ['wood', 'meat', 'fish', 'pelt']) {
+      const dests = [this.deliveryShop(good)].concat(CRAFT_SHOPS.filter(id => this.shopOpen(id) && CFG.shops[id].accepts.includes(good))).filter(Boolean);
+      if (!dests.length) continue;
+      let stock = 0, cap = 0;
+      for (const id of dests) { stock += this.shops[id].stock[good]; cap += CRAFT_SHOPS.includes(id) ? CFG.shops[id].matCap : this.shopCap(id); }
+      const fill = cap ? stock / cap : 0;
+      let held = 0;
+      for (const p of Object.values(this.piles)) if (p.good === good) held += p.stock;
+      if (this.shopOpen('slaughter') && (good === 'meat' || good === 'pelt')) held += this.shops.slaughter.stock[good];
+      for (const d of this.drops) if (d.kind === good && d.state === 'ground') held++;
+      const r = this.flowRate(good);
+      let status = 'ok';
+      if (fill < 0.12 && held >= 20) status = 'stuck';
+      else if (fill < 0.12 && r.secs >= 60 && r.cons >= r.prod * 0.8) status = 'short';
+      else if (fill > 0.9 && r.secs >= 60) status = 'glut';
+      const ids = status === 'stuck' ? ADVICE.haul : status === 'glut' ? ADVICE.sell[good] : ADVICE.more[good];
+      const recs = ids.map(id => UPG.find(u => u.id === id)).filter(u => u && this.padVisible(u));
+      out.push({ good, prod: r.prod, cons: r.cons, stock, cap, fill, held, status, recs });
+    }
+    return out;
+  }
+  adviceText(a) {
+    const G = CFG.goods[a.good], recs = a.recs.slice(0, 3).map(u => `${u.icon} ${u.name}`).join(' · ');
+    if (a.status === 'stuck') return `📊 ${G.emoji} ${G.name}: 더미·바닥에 ${a.held}개 쌓였는데 가게는 비었어요. 수거꾼이 모자랍니다 → ${recs || '🧺 수거꾼'}`;
+    if (a.status === 'short') return `📊 ${G.emoji} ${G.name} 부족: 생산 ${Math.round(a.prod)}/분 · 소비 ${Math.round(a.cons)}/분. 생산을 올리세요 → ${recs || '생산 업그레이드'}`;
+    return `📊 ${G.emoji} ${G.name} 과잉: 가게가 가득해요. 수요를 늘리세요 → ${recs || '📣 홍보'}`;
+  }
+  // 15초마다 수급을 보고, 같은 문제가 90초 이상 이어지면 새 소식으로 알린다(품목·문제당 5분에 한 번)
+  updateAdvice(dt) {
+    this.adviceT -= dt; if (this.adviceT > 0) return; this.adviceT = 15;
+    if (this.t < 240) return;
+    let shown = 0;
+    const list = this.advice().sort((a, b) => (b.status === 'stuck') - (a.status === 'stuck') || (b.cons - b.prod) - (a.cons - a.prod));   // 운반 지연 먼저, 그다음 많이 모자란 순
+    for (const a of list) {
+      const key = a.good + ':' + a.status;
+      if (a.status === 'ok') { this.adviceSince[a.good] = null; continue; }
+      if (this.adviceSince[a.good] !== key) { this.adviceSince[a.good] = key; this.adviceSinceT[a.good] = this.t; continue; }
+      if (this.t - this.adviceSinceT[a.good] < 90) continue;
+      if ((this.adviceLast[key] || -1e9) > this.t - 300) continue;
+      if (shown >= 2) continue;   // 한 번에 둘까지
+      this.adviceLast[key] = this.t; shown++;
+      this.tipQueue.push({ id: 'adv-' + key, text: this.adviceText(a) });
+    }
+  }
+
   // ---- 더미: 운반 분업 뒤 생산자가 물건을 쌓아 두는 곳 ----
   // 역할별로 몇 단계 분업부터 더미를 쓰는지
   usesPile(role) { return this.lv.logistics >= ({ hunter: 1, slaughter: 1, fisher: 2, fishFarmer: 2, worker: 3 })[role]; }
@@ -505,10 +577,11 @@ class Game {
     for (const S of this.collectorSources()) {
       if (center && dist(center.x, center.y, S.x, S.y) > CFG.hunt.loot.sweepRange) continue;
       const dd = dist(c.x, c.y, S.x, S.y); if (range != null && dd > range) continue;
-      let n = 0; for (const k of S.kinds()) if (this.roomFor(k)) n += Math.max(0, Math.min(S.count(k), cap - c.inv[k]));
+      let n = 0, w = 0;
+      for (const k of S.kinds()) { if (!this.roomFor(k)) continue; const m = Math.max(0, Math.min(S.count(k), cap - c.inv[k])); if (m <= 0) continue; n += m; w += m * (2 + this.price(k) / 12 + 10 * this.scarcity(k)); }
       if (n <= 0) continue;
       const others = this.collectors.filter(o => o !== c && o.src && o.src.id === S.id).length;
-      const sc = dd * 0.7 - 6 * n - 120 * S.fill() + others * 320;   // 가깝고, 많이 실을 수 있고, 가득 차 가는 더미부터
+      const sc = dd * 0.7 - w - 120 * S.fill() + others * 320;   // 가깝고, 비싸고 가게에 모자란 물건을 많이 실을 수 있고, 가득 차 가는 더미부터
       if (sc < bs) { bs = sc; best = S; }
     }
     if (best) best.score = bs;
@@ -538,7 +611,7 @@ class Game {
       const dd = dist(x, y, d.x, d.y);
       if (range != null && dd > range) continue;
       const inLoot = d.x >= R.x && d.x <= R.x + R.w && d.y >= R.y && d.y <= R.y + R.h;
-      const sc = dd * (d.kind === 'pelt' ? L.peltMul : 1) * (inLoot ? L.zoneMul : 1) - L.agePer * Math.min(L.ageMax, this.t - (d.born != null ? d.born : this.t));
+      const sc = dd * (d.kind === 'pelt' ? L.peltMul : 1) * (inLoot ? L.zoneMul : 1) - L.agePer * Math.min(L.ageMax, this.t - (d.born != null ? d.born : this.t)) - 150 * this.scarcity(d.kind);
       if (sc < bs) { bs = sc; best = d; }
     }
     if (best && who) { if (who.target && who.target !== best && who.target.claim === who) who.target.claim = null; best.claim = who; }
@@ -582,7 +655,7 @@ class Game {
         if (dist(c.x, c.y, S.x, S.y) > 40) { moveToward(c, S.x + 28, S.y + 12, speed, dt); c.dropT = 0; }
         else {
           c.facing = -1; c.dropT += dt; let took = false;
-          while (c.dropT >= CFG.worker.dropRate) { const k = S.kinds().find(k => c.inv[k] < cap && this.roomFor(k)); if (!k) break; S.take(k); c.inv[k]++; c.dropT -= CFG.worker.dropRate; took = true; this.stats.collected++; this.emit('drop', c.x, c.y); }
+          while (c.dropT >= CFG.worker.dropRate) { const k = S.kinds().filter(k => c.inv[k] < cap && this.roomFor(k)).sort((a, b) => this.scarcity(b) - this.scarcity(a))[0]; if (!k) break; S.take(k); c.inv[k]++; c.dropT -= CFG.worker.dropRate; took = true; this.stats.collected++; this.emit('drop', c.x, c.y); }
           if (!took && !S.kinds().some(k => c.inv[k] < cap && this.roomFor(k))) { c.src = null; c.state = 'find'; }
         }
       } else if (c.state === 'toShop') {
@@ -619,7 +692,7 @@ class Game {
     e.proc.t += dt;
     if (Math.floor(e.proc.t * 1.5) !== Math.floor((e.proc.t - dt) * 1.5)) { e.swing = 1; this.emit('chop', e.x, e.y); }
     if (e.proc.t >= e.proc.need) {
-      e.proc = null; shop.stock.meat += this.meatPerAnimal; shop.stock.pelt = Math.min(cap, shop.stock.pelt + this.peltPerAnimal); this.stats.slaughters++;   // 모피 보관함이 꽉 차도 도축은 멈추지 않는다
+      e.proc = null; shop.stock.meat += this.meatPerAnimal; shop.stock.pelt = Math.min(cap, shop.stock.pelt + this.peltPerAnimal); this.stats.slaughters++; this.recordFlow('prod', 'meat', this.meatPerAnimal); this.recordFlow('prod', 'pelt', this.peltPerAnimal);   // 모피 보관함이 꽉 차도 도축은 멈추지 않는다
       this.text(e.x, e.y - 80, `🥩 +${this.meatPerAnimal}${this.peltPerAnimal ? ' 🧥 +' + this.peltPerAnimal : ''}`, '#ffb4b4', 1.1);
       this.emit('harvest', e.x, e.y);
     }
@@ -705,7 +778,7 @@ class Game {
       const G = CFG.goods[g];
       const missing = Object.keys(G.inputs).find(k => shop.stock[k] < G.inputs[k]);
       if (missing) { e.craftWait = missing; return; }
-      for (const k of Object.keys(G.inputs)) shop.stock[k] -= G.inputs[k];
+      for (const k of Object.keys(G.inputs)) { shop.stock[k] -= G.inputs[k]; this.recordFlow('cons', k, G.inputs[k]); }
       e.craft = { good: g, t: 0, need: G.time * this.toolMul * mul, shop: shopId };
     }
     e.craftWait = null;
@@ -755,6 +828,7 @@ class Game {
   update(dt) {
     if (this.over) return;
     this.t += dt;
+    this.flowTick();
     this.updatePlayer(dt);
     this.updateTrees(dt);
     this.updateWorkers(dt);
@@ -774,6 +848,7 @@ class Game {
     this.updateDrops(dt);
     this.updatePads(dt);
     this.updateWaves(dt);
+    this.updateAdvice(dt);
     this.updateBears(dt);
     if (this.over) return;
     this.updateGuards(dt);
@@ -836,13 +911,13 @@ class Game {
   }
 
   chop(tree, who) {
-    tree.logs--; who.inv.wood++; this.stats.chops++;
+    tree.logs--; who.inv.wood++; this.stats.chops++; this.recordFlow('prod', 'wood', 1);
     if (tree.logs <= 0) { tree.regrowT = CFG.tree.regrow; if (tree.user) tree.user.target = null; tree.user = null; }
     for (let i = 0; i < 5; i++) this.chips.push({ x: tree.x, y: tree.y - 20, vx: rnd(-90, 90), vy: rnd(-160, -40), z: 0, t: 0 });
     this.emit('chop', tree.x, tree.y);
   }
   catchFish(who, x, y) {
-    who.inv.fish++; this.stats.fish++;
+    who.inv.fish++; this.stats.fish++; this.recordFlow('prod', 'fish', 1);
     this.splashes.push({ x, y, t: 0 });
     this.text(x, y - 30, '🐟', '#fff', 0.8);
     this.emit('fish', x, y);
@@ -1146,7 +1221,7 @@ class Game {
     pen.harvestT += dt;
     if (pen.harvestT < CFG.fishFarm.harvestTime) return false;
     pen.harvestT = 0; pen.left -= n; if (pen.left <= 0) { pen.left = 0; pen.grow = 0; }
-    who.inv.fish += n; this.stats.farmed += n; this.stats.fish += n;
+    who.inv.fish += n; this.stats.farmed += n; this.stats.fish += n; this.recordFlow('prod', 'fish', n);
     this.text(pen.x, pen.y - 36, `🐟 +${n}`, '#9ad0ff', 1.1);
     for (let i = 0; i < 3; i++) this.splashes.push({ x: pen.x + rnd(-16, 16), y: pen.y + rnd(-8, 8), t: 0 });
     this.emit('harvest', pen.x, pen.y);
@@ -1286,7 +1361,7 @@ class Game {
   sell(c) {
     const sh = CFG.shops[c.shop], shop = this.shops[c.shop];
     let amount = 0;
-    for (const g of Object.keys(c.want)) { shop.stock[g] -= c.want[g]; amount += c.want[g] * this.price(g); }
+    for (const g of Object.keys(c.want)) { shop.stock[g] -= c.want[g]; amount += c.want[g] * this.price(g); this.recordFlow('cons', g, c.want[g]); }
     amount = Math.round(amount * sh.mul * (c.mul || 1));
     c.got = c.want; c.state = 'leave'; c.mood = 1; c.serveT = 0;
     this.stats.sales++;
@@ -1332,6 +1407,7 @@ class Game {
 
   // ---- 바닥에 떨어진 고기 ----
   spawnDrops(kind, n, x, y) {
+    this.recordFlow('prod', kind, n);
     for (let i = 0; i < n; i++) {
       if (this.drops.length >= CFG.drops.max) this.evictDrop();
       if (this.drops.length >= CFG.drops.max) break;

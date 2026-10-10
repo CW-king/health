@@ -308,6 +308,14 @@ const BOSS = [
   { name: '고대 설인', hp: 18, dmg: 5.0, scale: 1.4, bounty: 26, meat: 30 },
   { name: '얼음 거인', hp: 25, dmg: 6.5, scale: 1.6, bounty: 40, meat: 40 },
 ];
+// 수급 현황 추천: 부족(more)·운반 지연(haul)·과잉(sell)일 때 권하는 업그레이드 id. 지금 보이는 결제 원만 보여 준다
+const ADVICE = {
+  more: { wood: ['worker', 'axe', 'forest', 'grove', 'training'], meat: ['ranch', 'slaughterman', 'breed', 'feed', 'rancher', 'hunter'],
+          fish: ['fisher', 'rod', 'fishFarm', 'fishFarmer', 'fishFeed'], pelt: ['traps', 'bait', 'skinning', 'tanning', 'hunter'] },
+  haul: ['collector', 'sled', 'shoes'],
+  sell: { wood: ['promo', 'workshop', 'craftsman', 'mart', 'martLanes'], meat: ['promo', 'restaurant', 'cook', 'mart', 'martLanes'],
+          fish: ['promo', 'restaurant', 'cook', 'mart', 'martLanes'], pelt: ['promo', 'tailor', 'tailorman', 'mart', 'martLanes'] },
+};
 const bossTier = n => Math.min(BOSS.length - 1, Math.max(0, Math.floor(n / 10) - 1));
 const ENRAGE = { at: 0.35, speed: 1.5, dmg: 1.4 };   // 체력 35% 이하에서 분노
 
@@ -396,4 +404,4 @@ const TIPS = [
   { id: 'martopen', when: g => g.lv.mart >= 1,                       text: '마트 개업! 이제 목재·고기·생선·모피를 마트 왼쪽 칸에 내려놓으세요. 가게 재고는 마트로 옮겨졌습니다(가구 공방과 도축장은 그대로)' },
 ];
 
-if (typeof module !== 'undefined') module.exports = { CFG, UPG, ENEMY, FOREST_SPOTS, GUARD_POSTS, MILITIA_POSTS, TOWNHALL, BEACON, HINTS, TIPS, TIERS, tierOf, BOSS, bossTier, ENRAGE };
+if (typeof module !== 'undefined') module.exports = { CFG, UPG, ENEMY, FOREST_SPOTS, GUARD_POSTS, MILITIA_POSTS, TOWNHALL, BEACON, HINTS, TIPS, TIERS, tierOf, BOSS, bossTier, ENRAGE, ADVICE };
