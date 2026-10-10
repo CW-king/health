@@ -1132,6 +1132,7 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   items.push({ y: CFG.hut.y + 26, f: () => drawHut(ctx, g, time) });
   items.push({ y: TOWNHALL.y + 30, f: () => drawTownhall(ctx, g, time) });
   if (g.lv.infirmary) items.push({ y: CFG.infirmary.y + 14, f: () => drawInfirmary(ctx, g, time) });
+  if (g.manager && g.lv.manager && vis(g.manager.x, g.manager.y, 80)) items.push({ y: g.manager.y, f: () => { const m = g.manager; drawPerson(ctx, m, { sprite: 'manager', coat: '#2c3e50', pants: '#1b2631', hat: '#111', hatBand: '#c0392b', belt: '#c0392b' }, g); label(ctx, m.x, m.y - 72, g.autoInvest ? '🧑‍💼 관리인' : '🧑‍💼 관리인(쉼)', 11, '#fff'); if (m.sayT > 0) drawBubble(ctx, m.x, m.y - 86, m.say); } });
   if (g.lv.mess) items.push({ y: CFG.mess.y + 14, f: () => drawMess(ctx, g, time) });
   for (const m of g.medics) if (vis(m.x, m.y, 80)) items.push({ y: m.y, f: () => { drawPerson(ctx, m, { sprite: 'medic', coat: '#f4f6f8', pants: '#2b3a55', cap: '#e74c3c', belt: '#c0392b', bag: '#e74c3c', bagSize: 2 }, g); if (m.healing && m.target) bar(ctx, m.target.x - 18, m.target.y - 50, 36, 5, (m.target.healT || 0) / CFG.guard.healTime, '#7CFC9A'); } });
   for (const shopId of CRAFT_SHOPS) for (const r of g.runners[shopId]) if (vis(r.x, r.y, 80)) items.push({ y: r.y, f: () => drawPerson(ctx, r, { sprite: 'runner', coat: shopId === 'furn' ? '#a0522d' : shopId === 'rest' ? '#e67e22' : '#8e44ad', pants: '#2b3a55', cap: '#f1c40f', bag: '#b8962e', bagSize: 5 }, g) });

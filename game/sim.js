@@ -254,6 +254,8 @@ class Game {
     this.runners = { furn: [], rest: [], tailor: [] }; for (const id of CRAFT_SHOPS) for (let i = 0; i < (this.lv['runner_' + id] || 0); i++) this.addRunner(id);
     this.medics = []; for (let i = 0; i < this.lv.medic; i++) this.addMedic();
     this.fed = s.fed != null ? s.fed : 1; this.mealT = 0;
+    this.autoInvest = s.autoInvest != null ? !!s.autoInvest : true; this.managerT = 12; this.managerLog = (s.managerLog || []).slice(-6);
+    this.manager = this.lv.manager ? { x: TOWNHALL.x + 110, y: TOWNHALL.y + 50, state: 'idle', target: null, facing: -1, moving: false, anim: 0, say: '', sayT: 0 } : null;
     this.player.proc = null;
     this.ranchers = []; for (let i = 0; i < this.lv.rancher; i++) this.addRancher();
     this.player.craft = null;
@@ -292,7 +294,7 @@ class Game {
       drops: this.drops.filter(d => d.state === 'ground').map(d => ({ kind: d.kind, x: Math.round(d.x), y: Math.round(d.y) })),
       tipQueue: this.tipQueue.map(t => t.id),
       shops, inv: this.player.inv, playerHp: this.player.hp, tutorial: this.tutorial, tips: this.tips, stats: this.stats,
-      fed: this.fed, animals: this.animals.map(a => a.grow), pens: this.pens.map(p => p.grow), piles: Object.fromEntries(Object.values(this.piles).map(p => [p.id, p.stock])), innGuests: this.inn.guests, ship: this.ship,
+      fed: this.fed, autoInvest: this.autoInvest, managerLog: this.managerLog.slice(-6), animals: this.animals.map(a => a.grow), pens: this.pens.map(p => p.grow), piles: Object.fromEntries(Object.values(this.piles).map(p => [p.id, p.stock])), innGuests: this.inn.guests, ship: this.ship,
     };
   }
 
@@ -875,6 +877,7 @@ class Game {
     this.updateRunners(dt);
     this.updateMedics(dt);
     this.updateMeals(dt);
+    this.updateManager(dt);
     this.updateInn(dt);
     this.updateShip(dt);
     this.updateCraftsmen(dt);
@@ -1533,6 +1536,7 @@ class Game {
     else if (u.id === 'collector') this.addCollector();
     else if (u.id === 'fishFarmer') this.addFishFarmer();
     else if (u.id === 'medic') this.addMedic();
+    else if (u.id === 'manager') this.manager = { x: u.pad.x, y: u.pad.y + 40, state: 'idle', target: null, facing: -1, moving: false, anim: 0, say: '', sayT: 0 };
     else if (u.id.startsWith('runner_')) this.addRunner(u.id.slice(7));
     else if (u.id === 'fishFarm') { while (this.pens.length < Math.min(this.lv.fishFarm, CFG.fishFarm.pens.length)) this.addPen(0); }
     else if (u.id === 'ranch') { while (this.animals.length < this.animalCount) this.addAnimal(0); }
@@ -1610,6 +1614,7 @@ class Game {
     else if (id === 'fishFarm' || id === 'fishFeed') { for (const p of this.pens) this.sparkle(p.x, p.y, 6, '#9ad0ff'); }
     else if (id === 'fishFarmer') { const f = this.fishFarmers[this.fishFarmers.length - 1]; if (f) this.sparkle(f.x, f.y - 40, 10, '#fff'); }
     else if (id === 'tower' && this.lv.tower % CFG.tower.per === 0 && this.lv.tower / CFG.tower.per < CFG.tower.sites.length) { const S = CFG.tower.sites[this.towerCount - 1]; this.sparkle(S.x, S.y - 60, 24, '#ffd166'); this.text(S.x, S.y - 140, `🏹 감시탑 ${this.towerCount}호 완성!`, '#ffd166', 2.5); }
+    else if (id === 'manager') { if (this.manager) this.sparkle(this.manager.x, this.manager.y - 40, 14, '#ffd166'); }
     else if (id === 'infirmary') { this.sparkle(CFG.infirmary.x, CFG.infirmary.y - 30, 16, '#ff8a80'); }
     else if (id === 'medic') { const m = this.medics[this.medics.length - 1]; if (m) this.sparkle(m.x, m.y - 40, 10, '#fff'); }
     else if (id === 'mess') { this.sparkle(CFG.mess.x, CFG.mess.y - 30, 16, '#ffd166'); this.text(CFG.mess.x, CFG.mess.y - 90, '🍲 급식소 개업! 고기·생선을 식량 창고에', '#ffd166', 2.5); }
@@ -1841,6 +1846,69 @@ class Game {
       }
       if (m.moving) m.anim += dt * 11;
     }
+  }
+  // ---- 관리인: 수급 현황과 방어 상태를 읽고 가장 급한 업그레이드를 알아서 산다 ----
+  // 다음 습격을 지금 전력으로 몇 초에 치울 수 있나(길수록 위험)
+  defenseGap() {
+    const n = this.wave.n + 1;
+    let hp = 0; for (const t of this.waveComposition(n)) hp += this.bearHP(n) * (this.isBossType(t) ? this.bossDef(n).hp : ENEMY[t].hp);
+    const D = this.towerTierDef;
+    const dps = this.guards.length * this.guardDmg / CFG.guard.atkCd + (this.lv.tower ? this.towerCount * this.towerDmg * D.dmg * D.shots / (CFG.tower.cd * D.cd) * 0.6 : 0) + this.atkDmg / CFG.player.atkCd * 0.5;
+    const killTime = hp / Math.max(1, dps);
+    const incoming = this.bearCount(n) * this.bearDmg(n) * Math.min(killTime, 40);
+    return { killTime, fenceWeak: this.fence.maxhp + this.hut.maxhp < incoming, n };
+  }
+  managerPick() {
+    const reserve = Math.max(1500, this.money * 0.25), budget = this.money - reserve;
+    const ok = u => u && this.padVisible(u) && this.hasNeeds(u) && this.padCost(u) > 0 && this.padCost(u) <= budget;
+    const U = id => UPG.find(u => u.id === id);
+    // 1) 방어가 모자라면 방어부터
+    const g = this.defenseGap();
+    if (g.killTime > 18 || g.fenceWeak) {
+      // 경비병 수 → 감시탑 수 → 울타리 → 무기·방위대 순으로, 효과가 큰 것부터
+      let c = null;
+      if (this.lv.guard < Math.min(12, 2 + Math.floor(g.n / 3)) && ok(U('guard'))) c = U('guard');
+      else if (this.lv.tower < Math.floor(g.n / 4) && ok(U('tower'))) c = U('tower');
+      else if (g.fenceWeak && ok(U('fence'))) c = U('fence');
+      else c = ['weapon', 'tower', 'militia', 'fence'].map(U).filter(ok).sort((a, b) => this.padCost(b) - this.padCost(a))[0];   // 예산 안에서 가장 비싼 것(효과 큰 것)
+      if (c) return { u: c, why: '방어 보강' };
+    }
+    // 2) 수급: 운반 지연 → 생산 부족 → 과잉 순으로 급한 것부터
+    const list = this.advice().filter(a => a.status !== 'ok').sort((a, b) => ({ stuck: 0, short: 1, glut: 2 })[a.status] - ({ stuck: 0, short: 1, glut: 2 })[b.status] || (b.cons - b.prod) - (a.cons - a.prod));
+    for (const a of list) { const c = a.recs.filter(ok).sort((x, y) => this.padCost(x) - this.padCost(y))[0]; if (c) return { u: c, why: `${CFG.goods[a.good].emoji} ${a.status === 'stuck' ? '운반 지연' : a.status === 'short' ? '생산 부족' : '과잉'}` }; }
+    // 3) 여유가 많으면 수입 기본기(가격·홍보·일꾼)
+    if (budget > 5000) { const c = ['price', 'promo', 'worker', 'training', 'shoes'].map(U).filter(ok).sort((a, b) => this.padCost(a) - this.padCost(b))[0]; if (c) return { u: c, why: '수입 늘리기' }; }
+    return null;
+  }
+  updateManager(dt) {
+    const m = this.manager; if (!m || !this.lv.manager) return;
+    m.moving = false; m.sayT = Math.max(0, m.sayT - dt);
+    const home = { x: TOWNHALL.x + 110, y: TOWNHALL.y + 50 };
+    if (m.state === 'idle') {
+      this.managerT -= dt;
+      moveToward(m, home.x, home.y, this.workerSpeed, dt);
+      if (this.managerT <= 0) {
+        this.managerT = 20;
+        if (!this.autoInvest) return;
+        const pick = this.managerPick();
+        if (pick) { m.target = pick; m.state = 'go'; m.say = `${pick.u.icon} ${pick.u.name} 사러`; m.sayT = 4; }
+      }
+    } else if (m.state === 'go') {
+      const u = m.target.u, pp = this.padPos(u);
+      if (!this.padVisible(u) || this.padCost(u) > this.money - Math.max(1500, this.money * 0.25) * 0.5) { m.state = 'idle'; m.target = null; return; }
+      if (moveToward(m, pp.x, pp.y - 10, this.workerSpeed * 1.1, dt)) {
+        const cost = this.padCost(u) - (this.paid[u.id] || 0);
+        if (cost <= this.money) {
+          this.money -= cost; this.paid[u.id] = 0; this.buy(u);
+          const line = `🧑‍💼 ${u.icon} ${u.name}${u.max === 1 ? '' : ' Lv' + this.lv[u.id]} (${m.target.why}) $${Math.round(cost)}`;
+          this.managerLog.push(line); if (this.managerLog.length > 6) this.managerLog.shift();
+          this.text(pp.x, pp.y - 90, `🧑‍💼 관리인: ${u.icon} ${u.name} 구매 · ${m.target.why}`, '#ffd166', 2.5);
+          m.say = '구매 완료!'; m.sayT = 2;
+        }
+        m.state = 'idle'; m.target = null; this.managerT = 3;   // 예산이 남았으면 곧바로 다음 결정
+      }
+    }
+    if (m.moving) m.anim += dt * 11;
   }
   // ---- 급식소: 직원 수만큼 고기·생선을 먹는다. fed = 최근에 얼마나 잘 먹었나(0~1) ----
   get staffCount() { return this.workers.length + this.hunters.length + this.fishers.length + this.fishFarmers.length + this.collectors.length + this.ranchers.length + this.slaughtermen.length + this.crafters.furn.length + this.crafters.rest.length + this.crafters.tailor.length + this.runners.furn.length + this.runners.rest.length + this.runners.tailor.length + this.medics.length + this.guards.length; }

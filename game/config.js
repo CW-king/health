@@ -311,6 +311,8 @@ const UPG = [
     cost: tbl([700, 1800, 4000, 9000], 1.8),       pad: { x: 270, y: 1470 }, unlock: g => g.lv.infirmary >= 1 },
   { id: 'mess',   icon: '🍲', name: '급식소',     desc: '직원들이 고기·생선을 먹습니다(1인당 분당 0.15). 배부르면 모두의 작업 효율 +15%, 굶으면 −20%. 수거꾼이 식량 창고에 나릅니다', max: 1,
     cost: () => 2500,                              pad: { x: 590, y: 1460 }, unlock: g => (g.lv.butcher >= 1 || g.lv.fishShop >= 1 || g.lv.mart >= 1) && g.lv.worker >= 3 },
+  { id: 'manager', icon: '🧑‍💼', name: '관리인 고용', desc: '📊 수급 현황을 읽고 막힌 곳(생산 부족·운반 지연·과잉·방어)에 알아서 투자합니다. 돈의 25%는 남겨 둡니다. 📊 창에서 켜고 끕니다', max: 1,
+    cost: () => 15000,                             pad: { x: 560, y: 1340 }, unlock: g => g.lv.townhall >= 1 },
   { id: 'repair', icon: '🔧', name: '본부 수리',  desc: '본부 내구도 전부 회복',     max: Infinity,
     cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 },
 ];
@@ -436,6 +438,7 @@ const TIPS = [
   { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. 잡으면 🧥 모피! ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
   { id: 'pelt',    when: g => g.drops.some(d => d.kind === 'pelt'),  text: '🧥 모피가 떨어졌어요! 주워 두세요. 사냥터 옆 모피 상점을 열면 비싸게 팝니다' },
   { id: 'collector', when: g => g.padVisible(UPG.find(u => u.id === 'collector')) && g.drops.length >= 4, text: '바닥에 고기·모피가 남아 있어요. 🧺 수거꾼(사냥터 입구)을 고용하면 맵 전체를 돌며 주워 가게에 나릅니다. 2명째부터는 캠프 옆 초소에서 습격 전리품을 기다립니다' },
+  { id: 'manager', when: g => g.lv.manager >= 1, text: '🧑‍💼 관리인 고용! 20초마다 수급·방어를 살펴 가장 급한 업그레이드를 알아서 삽니다(돈의 25%는 남김). 📊 수급 현황 창에서 자동 투자를 끌 수 있어요' },
   { id: 'infirmary', when: g => g.padVisible(UPG.find(u => u.id === 'infirmary')), text: '⚠️ 쓰러진 경비병은 30초 안에 치료받지 못하면 전사하고 경비병 레벨이 깎입니다. 🏥 의무소(캠프 북서쪽)를 짓고 🩺 의무병을 두세요. 급하면 내가 옆에 서도 치료됩니다' },
   { id: 'mess', when: g => g.lv.mess >= 1, text: '🍲 급식소 개업! 캠프 북동쪽 식량 창고에 고기·생선을 두면 직원들이 먹고 효율이 15% 오릅니다. 비면 20% 떨어지니 수거꾼이 채우게 두세요' },
   { id: 'runner', when: g => g.padVisible(UPG.find(u => u.id === 'runner_tailor')) || g.padVisible(UPG.find(u => u.id === 'runner_rest')), text: '🚚 배달부를 두면 식당·재단소·공방이 더미와 마트에서 재료를 직접 가져옵니다. 수거꾼이 바쁠 때 재료 대기를 줄입니다' },

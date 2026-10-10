@@ -138,11 +138,12 @@
       const recs = a.recs.slice(0, 3).map(u => `${u.icon} ${u.name}`).join(' · ');
       return `<tr><td>${G.emoji} ${G.name}</td><td>${Math.round(a.prod)}</td><td>${Math.round(a.cons)}</td><td>${a.stock}/${a.cap}${a.held ? `<br><span class="dim">쌓임 ${a.held}</span>` : ''}</td><td>${st}${recs ? `<br><span class="dim">${recs}</span>` : ''}</td></tr>`;
     }).join('');
-    return `<h2>📊 수급 현황</h2>
+    const mgr = game.lv.manager ? `<p><button class="btn ${game.autoInvest ? 'primary' : ''}" id="btn-auto" style="width:100%">🧑‍💼 관리인 자동 투자: ${game.autoInvest ? '켬' : '끔'}</button></p>${game.managerLog.length ? `<p class="dim">최근 구매<br>${game.managerLog.slice().reverse().join('<br>')}</p>` : ''}` : '';
+    return `<h2>📊 수급 현황</h2>${mgr}
       <p class="dim">최근 2분 기준 분당 생산·소비입니다. 🔴 부족이면 생산 업그레이드, 🟠 운반 지연이면 수거꾼·썰매, 🟡 과잉이면 수요(홍보·제작·마트)를 올리세요. 90초 넘게 이어지는 문제는 새 소식으로도 알려 줍니다.</p>
       <table class="supply"><tr><th>품목</th><th>생산/분</th><th>소비/분</th><th>가게 재고</th><th>상태 · 추천</th></tr>${rows || '<tr><td colspan="5" class="dim">아직 파는 가게가 없어요</td></tr>'}</table>`;
   }
-  function showSupply() { modal(supplyHtml(), [{ label: '닫기', cls: 'primary' }]); }
+  function showSupply() { modal(supplyHtml(), [{ label: '닫기', cls: 'primary' }]); const b = document.getElementById('btn-auto'); if (b) b.onclick = () => { game.autoInvest = !game.autoInvest; save(); showSupply(); }; }
   // 세이브 복사/붙여넣기: 다른 기기로 옮기거나 진행 상황을 공유할 때
   function exportText() { try { save(); return btoa(unescape(encodeURIComponent(localStorage.getItem(CFG.saveKey) || ''))); } catch (e) { return ''; } }
   function showExport() {
