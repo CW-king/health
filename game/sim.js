@@ -61,6 +61,7 @@ const MART_RECT = { x: CFG.shops.mart.x - CFG.shops.mart.w / 2, y: CFG.shops.mar
 const FURN_RECT = { x: CFG.shops.furn.x - CFG.shops.furn.w / 2, y: CFG.shops.furn.y - 60, w: CFG.shops.furn.w, h: 90 };
 const RIVER_RECT = CFG.river;
 const MAIN_TREES = FOREST_SPOTS.filter(p => p.grove == null).length;   // 남쪽 숲 앞의 본 숲 나무 수
+const COLLECTOR_GOODS = ['meat', 'pelt', 'fish', 'wood'];   // 수거꾼이 나르는 것(드랍·더미·도축장 보관함)
 const SLAUGHTER_RECT = { x: CFG.shops.slaughter.x - 75, y: CFG.shops.slaughter.y - 50, w: 150, h: 70 };
 const CUSTOMER_COATS = ['#3b82c4', '#2f6fb0', '#4a90d9', '#346fa8', '#5aa0e0', '#7b6fd1', '#d16f9a'];
 
@@ -460,7 +461,7 @@ class Game {
   nearestPile(x, y, good, needRoom) {
     let best = null, bd = Infinity;
     for (const p of Object.values(this.piles)) {
-      if (p.good !== good || !this.pileActive(p) || (needRoom && p.stock >= p.cap)) continue;
+      if (p.good !== good || !this.pileActive(p) || (needRoom && p.stock >= p.cap * CFG.pileFull)) continue;   // 더미가 차오르면(80%) 직접 나른다
       const d = dist(x, y, p.x, p.y); if (d < bd) { bd = d; best = p; }
     }
     return best;
@@ -491,10 +492,10 @@ class Game {
   // 수거꾼이 실어 갈 수 있는 곳: 더미 + (분업 뒤) 도축장 보관함
   collectorSources() {
     const out = [];
-    for (const p of Object.values(this.piles)) if (p.stock > 0) out.push({ id: p.id, x: p.x, y: p.y, kinds: () => (p.stock > 0 ? [p.good] : []), count: k => (k === p.good ? p.stock : 0), take: () => { p.stock--; }, has: () => p.stock > 0 });
+    for (const p of Object.values(this.piles)) if (p.stock > 0) out.push({ id: p.id, x: p.x, y: p.y, kinds: () => (p.stock > 0 ? [p.good] : []), count: k => (k === p.good ? p.stock : 0), take: () => { p.stock--; }, has: () => p.stock > 0, fill: () => p.stock / p.cap });
     if (this.shopOpen('slaughter') && this.usesPile('slaughter')) {
       const st = this.shops.slaughter.stock, pk = CFG.shops.slaughter.pickup;
-      out.push({ id: 'slaughter', x: pk.x, y: pk.y, kinds: () => ['meat', 'pelt'].filter(k => st[k] > 0), count: k => st[k] || 0, take: k => { st[k]--; }, has: () => st.meat > 0 || st.pelt > 0 });
+      out.push({ id: 'slaughter', x: pk.x, y: pk.y, kinds: () => ['meat', 'pelt'].filter(k => st[k] > 0), count: k => st[k] || 0, take: k => { st[k]--; }, has: () => st.meat > 0 || st.pelt > 0, fill: () => Math.max(st.meat, st.pelt) / this.shopCap('slaughter') });
     }
     return out;
   }
@@ -504,10 +505,10 @@ class Game {
     for (const S of this.collectorSources()) {
       if (center && dist(center.x, center.y, S.x, S.y) > CFG.hunt.loot.sweepRange) continue;
       const dd = dist(c.x, c.y, S.x, S.y); if (range != null && dd > range) continue;
-      let n = 0; for (const k of S.kinds()) if (this.destFor(k)) n += Math.max(0, Math.min(S.count(k), cap - c.inv[k]));
+      let n = 0; for (const k of S.kinds()) if (this.roomFor(k)) n += Math.max(0, Math.min(S.count(k), cap - c.inv[k]));
       if (n <= 0) continue;
       const others = this.collectors.filter(o => o !== c && o.src && o.src.id === S.id).length;
-      const sc = dd * 0.7 - 6 * n + others * 320;
+      const sc = dd * 0.7 - 6 * n - 120 * S.fill() + others * 320;   // 가깝고, 많이 실을 수 있고, 가득 차 가는 더미부터
       if (sc < bs) { bs = sc; best = S; }
     }
     if (best) best.score = bs;
@@ -558,18 +559,18 @@ class Game {
         d.state = 'fly'; d.to = c; d.claim = null; fly[d.kind]++; this.stats.collected++;
         if (c.target === d) c.target = null;
       }
-      const carriedKinds = ['meat', 'pelt'].filter(k => c.inv[k] > 0 && this.destFor(k));
+      const carriedKinds = COLLECTOR_GOODS.filter(k => c.inv[k] > 0 && this.destFor(k));
       if (c.state === 'find') {
         const carrying = carriedKinds.length > 0, full = carriedKinds.some(k => c.inv[k] >= cap && this.roomFor(k));   // 가득 찬 종류를 실제로 내려놓을 수 있을 때만 배달 우선
         const campDuty = raid && !(c.i === 0 && this.collectors.length >= 2);   // 습격 경보 중엔 0번만 사냥터에 남고 나머지는 캠프 초소로
         const d = full ? null : this.nearestAnyDrop(c.x, c.y, cap, c.inv, c, carrying ? 700 : null, campDuty ? this.hut : null);
         const src = full ? null : this.bestSource(c, cap, carrying ? 700 : null, campDuty ? this.hut : null);
-        if (src && (!d || src.score < this._dropScore)) { this.release(c); c.src = src; c.state = 'load'; }
+        if (src && (!d || src.score < this._dropScore)) { this.release(c); if (d && d.claim === c) d.claim = null; c.src = src; c.state = 'load'; }
         else if (d) { c.target = d; c.state = 'go'; }
         else if (carrying && c.holdT <= 0) { const k = carriedKinds.sort((a, b) => c.inv[b] - c.inv[a]).find(k => this.roomFor(k)); if (k) { c.dest = this.destFor(k); c.state = 'toShop'; } else c.holdT = 3; }   // 자리 있는 가게부터
         else if (carrying) { /* 가게가 가득: 잠시 기다린다 */ }
-        else if (campDuty) { c.wait = 'raid'; const k = this.collectors.length >= 2 ? c.i - 1 : 0; moveToward(c, PS.x, PS.y + k * 26, speed, dt); }
-        else if (c.home === PS) moveToward(c, PS.x, PS.y + Math.floor(c.i / 2) * 26, speed, dt);
+        else if (campDuty) { c.wait = 'raid'; const k = this.collectors.length >= 2 ? c.i - 1 : 0; moveToward(c, PS.x + k * 26, PS.y, speed, dt); }
+        else if (c.home === PS) moveToward(c, PS.x + Math.floor(c.i / 2) * 26, PS.y, speed, dt);
         else moveToward(c, c.home.x + Math.floor(c.i / 2) * 26, c.home.y, speed, dt);
       } else if (c.state === 'go') {
         const d = c.target;
@@ -581,8 +582,8 @@ class Game {
         if (dist(c.x, c.y, S.x, S.y) > 40) { moveToward(c, S.x + 28, S.y + 12, speed, dt); c.dropT = 0; }
         else {
           c.facing = -1; c.dropT += dt; let took = false;
-          while (c.dropT >= CFG.worker.dropRate) { const k = S.kinds().find(k => c.inv[k] < cap && this.destFor(k)); if (!k) break; S.take(k); c.inv[k]++; c.dropT -= CFG.worker.dropRate; took = true; this.stats.collected++; this.emit('drop', c.x, c.y); }
-          if (!took && !S.kinds().some(k => c.inv[k] < cap && this.destFor(k))) { c.src = null; c.state = 'find'; }
+          while (c.dropT >= CFG.worker.dropRate) { const k = S.kinds().find(k => c.inv[k] < cap && this.roomFor(k)); if (!k) break; S.take(k); c.inv[k]++; c.dropT -= CFG.worker.dropRate; took = true; this.stats.collected++; this.emit('drop', c.x, c.y); }
+          if (!took && !S.kinds().some(k => c.inv[k] < cap && this.roomFor(k))) { c.src = null; c.state = 'find'; }
         }
       } else if (c.state === 'toShop') {
         if (!c.dest || !this.shopOpen(c.dest)) { c.state = 'find'; continue; }
@@ -593,7 +594,7 @@ class Game {
         if (dist(c.x, c.y, CFG.shops[c.dest].drop.x, CFG.shops[c.dest].drop.y) > CFG.shops[c.dest].drop.r + 40) { c.state = 'toShop'; continue; }
         if (!this.deposit(c, c.dest, dt, CFG.worker.dropRate)) { c.dest = null; c.state = 'find'; }
         else if (this.shopFull(c, c.dest)) {   // 가득 찼으면 다른 종류를 받는 가게로, 없으면 3초 뒤 다시 시도(그동안 근처 드랍은 줍는다)
-          const alt = ['meat', 'pelt'].filter(k => c.inv[k] > 0 && this.roomFor(k)).sort((a, b) => c.inv[b] - c.inv[a])[0];
+          const alt = COLLECTOR_GOODS.filter(k => c.inv[k] > 0 && this.roomFor(k)).sort((a, b) => c.inv[b] - c.inv[a])[0];
           if (alt && this.destFor(alt) !== c.dest) { c.dest = this.destFor(alt); c.state = 'toShop'; } else { c.dest = null; c.state = 'find'; c.holdT = 3; }
         }
       }
@@ -1626,11 +1627,11 @@ class Game {
   assignGuardTargets() {
     const alive = this.bears.filter(b => !b.dead);
     const count = new Map();
-    for (const g of this.guards) { if (g.target && (g.target.dead || !alive.includes(g.target))) g.target = null; if (g.target) count.set(g.target, (count.get(g.target) || 0) + 1); }
+    for (const g of this.guards) { if (g.down > 0 || (g.target && (g.target.dead || !alive.includes(g.target)))) g.target = null; if (g.target) count.set(g.target, (count.get(g.target) || 0) + 1); }
     for (const g of this.guards) {
       if (g.down > 0 || g.target) continue;
       let best = null, bs = Infinity;
-      for (const b of alive) { const sc = dist(g.x, g.y, b.x, b.y) + 260 * (count.get(b) || 0) / (b.bossName ? 3 : 1); if (sc < bs) { bs = sc; best = b; } }
+      for (const b of alive) { const n = count.get(b) || 0, pen = n === 0 ? 0 : 140 + 260 * (n - 1); const sc = dist(g.x, g.y, b.x, b.y) + pen / (b.bossName ? 3 : 1); if (sc < bs) { bs = sc; best = b; } }   // 아무도 안 맡은 적 우선, 둘째는 싸게, 셋째부터 비싸게
       if (best) { g.target = best; count.set(best, (count.get(best) || 0) + 1); }
     }
   }
