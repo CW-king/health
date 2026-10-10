@@ -17,7 +17,7 @@ const CFG = {
   },
   worker: { speed: 130, chopMul: 1.5, carry: 4, dropRate: 0.12, idle: { x: 720, y: 900 } },
   guard:  { speed: 155, atkCd: 0.8, range: 55, dmg: 4, hp: 50, hpPerWeapon: 10, downTime: 20, regenTime: 30, bleedOut: 30, healTime: 5, reviveHp: 0.6 },   // 쓰러진 경비병은 bleedOut초 안에 치료받지 못하면 전사한다
-  infirmary: { x: 150, y: 1560, post: { x: 150, y: 1600 } },   // 의무소(캠프 북서쪽)
+  infirmary: { x: 150, y: 1560, post: { x: 150, y: 1660 } },   // 의무소(캠프 북서쪽). 대기 자리는 간판 아래
   repair: { post: { x: 150, y: 1860 }, towerTime: 20, hutTime: 30, fenceTime: 40 },   // 수리공 대기 자리(캠프 남서쪽), 하나를 전부 고치는 데 걸리는 초
   // 급식소: 직원 1인당 분당 perWorker만큼 고기·생선을 먹는다. 배부르면 효율 bonus, 굶으면 penalty
   mess: { x: 490, y: 1560, drop: { x: 480, y: 1630, r: 40 }, cap: 120, perWorker: 0.15, bonus: 1.15, penalty: 0.8 },
@@ -25,7 +25,7 @@ const CFG = {
   // 감시탑: 남문 앞이 첫 탑. per레벨마다 sites 순서대로 탑이 하나씩 더 선다(서쪽 담 밖 → 동쪽 담 밖 → 황무지 전진 초소)
   tower:  { x: 330, y: 1920, cd: 1.1, dmg: 6, dmgPer: 5, range: 320, rangePer: 14, per: 6,
             hp: 100, hpGrowth: 1.1, regenTime: 150, aggro: 80, bossAggro: 380,   // 탑 내구도(레벨마다 ×1.1). 적은 aggro 안을 지나면, 보스는 bossAggro 안이면 탑부터 부순다. 습격이 끝나면 천천히 자가 회복(부서진 탑은 수리 필요)
-            sites: [{ x: 330, y: 1920 }, { x: 50, y: 1720 }, { x: 740, y: 1600 }, { x: 60, y: 2160 }] },   // 결제 원·글자를 가리지 않는 자리   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
+            sites: [{ x: 330, y: 1920 }, { x: 50, y: 1720 }, { x: 740, y: 1600 }, { x: 820, y: 1990 }] },   // 결제 원·글자를 가리지 않는 자리   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
 
   tree:   { logs: 3, regrow: 8, range: 50 },
   // 남쪽 숲: 공방 가까운 벌목지. 개간 레벨마다 perLevel그루가 열린다
@@ -40,6 +40,9 @@ const CFG = {
     fish: { name: '생선', emoji: '🐟', base: 15, priceUp: 'fishPrice' },
     pelt: { name: '모피', emoji: '🐾', base: 45, priceUp: 'peltPrice' },     // 곰·늑대·순록의 모피(사냥터·습격 전리품·무두질)
     animal: { name: '순록', emoji: '🦌', base: 0, priceUp: 'meatPrice' },   // 출하 순록(도축장으로 데려간다)
+    milk:  { name: '우유',   emoji: '🥛', base: 24, priceUp: 'price' },      // 낙농장(동쪽)
+    ore:   { name: '광석',   emoji: '🪨', base: 30, priceUp: 'price' },      // 광산(광산 골짜기)
+    grain: { name: '곡물',   emoji: '🌾', base: 18, priceUp: 'price' },      // 밀밭(평원 농장)
     // 제작품: shop = 만드는 곳, tier = 그 가게 레벨 순서, inputs = 재료, time = 제작 시간(초)
     chair:  { name: '의자',   emoji: '🪑', base: 60,   priceUp: 'furnPrice', shop: 'furn', inputs: { wood: 3 },  time: 4,  tier: 1 },
     sofa:   { name: '소파',   emoji: '🛋️', base: 150,  priceUp: 'furnPrice', shop: 'furn', inputs: { wood: 6 },  time: 7,  tier: 2 },
@@ -64,6 +67,31 @@ const CFG = {
     jerky:   { name: '육포',     emoji: '🥓', base: 160,  priceUp: 'procPrice', shop: 'meatproc', inputs: { meat: 4 },  time: 9,  tier: 2 },
     ham:     { name: '햄',       emoji: '🍖', base: 360,  priceUp: 'procPrice', shop: 'meatproc', inputs: { meat: 7 },  time: 15, tier: 3 },
     meatset: { name: '특제 소시지 세트', emoji: '🎁', base: 900, priceUp: 'procPrice', shop: 'meatproc', inputs: { meat: 12 }, time: 24, tier: 4 },
+    // 유제품 공방(동쪽): 우유
+    cheese:  { name: '치즈',     emoji: '🧀', base: 120,  priceUp: 'creamPrice', shop: 'cream', inputs: { milk: 2 },  time: 6,  tier: 1 },
+    butter:  { name: '버터',     emoji: '🧈', base: 260,  priceUp: 'creamPrice', shop: 'cream', inputs: { milk: 4 },  time: 10, tier: 2 },
+    icecream: { name: '아이스크림', emoji: '🍦', base: 520, priceUp: 'creamPrice', shop: 'cream', inputs: { milk: 6 }, time: 15, tier: 3 },
+    dairyset: { name: '유제품 세트', emoji: '🎁', base: 1200, priceUp: 'creamPrice', shop: 'cream', inputs: { milk: 12 }, time: 26, tier: 4 },
+    // 대장간(광산 골짜기): 광석 + 목재
+    nails:   { name: '철물',     emoji: '🔩', base: 110,  priceUp: 'smithPrice', shop: 'smith', inputs: { ore: 2, wood: 1 }, time: 6,  tier: 1 },
+    toolset: { name: '연장 세트', emoji: '🛠️', base: 260,  priceUp: 'smithPrice', shop: 'smith', inputs: { ore: 4, wood: 2 }, time: 10, tier: 2 },
+    armor:   { name: '강철 갑옷', emoji: '🛡️', base: 620,  priceUp: 'smithPrice', shop: 'smith', inputs: { ore: 8 },          time: 16, tier: 3 },
+    clockwork: { name: '태엽 장치', emoji: '⚙️', base: 1500, priceUp: 'smithPrice', shop: 'smith', inputs: { ore: 12, wood: 4 }, time: 26, tier: 4 },
+    // 보석 세공소(광산 골짜기): 광석
+    ring:    { name: '반지',     emoji: '💍', base: 240,  priceUp: 'jewelPrice', shop: 'jewel', inputs: { ore: 3 },  time: 8,  tier: 1 },
+    necklace: { name: '목걸이',  emoji: '📿', base: 560,  priceUp: 'jewelPrice', shop: 'jewel', inputs: { ore: 6 },  time: 14, tier: 2 },
+    crown:   { name: '왕관',     emoji: '👑', base: 1600, priceUp: 'jewelPrice', shop: 'jewel', inputs: { ore: 12 }, time: 26, tier: 3 },
+    gem:     { name: '왕실 보석', emoji: '💎', base: 3200, priceUp: 'jewelPrice', shop: 'jewel', inputs: { ore: 20 }, time: 36, tier: 4 },
+    // 빵집(평원 농장): 곡물 + 우유
+    bread:   { name: '빵',       emoji: '🍞', base: 90,   priceUp: 'breadPrice', shop: 'bakery', inputs: { grain: 2 },           time: 5,  tier: 1 },
+    pie:     { name: '파이',     emoji: '🥧', base: 220,  priceUp: 'breadPrice', shop: 'bakery', inputs: { grain: 3, milk: 1 },  time: 9,  tier: 2 },
+    cake:    { name: '케이크',   emoji: '🎂', base: 520,  priceUp: 'breadPrice', shop: 'bakery', inputs: { grain: 4, milk: 3 },  time: 15, tier: 3 },
+    feastcake: { name: '축제 케이크', emoji: '🎁', base: 1300, priceUp: 'breadPrice', shop: 'bakery', inputs: { grain: 8, milk: 6 }, time: 26, tier: 4 },
+    // 양조장(평원 농장): 곡물
+    ale:     { name: '맥주',     emoji: '🍺', base: 150,  priceUp: 'brewPrice', shop: 'brew', inputs: { grain: 3 },  time: 7,  tier: 1 },
+    mead:    { name: '벌꿀술',   emoji: '🍯', base: 340,  priceUp: 'brewPrice', shop: 'brew', inputs: { grain: 5 },  time: 12, tier: 2 },
+    whisky:  { name: '위스키',   emoji: '🥃', base: 800,  priceUp: 'brewPrice', shop: 'brew', inputs: { grain: 8 },  time: 20, tier: 3 },
+    barrel:  { name: '숙성 오크통', emoji: '🛢️', base: 1800, priceUp: 'brewPrice', shop: 'brew', inputs: { grain: 14 }, time: 30, tier: 4 },
   },
   // 가게. drop = 물건을 내려놓는 칸, lanes = 손님 줄(시작점·방향), rate = 손님 방문 간격 배수, mul = 가격 배수
   shops: {
@@ -76,7 +104,7 @@ const CFG = {
     fish: { name: '어물전', goods: ['fish'], x: 980, y: 380, w: 160, cap: 40, rate: 1.2, mul: 1,
             drop: { x: 860, y: 410, r: 50 }, moneySpot: { x: 980, y: 460 }, cashier: { x: 1035, y: 336 },
             lanes: [{ x: 1090, y: 415, dx: 0.3, dy: 0.95 }], gap: 46, max: 8, serve: 0.8 },
-    mart: { name: '마트', goods: ['wood', 'meat', 'fish', 'pelt'], x: 1500, y: 2150, w: 300, cap: 120, rate: 0.55, mul: 1.3,
+    mart: { name: '마트', goods: ['wood', 'meat', 'fish', 'pelt', 'milk', 'ore', 'grain'], x: 1500, y: 2150, w: 300, cap: 120, rate: 0.55, mul: 1.3,
             drop: { x: 1290, y: 2200, r: 58 }, moneySpot: { x: 1380, y: 2260 }, cashier: { x: 1440, y: 2100 },
             lanes: [{ x: 1420, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1500, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1580, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1660, y: 2270, dx: 0.12, dy: 0.99 }, { x: 1740, y: 2270, dx: 0.12, dy: 0.99 }],
             gap: 44, max: 6, serve: 0.6 },
@@ -105,6 +133,29 @@ const CFG = {
             drop: { x: 2200, y: 1190, r: 50 }, moneySpot: { x: 2330, y: 1320 }, cashier: { x: 2390, y: 1106 },
             lanes: [{ x: 2450, y: 1190, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.0,
             benches: [{ x: 2280, y: 1240 }, { x: 2370, y: 1240 }], benchRange: 42, upg: 'meatproc', worker: 'meatworker' },
+    // 동쪽 아래: 유제품 공방(우유)
+    cream: { name: '유제품 공방', goods: ['cheese', 'butter', 'icecream', 'dairyset'], accepts: ['milk'], x: 2330, y: 2200, w: 190, cap: 10, matCap: 60, rate: 1.4, mul: 1,
+            drop: { x: 2200, y: 2240, r: 50 }, moneySpot: { x: 2330, y: 2370 }, cashier: { x: 2390, y: 2156 },
+            lanes: [{ x: 2450, y: 2240, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.0,
+            benches: [{ x: 2280, y: 2290 }, { x: 2370, y: 2290 }], benchRange: 42, upg: 'cream', worker: 'creamer' },
+    // 광산 골짜기: 대장간(광석+목재) · 보석 세공소(광석)
+    smith: { name: '대장간', goods: ['nails', 'toolset', 'armor', 'clockwork'], accepts: ['ore', 'wood'], x: 3140, y: 1150, w: 190, cap: 10, matCap: 60, rate: 1.4, mul: 1,
+            drop: { x: 3010, y: 1190, r: 50 }, moneySpot: { x: 3140, y: 1320 }, cashier: { x: 3200, y: 1106 },
+            lanes: [{ x: 3260, y: 1190, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.0,
+            benches: [{ x: 3090, y: 1240 }, { x: 3180, y: 1240 }], benchRange: 42, upg: 'smith', worker: 'smithman' },
+    jewel: { name: '보석 세공소', goods: ['ring', 'necklace', 'crown', 'gem'], accepts: ['ore'], x: 3140, y: 1800, w: 190, cap: 8, matCap: 60, rate: 1.7, mul: 1,
+            drop: { x: 3010, y: 1840, r: 50 }, moneySpot: { x: 3140, y: 1970 }, cashier: { x: 3200, y: 1756 },
+            lanes: [{ x: 3260, y: 1840, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.1,
+            benches: [{ x: 3090, y: 1890 }, { x: 3180, y: 1890 }], benchRange: 42, upg: 'jewel', worker: 'jeweler' },
+    // 평원 농장: 빵집(곡물+우유) · 양조장(곡물)
+    bakery: { name: '빵집', goods: ['bread', 'pie', 'cake', 'feastcake'], accepts: ['grain', 'milk'], x: 3900, y: 1150, w: 190, cap: 12, matCap: 60, rate: 1.3, mul: 1,
+            drop: { x: 3770, y: 1190, r: 50 }, moneySpot: { x: 3900, y: 1320 }, cashier: { x: 3960, y: 1106 },
+            lanes: [{ x: 4020, y: 1190, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 0.9,
+            benches: [{ x: 3850, y: 1240 }, { x: 3940, y: 1240 }], benchRange: 42, upg: 'bakery', worker: 'baker' },
+    brew: { name: '양조장', goods: ['ale', 'mead', 'whisky', 'barrel'], accepts: ['grain'], x: 3900, y: 1800, w: 190, cap: 10, matCap: 60, rate: 1.5, mul: 1,
+            drop: { x: 3770, y: 1840, r: 50 }, moneySpot: { x: 3900, y: 1970 }, cashier: { x: 3960, y: 1756 },
+            lanes: [{ x: 4020, y: 1840, dx: 0.1, dy: 1 }], gap: 46, max: 6, serve: 1.0,
+            benches: [{ x: 3850, y: 1890 }, { x: 3940, y: 1890 }], benchRange: 42, upg: 'brew', worker: 'brewer' },
     inn: { name: '여관', goods: [], accepts: [], x: 1560, y: 1000, w: 170, cap: 0, rate: 1.2, mul: 1, stay: 40, rent: 25,
             drop: { x: 1560, y: 900, r: 0 }, moneySpot: { x: 1470, y: 1085 }, cashier: { x: 1615, y: 956 }, door: { x: 1560, y: 1050 },
             lanes: [{ x: 1660, y: 1070, dx: 0.25, dy: 0.97 }], gap: 46, max: 8, serve: 0.5 },
@@ -121,6 +172,37 @@ const CFG = {
   river: { x: 0, y: 30, w: 2760, h: 120 },                        // 강(맨 위, 동쪽 지대까지 이어진다)
   // 동쪽 지대: 🧭 동쪽 개척을 사면 세계가 오른쪽으로 넓어지고 훈제장·육가공소가 들어선다
   east: { x: 2000, w: 760, name: '동쪽 벌판', road: { y: 1250 } },
+  // 개척지: 순서대로 열리며 세계가 오른쪽으로 넓어진다. 각 지대는 길(road.y)로 이어진다
+  districts: [
+    { id: 'east', x: 2000, w: 760, name: '동쪽 벌판',   upg: 'expandEast', ground: '#e4ebf2', icon: '🧭' },
+    { id: 'mine', x: 2760, w: 760, name: '광산 골짜기', upg: 'expandMine', ground: '#dfe3e8', icon: '⛏️', mountain: true },
+    { id: 'farm', x: 3520, w: 760, name: '평원 농장',   upg: 'expandFarm', ground: '#e6ecdf', icon: '🌾' },
+  ],
+  // 농장류(묘목장·낙농장·광산·밀밭): 자리(plot)가 자라면 일꾼이 거둬 더미·가게로 나른다. plant면 거둔 뒤 다시 심어야 자란다
+  farms: {
+    nursery: { name: '묘목장', icon: '🌱', good: 'wood',  worker: 'forester', upg: 'nursery', plant: true,  plantTime: 2.5, growTime: 55, yield: 4, harvestTime: 1.6, carry: 8,  perLevel: 4, sprite: 'tree',
+               rect: { x: 2040, y: 1500, w: 400, h: 330 }, origin: { x: 2090, y: 1575 }, dx: 100, dy: 84, cols: 4, rows: 3, post: { x: 2060, y: 1880 }, pile: 'woodEast', district: 'east', boost: 'sapling' },
+    dairy:   { name: '낙농장', icon: '🥛', good: 'milk',  worker: 'dairyman', upg: 'dairy',   plant: false, growTime: 45, yield: 3, harvestTime: 2.0, carry: 8,  perLevel: 2, sprite: 'cow',
+               rect: { x: 2480, y: 1480, w: 260, h: 400 }, origin: { x: 2530, y: 1590 }, dx: 85, dy: 92, cols: 3, rows: 3, post: { x: 2500, y: 1920 }, pile: 'milk', district: 'east' },
+    mine:    { name: '광산',   icon: '⛏️', good: 'ore',   worker: 'miner',    upg: 'mine',    plant: false, growTime: 18, yield: 2, harvestTime: 2.2, carry: 6,  perLevel: 2, sprite: 'vein',
+               rect: { x: 2800, y: 250, w: 680, h: 420 },  origin: { x: 2860, y: 450 }, dx: 100, dy: 90, cols: 6, rows: 2, post: { x: 2840, y: 700 }, pile: 'ore', district: 'mine', boost: 'pickaxe' },
+    grain:   { name: '밀밭',   icon: '🌾', good: 'grain', worker: 'farmer',   upg: 'field',   plant: true,  plantTime: 2.0, growTime: 65, yield: 5, harvestTime: 1.8, carry: 10, perLevel: 4, sprite: 'field',
+               rect: { x: 3570, y: 300, w: 660, h: 500 },  origin: { x: 3620, y: 380 }, dx: 100, dy: 90, cols: 6, rows: 5, post: { x: 3580, y: 860 }, pile: 'grain', district: 'farm', boost: 'seed' },
+  },
+  // 날씨: 개척할수록 종류가 는다. cust 손님 빈도, grow 작물·가축 성장, move 이동 속도, enemy 적 속도, tower 탑 사거리, price 판매가
+  weather: {
+    kinds: {
+      snow:     { name: '눈',     icon: '🌨️', dur: [90, 150], w: 35, cust: 1,    grow: 1,   move: 1,   need: null },
+      clear:    { name: '맑음',   icon: '☀️', dur: [70, 110], w: 25, cust: 1.15, grow: 1.15, move: 1, need: 'expandEast' },
+      blizzard: { name: '눈보라', icon: '❄️', dur: [45, 75],  w: 15, cust: 0.7,  grow: 0.6, move: 0.8, enemy: 0.8, need: 'expandEast' },
+      fog:      { name: '안개',   icon: '🌫️', dur: [50, 80],  w: 12, cust: 0.85, grow: 1,   move: 1,   tower: 0.7, need: 'expandMine' },
+      aurora:   { name: '오로라', icon: '🌌', dur: [50, 80],  w: 8,  cust: 1.1,  grow: 1,   move: 1,   price: 1.2, need: 'expandMine' },
+      thaw:     { name: '해빙',   icon: '🌤️', dur: [60, 90],  w: 10, cust: 1.05, grow: 1.6, move: 1.05, need: 'expandFarm' },
+    },
+    first: 120,   // 첫 날씨 변화까지(초). 동쪽 개척 전엔 늘 눈
+  },
+  // 주문 게시판: 상인·귀족·왕족이 물건을 대량 주문한다. 마트(또는 만드는 가게) 재고에서 1초에 1개씩 채워지고, 다 채우면 보상
+  orders: { every: 110, max: 3, duration: 300, bonus: [0, 0, 1.5, 1.7, 1.9], rep: [0, 0, 3, 5, 7], pos: { x: 150, y: 1300 } },
   fishing: { spots: [{ x: 820, y: 190 }, { x: 940, y: 190 }, { x: 1060, y: 190 }, { x: 1180, y: 190 }],
              range: 42, time: 3.0, fisherMul: 1.3, carry: 4 },   // 낚시: 3초에 한 마리, 낚싯대 레벨당 ×0.89
   hunt: { rect: { x: 1450, y: 250, w: 500, h: 370 }, max: 3, maxPerHunter: 1, respawn: 10, firstAt: 45,
@@ -136,6 +218,10 @@ const CFG = {
   piles: {
     pelt:      { x: 1560, y: 520,  good: 'pelt', name: '가죽 더미',   cap: 100, lv: 1 },   // 사냥꾼 초소 옆
     huntMeat:  { x: 1470, y: 540,  good: 'meat', name: '고기 걸이',   cap: 100, lv: 1 },   // 사냥꾼이 사냥터 고기를 걸어 두는 곳
+    woodEast:  { x: 2400, y: 1880, good: 'wood', name: '묘목장 더미', cap: 120, lv: 3, farm: 'nursery' },
+    milk:      { x: 2700, y: 1930, good: 'milk', name: '우유 통',     cap: 100, lv: 3, farm: 'dairy' },
+    ore:       { x: 3140, y: 700,  good: 'ore',  name: '광석 더미',   cap: 120, lv: 3, farm: 'mine' },
+    grain:     { x: 3720, y: 860,  good: 'grain', name: '곡물 자루',  cap: 120, lv: 3, farm: 'grain' },
     fish:      { x: 900,  y: 162,  good: 'fish', name: '생선 바구니', cap: 100, lv: 2 },   // 낚시터 물가
     fishFarm:  { x: 520,  y: 200,  good: 'fish', name: '양식 바구니', cap: 100, lv: 2 },   // 양식장 둑
     woodMain:  { x: 740,  y: 840,  good: 'wood', name: '통나무 더미', cap: 120, lv: 3 },   // 숲 동쪽 울타리 밖(벌목꾼 대기 자리 옆)
@@ -185,7 +271,7 @@ const CFG = {
 // 고정 가격표 뒤로는 마지막 값에서 growth배씩 올린다(고용 상한을 늘려도 가격이 이어지도록)
 const tbl = (arr, growth) => l => (arr[l] != null ? arr[l] : Math.round(arr[arr.length - 1] * Math.pow(growth, l - arr.length + 1)));
 const UPG = [
-  { id: 'axe',    icon: '🪓', name: '도끼',       desc: '모두의 벌목 속도 +11%',    max: Infinity,
+  { id: 'axe',    icon: '🪓', name: '도끼',       desc: '모두의 벌목 속도 +11%',    max: 21,
     cost: l => Math.round(30 * Math.pow(1.35, l)),  pad: { x: 150, y: 960 }, unlock: () => true },
   { id: 'bag',    icon: '🎒', name: '가방',       desc: '내 운반량 +3, 모든 일꾼 운반량 +1(경비병 제외)', max: Infinity,
     cost: l => Math.round(60 * Math.pow(1.5, l)),   pad: { x: 340, y: 960 }, unlock: () => true },
@@ -238,7 +324,7 @@ const UPG = [
   // ---- 목장 ----
   { id: 'ranch',  icon: '🦌', name: '목장',       desc: '순록 +2마리. 다 자라면 도축장에 데려가 고기로 만듭니다', max: 10,
     cost: l => Math.round(1200 * Math.pow(1.6, l)), pad: { x: 1700, y: 1620 }, unlock: g => g.lv.butcher >= 1 },
-  { id: 'feed',   icon: '🌾', name: '사료',       desc: '순록 성장 속도 +12%',          max: Infinity,
+  { id: 'feed',   icon: '🌾', name: '사료',       desc: '순록 성장 속도 +12%',          max: 20,
     cost: l => Math.round(150 * Math.pow(1.4, l)),  pad: { x: 1470, y: 1370 }, unlock: g => g.lv.ranch >= 1 },
   { id: 'breed',  icon: '🧬', name: '품종 개량',  desc: '순록 한 마리당 고기 +1',        max: Infinity,
     cost: l => Math.round(300 * Math.pow(1.45, l)), pad: { x: 1820, y: 1870 }, unlock: g => g.lv.ranch >= 1 },
@@ -256,7 +342,7 @@ const UPG = [
   // ---- 강 · 낚시 ----
   { id: 'fishShop', icon: '🐟', name: '어물전 열기', desc: '강에서 잡은 생선을 파는 가게', max: 1,
     cost: () => 800,                                pad: { x: 980, y: 380 }, unlock: g => g.lv.mart < 1 && (g.lv.butcher >= 1 || g.lv.worker >= 3 || g.t >= 300) },
-  { id: 'rod',    icon: '🎣', name: '낚싯대',     desc: '낚시 속도 +12%',             max: Infinity,
+  { id: 'rod',    icon: '🎣', name: '낚싯대',     desc: '낚시 속도 +12%',             max: 20,
     cost: l => Math.round(80 * Math.pow(1.4, l)),   pad: { x: 740, y: 300 }, unlock: g => g.lv.fishShop >= 1 },
   { id: 'fisher', icon: '🛶', name: '어부 고용',   desc: '강가에서 낚시해 생선을 나릅니다', max: 8,
     cost: tbl([350, 800, 1800, 4000], 1.6),           pad: { x: 760, y: 480 }, unlock: g => g.lv.fishShop >= 1 },
@@ -275,8 +361,8 @@ const UPG = [
     unlock: g => g.lv.butcher >= 1 && g.lv.fishShop >= 1 && g.lv.price >= 3 },
   { id: 'martLanes', icon: '🛒', name: '계산대 추가', desc: '마트 계산대 +1줄(최대 5줄). 손님을 동시에 더 받습니다', max: 4,
     cost: l => [8000, 16000, 32000, 64000][l],     pad: { x: 1900, y: 2360 }, unlock: g => g.lv.mart >= 1 },
-  { id: 'martGoods', icon: '📦', name: '품목 확장', desc: '1: 🪑 가구 · 2: 🍲 요리 · 3: 🧥 의복 · 4: 🐠 훈제 · 5: 🌭 육가공을 마트에서도 팝니다. 공방 직원이 남는 완제품을 마트로 나릅니다', max: 5,
-    cost: tbl([10000, 25000, 60000, 120000, 240000], 2), pad: { x: 1900, y: 2480 }, unlock: g => g.lv.mart >= 1 },
+  { id: 'martGoods', icon: '📦', name: '품목 확장', desc: '1: 🪑 가구 · 2: 🍲 요리 · 3: 🧥 의복 · 4: 🐠 훈제 · 5: 🌭 육가공 · 6: 🧀 유제품 · 7: 🔩 철물 · 8: 💍 보석 · 9: 🍞 빵 · 10: 🍺 술을 마트에서도 팝니다. 공방 직원이 남는 완제품을 마트로 나릅니다', max: 10,
+    cost: tbl([10000, 25000, 60000, 120000, 240000, 480000, 900000, 1800000, 3500000, 7000000], 2), pad: { x: 1900, y: 2480 }, unlock: g => g.lv.mart >= 1 },
   { id: 'martBulk', icon: '🛍️', name: '묶음 구매', desc: '마트 손님이 품목마다 +1개씩 더 삽니다', max: 6,
     cost: l => Math.round(5000 * Math.pow(1.6, l)), pad: { x: 1900, y: 2240 }, unlock: g => g.lv.mart >= 1 },
 
@@ -287,7 +373,7 @@ const UPG = [
     cost: tbl([900, 2200, 5000], 1.7),               pad: { x: 780, y: 1130 }, unlock: g => g.lv.restaurant >= 1 },
   { id: 'dishPrice', icon: '🍽️', name: '요리 가격', desc: '요리 판매가 +12%',          max: Infinity,
     cost: l => Math.round(500 * Math.pow(1.4, l)),  pad: { x: 1270, y: 880 }, unlock: g => g.lv.restaurant >= 1 },
-  { id: 'tailor', icon: '🧵', name: '재단소',     desc: '1레벨: 건설(🧤 가죽 장갑) · 2: 🧥 모피 코트 · 3: 🧣 모피 망토 · 4: 👘 왕실 예복. 모피를 옷으로', max: 4,
+  { id: 'tailor', icon: '🧵', name: '재단소',     desc: '1레벨: 건설(🧤 가죽 장갑) · 2: 🐾 모피 코트 · 3: 🧣 모피 망토 · 4: 👘 왕실 예복. 모피를 옷으로', max: 4,
     cost: l => [2500, 6000, 14000, 30000][l],      pad: { x: 1920, y: 900 }, unlock: g => g.lv.mart >= 1 && g.lv.furShop >= 1 },
   { id: 'tailorman', icon: '🪡', name: '재단사 고용', desc: '재봉대에서 옷을 계속 만듭니다', max: 4,
     cost: tbl([800, 2000], 1.8),                     pad: { x: 1720, y: 690 }, unlock: g => g.lv.tailor >= 1 },
@@ -305,7 +391,7 @@ const UPG = [
   { id: 'workshop', icon: '🔨', name: '가구 공방', desc: '1레벨: 공방 건설(🪑 의자) · 2: 🛋️ 소파 · 3: 🛏️ 침대 · 4: 🗄️ 옷장 · 5: 🎹 피아노', max: 5,
     cost: l => [1500, 3000, 6500, 14000, 30000][l], pad: { x: 1070, y: 1845 },
     unlock: g => g.lv.worker >= 3 || g.stats.sales >= 60 },
-  { id: 'tools',  icon: '🧰', name: '공구',       desc: '가구·요리·의복 제작 속도 +12%', max: Infinity,
+  { id: 'tools',  icon: '🧰', name: '공구',       desc: '가구·요리·의복 제작 속도 +12%', max: 20,
     cost: l => Math.round(200 * Math.pow(1.4, l)),  pad: { x: 720, y: 1900 }, unlock: g => g.lv.workshop >= 1 },
   { id: 'craftsman', icon: '👨‍🔧', name: '목수 고용', desc: '작업대에서 가구를 계속 만듭니다', max: 5,
     cost: tbl([600, 1600, 4000], 1.7),                pad: { x: 1080, y: 2000 }, unlock: g => g.lv.workshop >= 1 },
@@ -352,6 +438,68 @@ const UPG = [
     cost: tbl([1200, 3000, 7000, 15000], 1.8),     pad: { x: 2200, y: 1390 }, unlock: g => g.lv.meatproc >= 1 },
   { id: 'procPrice', icon: '🏷️', name: '육가공품 가격', desc: '육가공품 판매가 +12%', max: Infinity,
     cost: l => Math.round(600 * Math.pow(1.4, l)),  pad: { x: 2560, y: 1270 }, unlock: g => g.lv.meatproc >= 1 },
+  // 동쪽 아래: 묘목장(나무 심기) · 낙농장 · 유제품 공방
+  { id: 'nursery', icon: '🌱', name: '묘목장',   desc: '1레벨: 건설 + 나무 자리 4 (최대 12). 산림꾼이 묘목을 심고 다 자라면 베어 목재로. 훈제장·마트에 가깝습니다', max: 3,
+    cost: tbl([5000, 12000, 25000], 2),            pad: { x: 2100, y: 1990 }, unlock: g => g.lv.expandEast >= 1 && g.lv.worker >= 2 },
+  { id: 'forester', icon: '🧑‍🌾', name: '산림꾼 고용', desc: '묘목장에서 묘목을 심고 자란 나무를 베어 목재를 나릅니다', max: 5,
+    cost: tbl([1500, 3500, 8000], 1.8),            pad: { x: 2220, y: 1990 }, unlock: g => g.lv.nursery >= 1 },
+  { id: 'sapling', icon: '🌳', name: '묘목 개량', desc: '묘목장 나무 성장 −10%, 3레벨마다 그루당 목재 +1', max: 10,
+    cost: l => Math.round(2500 * Math.pow(1.5, l)), pad: { x: 2340, y: 1990 }, unlock: g => g.lv.nursery >= 1 },
+  { id: 'dairy',  icon: '🥛', name: '낙농장',     desc: '1레벨: 건설 + 젖소 순록 2마리(최대 9). 낙농꾼이 젖을 짜 🥛 우유를 마트·유제품 공방에 나릅니다', max: 5,
+    cost: tbl([8000, 16000, 32000], 2),            pad: { x: 2520, y: 2010 }, unlock: g => g.lv.expandEast >= 1 && g.lv.ranch >= 3 },
+  { id: 'dairyman', icon: '🧑‍🌾', name: '낙농꾼 고용', desc: '낙농장에서 젖을 짜고 우유를 나릅니다', max: 5,
+    cost: tbl([1500, 3500, 8000], 1.8),            pad: { x: 2640, y: 2010 }, unlock: g => g.lv.dairy >= 1 },
+  { id: 'cream',  icon: '🧀', name: '유제품 공방', desc: '1레벨: 건설(🧀 치즈) · 2: 🧈 버터 · 3: 🍦 아이스크림 · 4: 🎁 유제품 세트. 우유를 비싼 상품으로', max: 4,
+    cost: tbl([7000, 16000, 34000, 70000], 2),      pad: { x: 2330, y: 2440 }, unlock: g => g.lv.dairy >= 1 },
+  { id: 'creamer', icon: '🧑‍🍳', name: '유제품 기술자 고용', desc: '유제품 공방에서 우유를 계속 가공합니다', max: 4,
+    cost: tbl([1500, 3500, 8000, 17000], 1.8),     pad: { x: 2200, y: 2440 }, unlock: g => g.lv.cream >= 1 },
+  { id: 'creamPrice', icon: '🏷️', name: '유제품 가격', desc: '유제품 판매가 +12%', max: Infinity,
+    cost: l => Math.round(700 * Math.pow(1.4, l)),  pad: { x: 2560, y: 2320 }, unlock: g => g.lv.cream >= 1 },
+  // ---- 광산 골짜기(두 번째 확장) ----
+  { id: 'expandMine', icon: '🧭', name: '광산 골짜기 개척', desc: '세계가 더 동쪽으로 넓어집니다. ⛏️ 광산(광석), ⚒️ 대장간(철물·갑옷), 💎 보석 세공소(귀족·왕족용)를 지을 수 있고 🌫️ 안개·🌌 오로라 날씨가 생깁니다', max: 1,
+    cost: () => 150000,                            pad: { x: 2700, y: 1250 }, unlock: g => g.lv.expandEast >= 1 && (g.lv.townhall >= 2 || g.longGlut('wood')) },
+  { id: 'mine',   icon: '⛏️', name: '광산',       desc: '1레벨: 건설 + 광맥 2 (최대 12). 광부가 광석을 캐 더미·대장간·마트로 나릅니다', max: 6,
+    cost: tbl([12000, 24000, 48000], 2),           pad: { x: 2860, y: 790 }, unlock: g => g.lv.expandMine >= 1 },
+  { id: 'miner',  icon: '👷', name: '광부 고용',   desc: '광산에서 광석을 캐고 나릅니다', max: 6,
+    cost: tbl([2500, 5500, 12000], 1.8),           pad: { x: 2980, y: 790 }, unlock: g => g.lv.mine >= 1 },
+  { id: 'pickaxe', icon: '⛏️', name: '곡괭이',    desc: '채굴 시간 −8%, 2레벨마다 광맥당 광석 +1', max: 10,
+    cost: l => Math.round(4000 * Math.pow(1.5, l)), pad: { x: 3100, y: 790 }, unlock: g => g.lv.mine >= 1 },
+  { id: 'smith',  icon: '⚒️', name: '대장간',     desc: '1레벨: 건설(🔩 철물) · 2: 🛠️ 연장 세트 · 3: 🛡️ 강철 갑옷 · 4: ⚙️ 태엽 장치. 광석과 목재로', max: 4,
+    cost: tbl([10000, 22000, 45000, 90000], 2),     pad: { x: 3140, y: 1390 }, unlock: g => g.lv.mine >= 1 },
+  { id: 'smithman', icon: '🧑‍🏭', name: '대장장이 고용', desc: '대장간에서 계속 두드립니다', max: 4,
+    cost: tbl([2000, 4500, 10000, 22000], 1.8),    pad: { x: 3010, y: 1390 }, unlock: g => g.lv.smith >= 1 },
+  { id: 'smithPrice', icon: '🏷️', name: '철물 가격', desc: '대장간 상품 판매가 +12%', max: Infinity,
+    cost: l => Math.round(900 * Math.pow(1.4, l)),  pad: { x: 3370, y: 1270 }, unlock: g => g.lv.smith >= 1 },
+  { id: 'jewel',  icon: '💎', name: '보석 세공소', desc: '1레벨: 건설(💍 반지) · 2: 📿 목걸이 · 3: 👑 왕관 · 4: 💎 왕실 보석. 귀족·왕족이 특히 찾는 사치품', max: 4,
+    cost: tbl([15000, 32000, 65000, 130000], 2),    pad: { x: 3140, y: 2040 }, unlock: g => g.lv.mine >= 1 && g.lv.townhall >= 3 },
+  { id: 'jeweler', icon: '💍', name: '세공사 고용', desc: '보석 세공소에서 광석을 다듬습니다', max: 4,
+    cost: tbl([2500, 5500, 12000, 26000], 1.8),    pad: { x: 3010, y: 2040 }, unlock: g => g.lv.jewel >= 1 },
+  { id: 'jewelPrice', icon: '🏷️', name: '보석 가격', desc: '보석 판매가 +12%', max: Infinity,
+    cost: l => Math.round(1200 * Math.pow(1.4, l)), pad: { x: 3370, y: 1920 }, unlock: g => g.lv.jewel >= 1 },
+  // ---- 평원 농장(세 번째 확장) ----
+  { id: 'expandFarm', icon: '🧭', name: '평원 농장 개척', desc: '세계가 더 넓어집니다. 🌾 밀밭(곡물), 🍞 빵집, 🍺 양조장을 지을 수 있고 🌤️ 해빙 날씨(작물 성장 +60%)가 생깁니다', max: 1,
+    cost: () => 400000,                            pad: { x: 3460, y: 1400 }, unlock: g => g.lv.expandMine >= 1 && g.lv.townhall >= 3 },
+  { id: 'field',  icon: '🌾', name: '밀밭',       desc: '1레벨: 건설 + 밭 4 (최대 28). 농부가 씨를 뿌리고 익으면 거둬 🌾 곡물을 나릅니다', max: 7,
+    cost: tbl([15000, 30000, 60000], 2),           pad: { x: 3620, y: 950 }, unlock: g => g.lv.expandFarm >= 1 },
+  { id: 'farmer', icon: '🧑‍🌾', name: '농부 고용',  desc: '밀밭에서 씨를 뿌리고 거둡니다', max: 6,
+    cost: tbl([3000, 6500, 14000], 1.8),           pad: { x: 3740, y: 950 }, unlock: g => g.lv.field >= 1 },
+  { id: 'seed',   icon: '🌱', name: '개량 종자',  desc: '곡물 성장 −10%, 3레벨마다 밭당 곡물 +1', max: 10,
+    cost: l => Math.round(5000 * Math.pow(1.5, l)), pad: { x: 3860, y: 950 }, unlock: g => g.lv.field >= 1 },
+  { id: 'bakery', icon: '🍞', name: '빵집',       desc: '1레벨: 건설(🍞 빵) · 2: 🥧 파이 · 3: 🎂 케이크 · 4: 🎁 축제 케이크. 곡물과 우유로', max: 4,
+    cost: tbl([14000, 30000, 60000, 120000], 2),    pad: { x: 3900, y: 1390 }, unlock: g => g.lv.field >= 1 },
+  { id: 'baker',  icon: '🧑‍🍳', name: '제빵사 고용', desc: '빵집에서 계속 굽습니다', max: 4,
+    cost: tbl([2500, 5500, 12000, 26000], 1.8),    pad: { x: 3770, y: 1390 }, unlock: g => g.lv.bakery >= 1 },
+  { id: 'breadPrice', icon: '🏷️', name: '빵 가격', desc: '빵집 상품 판매가 +12%', max: Infinity,
+    cost: l => Math.round(800 * Math.pow(1.4, l)),  pad: { x: 4130, y: 1270 }, unlock: g => g.lv.bakery >= 1 },
+  { id: 'brew',   icon: '🍺', name: '양조장',     desc: '1레벨: 건설(🍺 맥주) · 2: 🍯 벌꿀술 · 3: 🥃 위스키 · 4: 🛢️ 숙성 오크통. 곡물로', max: 4,
+    cost: tbl([18000, 38000, 76000, 150000], 2),    pad: { x: 3900, y: 2040 }, unlock: g => g.lv.field >= 1 && g.lv.townhall >= 3 },
+  { id: 'brewer', icon: '🧑‍🍳', name: '양조사 고용', desc: '양조장에서 계속 빚습니다', max: 4,
+    cost: tbl([3000, 6500, 14000, 30000], 1.8),    pad: { x: 3770, y: 2040 }, unlock: g => g.lv.brew >= 1 },
+  { id: 'brewPrice', icon: '🏷️', name: '술 가격', desc: '양조장 상품 판매가 +12%', max: Infinity,
+    cost: l => Math.round(1000 * Math.pow(1.4, l)), pad: { x: 4130, y: 1920 }, unlock: g => g.lv.brew >= 1 },
+  // 주문 게시판(회관 옆)
+  { id: 'board',  icon: '📜', name: '주문 게시판', desc: '상인·귀족·왕족이 물건을 대량 주문합니다. 마트(또는 만드는 가게) 재고에서 채워지고, 다 채우면 가격의 1.5~1.9배 보상과 평판. 📊 창에서 진행 확인', max: 1,
+    cost: () => 8000,                              pad: { x: 60, y: 1300 }, unlock: g => g.lv.townhall >= 1 && g.lv.mart >= 1 },
   { id: 'coldstore', icon: '❄️', name: '냉동 창고', desc: '도축장 보관함 +40, 대기 순록 +3. 도축장이 막히지 않게', max: 5,
     cost: tbl([3000, 6000, 12000, 24000, 48000], 2), pad: { x: 1440, y: 1700 }, unlock: g => g.lv.slaughter >= 2 },
   { id: 'manager', icon: '🧑‍💼', name: '관리인 고용', desc: '📊 수급 현황을 읽고 막힌 곳(생산 부족·운반 지연·과잉·방어)에 알아서 투자합니다. 돈의 25%는 남겨 둡니다. 📊 창에서 켜고 끕니다', max: 1,
@@ -359,7 +507,7 @@ const UPG = [
   { id: 'repair', icon: '🔧', name: '수리',  desc: '본부와 감시탑 내구도 전부 회복. 부서진 탑은 고칠 때까지 쏘지 못합니다',     max: Infinity,
     cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 || g.towerSites().some((S, i) => !(g.towerHp[i] > g.towerMax(g.lv.tower) * 0.6)) },
   { id: 'repairman', icon: '🔨', name: '수리공 고용', desc: '부서지거나 상한 감시탑·본부·울타리를 돌며 고칩니다(탑 하나 20초). 보스는 탑부터 부수니 꼭 두세요', max: 3,
-    cost: tbl([900, 2400, 6000], 2),              pad: { x: 140, y: 2080 }, unlock: g => g.lv.tower >= 1 && g.lv.fence >= 1 },
+    cost: tbl([900, 2400, 6000], 2),              pad: { x: 150, y: 2090 }, unlock: g => g.lv.tower >= 1 && g.lv.fence >= 1 },
 ];
 
 // 적 종류. 웨이브가 오를수록 섞여 나온다.
@@ -379,11 +527,13 @@ const BOSS = [
 ];
 // 수급 현황 추천: 부족(more)·운반 지연(haul)·과잉(sell)일 때 권하는 업그레이드 id. 지금 보이는 결제 원만 보여 준다
 const ADVICE = {
-  more: { wood: ['worker', 'axe', 'forest', 'grove', 'training'], meat: ['ranch', 'slaughterman', 'coldstore', 'breed', 'feed', 'rancher', 'hunter'],
-          fish: ['fisher', 'rod', 'fishFarm', 'fishFarmer', 'fishFeed'], pelt: ['traps', 'bait', 'skinning', 'tanning', 'hunter'] },
+  more: { wood: ['worker', 'axe', 'forest', 'grove', 'nursery', 'forester', 'sapling', 'training'], meat: ['ranch', 'slaughterman', 'coldstore', 'breed', 'feed', 'rancher', 'hunter'],
+          fish: ['fisher', 'rod', 'fishFarm', 'fishFarmer', 'fishFeed'], pelt: ['traps', 'bait', 'skinning', 'tanning', 'hunter'],
+          milk: ['dairy', 'dairyman'], ore: ['mine', 'miner', 'pickaxe'], grain: ['field', 'farmer', 'seed'] },
   haul: ['collector', 'sled', 'runner_tailor', 'runner_rest', 'runner_furn', 'shoes'],
-  sell: { wood: ['promo', 'workshop', 'craftsman', 'smoke', 'mart', 'martLanes'], meat: ['meatproc', 'meatworker', 'expandEast', 'restaurant', 'cook', 'promo', 'mart', 'martLanes'],
-          fish: ['smoke', 'smoker', 'expandEast', 'restaurant', 'cook', 'promo', 'mart', 'martLanes'], pelt: ['tailor', 'tailorman', 'promo', 'mart', 'martLanes'] },
+  sell: { wood: ['promo', 'workshop', 'craftsman', 'smoke', 'smith', 'mart', 'martLanes'], meat: ['meatproc', 'meatworker', 'expandEast', 'restaurant', 'cook', 'promo', 'mart', 'martLanes'],
+          fish: ['smoke', 'smoker', 'expandEast', 'restaurant', 'cook', 'promo', 'mart', 'martLanes'], pelt: ['tailor', 'tailorman', 'promo', 'mart', 'martLanes'],
+          milk: ['cream', 'creamer', 'bakery', 'baker', 'promo', 'martGoods'], ore: ['smith', 'smithman', 'jewel', 'jeweler', 'promo', 'martGoods'], grain: ['bakery', 'baker', 'brew', 'brewer', 'promo', 'martGoods'] },
 };
 const bossTier = n => Math.min(BOSS.length - 1, Math.max(0, Math.floor(n / 10) - 1));
 const ENRAGE = { at: 0.35, speed: 1.5, dmg: 1.4 };   // 체력 35% 이하에서 분노
@@ -405,7 +555,7 @@ const TIERS = {
   hut:   [{ at: 0, name: '오두막' }, { at: 5, name: '통나무집' }, { at: 10, name: '석조 본부' }, { at: 20, name: '요새' }],
   // 감시탑 단계: shot(투사체) arrow 화살 · bolt 쇠뇌 · cannon 대포(범위 피해) · bullet 소총(연사) · mg 기관총. shots 한 번에 쏘는 수, cd 발사 간격 배수, dmg 한 발 피해 배수
   tower: [{ at: 1, name: '망루', shot: 'arrow', shots: 1, cd: 1, dmg: 1 }, { at: 4, name: '감시탑', shot: 'arrow', shots: 2, cd: 1, dmg: 1 }, { at: 8, name: '석탑', shot: 'arrow', shots: 3, cd: 1, dmg: 1 },
-          { at: 12, name: '쇠뇌탑', shot: 'bolt', shots: 3, cd: 1.1, dmg: 1.7 }, { at: 16, name: '대포탑', shot: 'cannon', shots: 2, cd: 1.7, dmg: 2.4, splash: 80 },
+          { at: 12, name: '쇠뇌탑', shot: 'bolt', shots: 3, cd: 1.1, dmg: 1.7 }, { at: 16, name: '대포탑', shot: 'cannon', shots: 2, cd: 1.6, dmg: 3.6, splash: 80 },
           { at: 20, name: '소총탑', shot: 'bullet', shots: 4, cd: 0.55, dmg: 0.6 }, { at: 26, name: '기관총탑', shot: 'mg', shots: 6, cd: 0.35, dmg: 0.45 }],
   stall: [{ at: 0, name: '좌판' }, { at: 3, name: '천막 가게' }, { at: 7, name: '목재 상점' }],
   workshop: [{ at: 1, name: '작업 헛간' }, { at: 2, name: '가구 공방' }, { at: 4, name: '대형 공방' }],
@@ -415,6 +565,11 @@ const TIERS = {
   inn: [{ at: 1, name: '여관' }, { at: 8, name: '객잔' }, { at: 16, name: '호텔' }, { at: 30, name: '그랜드 호텔' }, { at: 50, name: '리조트' }],
   smoke: [{ at: 1, name: '훈제 오두막' }, { at: 3, name: '훈제장' }],
   meatproc: [{ at: 1, name: '가공 작업장' }, { at: 3, name: '육가공소' }],
+  cream: [{ at: 1, name: '치즈 오두막' }, { at: 3, name: '유제품 공방' }],
+  smith: [{ at: 1, name: '대장간' }, { at: 3, name: '제철소' }],
+  jewel: [{ at: 1, name: '세공 작업대' }, { at: 3, name: '보석 세공소' }],
+  bakery: [{ at: 1, name: '화덕' }, { at: 3, name: '빵집' }],
+  brew: [{ at: 1, name: '양조 헛간' }, { at: 3, name: '양조장' }],
   ranch: [{ at: 1, name: '울타리 목장' }, { at: 4, name: '축사' }, { at: 8, name: '대형 축사' }],
   village: [{ at: 0, name: '개척지' }, { at: 1, name: '마을' }, { at: 3, name: '큰 마을' }, { at: 6, name: '읍내' }, { at: 10, name: '도시' }],
   axe:   [{ at: 0, name: '쇠도끼', color: '#9aa7b5' }, { at: 3, name: '강철 도끼', color: '#6fa8dc' }, { at: 6, name: '황금 도끼', color: '#f1c40f' }, { at: 10, name: '수정 도끼', color: '#b388ff' }],
@@ -482,12 +637,20 @@ const HINTS = [
 
 // 새 컨텐츠가 열릴 때 한 번씩 보여 주는 팁
 const TIPS = [
-  { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. 잡으면 🧥 모피! ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
+  { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. 잡으면 🐾 모피! ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
   { id: 'pelt',    when: g => g.drops.some(d => d.kind === 'pelt'),  text: '🐾 모피가 떨어졌어요! 주워 두세요. 사냥터 옆 모피 상점을 열면 비싸게 팝니다' },
   { id: 'collector', when: g => g.padVisible(UPG.find(u => u.id === 'collector')) && g.drops.length >= 4, text: '바닥에 고기·모피가 남아 있어요. 🧺 수거꾼(사냥터 입구)을 고용하면 맵 전체를 돌며 주워 가게에 나릅니다. 2명째부터는 캠프 옆 초소에서 습격 전리품을 기다립니다' },
   { id: 'classes', when: g => g.lv.townhall >= 1, text: '👥 마을이 커지면 손님도 발전합니다: 마을 사람 → 나그네 → 상인 → 귀족 → 왕족. 계급이 높을수록 비싸게·많이 사고 팁도 줍니다. 손님을 화나게 하면 평판이 떨어져 낮은 계급이 늘어요(📊 창에서 평판 확인)' },
   { id: 'expandpad', when: g => g.padVisible(UPG.find(u => u.id === 'expandEast')), text: '🧭 동쪽 개척(목장 아래 오른쪽 끝)을 사면 세계가 동쪽으로 넓어지고 훈제장·육가공소를 지을 수 있어요. 생선·고기가 남아돌 때의 답입니다' },
   { id: 'expand', when: g => g.lv.expandEast >= 1, text: '🧭 동쪽 벌판이 열렸어요! 오른쪽으로 가 보세요. 🐠 훈제장은 생선+장작, 🌭 육가공소는 고기를 비싼 상품으로 만듭니다. 마트 품목 확장 4·5단계로 마트에서도 팝니다' },
+  { id: 'nursery', when: g => g.padVisible(UPG.find(u => u.id === 'nursery')) && g.lv.nursery < 1, text: '🌱 동쪽 벌판 아래에 묘목장을 지으면 나무를 직접 심어 키울 수 있어요. 산림꾼이 심고 베어 목재를 훈제장·마트로 나릅니다' },
+  { id: 'dairy', when: g => g.padVisible(UPG.find(u => u.id === 'dairy')) && g.lv.dairy < 1, text: '🥛 순록이 많아졌네요! 동쪽 벌판 아래 낙농장을 지으면 젖을 짜 우유를 팔고, 🧀 유제품 공방에서 치즈·버터·아이스크림을 만듭니다' },
+  { id: 'expandMine', when: g => g.padVisible(UPG.find(u => u.id === 'expandMine')) && g.lv.expandMine < 1, text: '🧭 광산 골짜기 개척(동쪽 길 끝)이 열렸어요. ⛏️ 광산과 ⚒️ 대장간, 💎 보석 세공소가 생기고 안개·오로라 날씨가 찾아옵니다' },
+  { id: 'mineOpen', when: g => g.lv.expandMine >= 1 && g.lv.mine < 1, text: '⛏️ 광산 골짜기! 광산을 짓고 광부를 두면 🪨 광석이 나옵니다. 대장간은 광석+목재로 철물·갑옷을, 보석 세공소는 귀족·왕족이 찾는 보석을 만듭니다' },
+  { id: 'expandFarm', when: g => g.padVisible(UPG.find(u => u.id === 'expandFarm')) && g.lv.expandFarm < 1, text: '🧭 평원 농장 개척(광산 길 끝)이 열렸어요. 🌾 밀밭·🍞 빵집·🍺 양조장이 생기고 🌤️ 해빙 날씨에 작물이 빨리 자랍니다' },
+  { id: 'weather', when: g => g.weather && g.weather.kind !== 'snow', text: '🌦️ 날씨가 바뀝니다! ☀️ 맑음은 손님·성장 +15%, ❄️ 눈보라는 모두 느려지고 손님이 줄어요. 🌫️ 안개는 탑 사거리 −30%, 🌌 오로라는 판매가 +20%, 🌤️ 해빙은 작물 성장 +60%. 위쪽 ❄ 줄에서 지금 날씨를 봅니다' },
+  { id: 'board', when: g => g.padVisible(UPG.find(u => u.id === 'board')) && g.lv.board < 1, text: '📜 주문 게시판(회관 왼쪽)을 세우면 상인·귀족·왕족이 대량 주문을 냅니다. 재고로 채우면 보상과 평판!' },
+  { id: 'order', when: g => g.orders && g.orders.length > 0, text: '📜 새 주문이 들어왔어요! 📊 창에서 어떤 물건이 얼마나 필요한지 보세요. 기한 안에 마트 재고로 채워지면 보상을 받습니다' },
   { id: 'coldstore', when: g => g.padVisible(UPG.find(u => u.id === 'coldstore')), text: '도축장이 자주 막히나요? ❄️ 냉동 창고(도축장 아래)는 보관함과 대기 순록 자리를 늘립니다' },
   { id: 'manager', when: g => g.lv.manager >= 1, text: '🧑‍💼 관리인 고용! 20초마다 수급·방어를 살펴 가장 급한 업그레이드를 알아서 삽니다(돈의 25%는 남김). 📊 수급 현황 창에서 자동 투자를 끌 수 있어요' },
   { id: 'towerhp', when: g => g.towerSites().some((S, i) => g.towerHp[i] < g.towerMax(g.lv.tower) * 0.7), text: '⚠️ 감시탑도 내구도가 있어요. 적이 지나가며 부수고 보스는 탑부터 노립니다. 부서진 탑은 쏘지 못하니 🔧 수리(본부 왼쪽)로 고치거나 🔨 수리공(캠프 남서쪽)을 두세요' },

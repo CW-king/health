@@ -10,7 +10,8 @@ const inRect = (x, y, r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y +
 const GOOD_IDS = ['wood', 'meat', 'fish', 'pelt', 'animal'];
 const ALL_GOODS = Object.keys(CFG.goods);
 const FURN_IDS = ALL_GOODS.filter(g => CFG.goods[g].shop === 'furn');
-const CRAFT_SHOPS = ['furn', 'rest', 'tailor', 'smoke', 'meatproc'];   // 제작 가게(재료를 받아 완제품을 판다)
+const CRAFT_SHOPS = ['furn', 'rest', 'tailor', 'smoke', 'meatproc', 'cream', 'smith', 'jewel', 'bakery', 'brew'];   // 제작 가게(재료를 받아 완제품을 판다). 순서 = 마트 품목 확장 순서
+const FARM_BY_UPG = {}; for (const [k, F] of Object.entries(CFG.farms)) FARM_BY_UPG[F.upg] = k;
 const emptyStock = () => { const o = {}; for (const g of ALL_GOODS) o[g] = 0; return o; };
 const emptyInv = emptyStock;
 
@@ -61,7 +62,7 @@ const MART_RECT = { x: CFG.shops.mart.x - CFG.shops.mart.w / 2, y: CFG.shops.mar
 const FURN_RECT = { x: CFG.shops.furn.x - CFG.shops.furn.w / 2, y: CFG.shops.furn.y - 60, w: CFG.shops.furn.w, h: 90 };
 const RIVER_RECT = CFG.river;
 const MAIN_TREES = FOREST_SPOTS.filter(p => p.grove == null).length;   // 남쪽 숲 앞의 본 숲 나무 수
-const COLLECTOR_GOODS = ['meat', 'pelt', 'fish', 'wood'];
+const COLLECTOR_GOODS = ['meat', 'pelt', 'fish', 'wood', 'milk', 'ore', 'grain'];
 const HUNT_GOODS = ['pelt', 'meat'];   // 사냥꾼이 사냥터에서 직접 챙기는 것
 // 무한 업그레이드 가격: 20레벨까지는 표대로, 그 뒤 40레벨은 10%씩, 그 뒤로는 4%씩만 오른다(300레벨까지 가도 천문학적이 되지 않게)
 function softCost(u, l) {
@@ -82,7 +83,9 @@ class Game {
 
   // ---- 파생 수치 ----
   get bonus() { return 1 + this.meta.snowflakes * CFG.meta.bonusPer; }
-  price(good) { const G = CFG.goods[good]; return Math.round(G.base * Math.pow(CFG.price.growth, this.lv[G.priceUp]) * this.bonus * (1 + 0.05 * this.lv.townhall)); }
+  price(good) { const G = CFG.goods[good]; return Math.round(G.base * Math.pow(CFG.price.growth, this.lv[G.priceUp]) * this.bonus * (1 + 0.05 * this.lv.townhall) * (this.weatherDef.price || 1)); }
+  get weatherDef() { return (this.weather && CFG.weather.kinds[this.weather.kind]) || CFG.weather.kinds.snow; }
+  get growMul() { return this.weatherDef.grow || 1; }   // 날씨: 작물·가축·양식 성장 배수
   get chopMul() { return Math.max(0.09, Math.pow(0.89, this.lv.axe)); }
   // 식량 창고는 고기+생선 합산 상한이라, 종류별 '상한'을 지금 남은 자리만큼으로 돌려준다
   pantryRoomCap(shop) { const room = Math.max(0, CFG.mess.cap - (shop.stock.meat + shop.stock.fish)); return room > 0 ? Math.max(shop.stock.meat, shop.stock.fish) + room : Math.min(shop.stock.meat, shop.stock.fish); }
@@ -94,16 +97,16 @@ class Game {
   get workerCarry() { return CFG.worker.carry + this.lv.bag; }   // 가방은 전투원 빼고 모든 일꾼에게 적용
   get wantMax() { return CFG.customer.wantMax + Math.floor(this.lv.promo / 3); }
   get carryCap() { return CFG.player.carry + CFG.player.carryPerBag * this.lv.bag; }
-  get moveMul() { return 1 + 0.1 * this.lv.shoes; }   // 👟 신발: 모두의 이동 속도
+  get moveMul() { return (1 + 0.1 * this.lv.shoes) * (this.weatherDef.move || 1); }   // 👟 신발: 모두의 이동 속도(눈보라면 느려진다)
   get playerSpeed() { return CFG.player.speed * this.moveMul; }
   get workerSpeed() { return CFG.worker.speed * this.moveMul; }
   get guardSpeed() { return CFG.guard.speed * this.moveMul; }
-  get custInterval() { return Math.max(CFG.customer.minInterval, CFG.customer.interval * Math.pow(CFG.customer.intervalMul, this.lv.promo)); }
+  get custInterval() { return Math.max(CFG.customer.minInterval, CFG.customer.interval * Math.pow(CFG.customer.intervalMul, this.lv.promo)) / (this.weatherDef.cust || 1); }
   get atkDmg() { return CFG.player.atkDmg + CFG.weapon.dmgPer * this.lv.weapon; }
   get guardDmg() { return CFG.guard.dmg + CFG.weapon.dmgPer * this.lv.weapon; }
   get hunterDmg() { return Math.round((CFG.hunt.hunterDmg + CFG.weapon.dmgPer * this.lv.weapon) * this.effMul * 10) / 10; }
   get towerDmg() { return CFG.tower.dmg + CFG.tower.dmgPer * this.lv.tower; }
-  get towerRange() { return CFG.tower.range + CFG.tower.rangePer * this.lv.tower; }
+  get towerRange() { return (CFG.tower.range + CFG.tower.rangePer * this.lv.tower) * (this.weatherDef.tower || 1); }
   get towerTierDef() { return TIERS.tower[tierOf('tower', this.lv.tower)]; }
   get towerArrows() { return this.towerTierDef.shots; }
   get towerCount() { return this.lv.tower ? Math.min(CFG.tower.sites.length, 1 + Math.floor(this.lv.tower / CFG.tower.per)) : 0; }
@@ -141,6 +144,7 @@ class Game {
   get toolMul() { return Math.max(0.1, Math.pow(0.89, this.lv.tools)); }
   shopOpen(id) {
     if (id === 'mart') return this.lv.mart >= 1;
+    if (CFG.shops[id].upg && CFG.shops[id].worker) return this.lv[CFG.shops[id].upg] >= 1;   // 제작 가게는 건설 업그레이드 1레벨부터
     if (id === 'furn') return this.lv.workshop >= 1;
     if (id === 'rest') return this.lv.restaurant >= 1;
     if (id === 'tailor') return this.lv.tailor >= 1;
@@ -194,12 +198,12 @@ class Game {
     const K = B.kind, m = 1 + 0.6 * B.rank;
     return Object.assign({}, K, { name: K.name + BOSS_RANKS[B.rank], hp: K.hp * m, dmg: K.dmg * m, bounty: Math.round(K.bounty * m), meat: Math.round(K.meat * m), pelt: K.pelt + B.rank * 2, rank: B.rank });
   }
-  enemyName(t, n) { return ENEMY[t] ? ENEMY[t].name : this.bossDef(n).name; }
+  enemyName(t, n) { return this.isBossType(t) ? this.bossDef(n).name : ENEMY[t].name; }
   enemyEmoji(t) { return ENEMY[t] ? ENEMY[t].emoji : (BOSS_KINDS.find(k => k.type === t) || {}).emoji || '👹'; }
   isBossType(t) { return t === 'yeti' || BOSS_KINDS.some(k => k.type === t); }
   _unusedWaveLabel() {
   }
-  bearHP(n) { return Math.round(CFG.wave.hp * Math.pow(CFG.wave.hpGrowth, n - 1)); }
+  bearHP(n) { return Math.round(CFG.wave.hp * Math.pow(CFG.wave.hpGrowth, Math.min(49, n - 1)) * Math.pow(1.08, Math.max(0, n - 50))); }   // 50웨이브 뒤엔 완만하게(무기·탑 300레벨까지 닿도록)
   bearDmg(n) { return CFG.wave.dmg * Math.pow(CFG.wave.dmgGrowth, n - 1); }
   bounty(n) { return Math.round(CFG.wave.bounty * Math.pow(CFG.wave.bountyGrowth, n - 1) * this.bonus); }
   wildHP() { return Math.round(CFG.hunt.hp * Math.pow(CFG.hunt.hpGrowth, this.wave.n)); }
@@ -217,7 +221,7 @@ class Game {
   get fishGrowTime() { return Math.max(8, CFG.fishFarm.growTime * Math.pow(0.89, this.lv.fishFeed)); }
   get fishPerPen() { return CFG.fishFarm.yield + Math.floor(this.lv.fishFeed / 2); }
   get slaughterAnimalCap() { return CFG.shops.slaughter.animalCap + 2 * Math.max(0, this.lv.slaughter - 1) + 3 * this.lv.coldstore; }
-  get worldW() { return CFG.world.w + (this.lv.expandEast ? CFG.east.w : 0); }   // 동쪽 개척 뒤 세계 너비
+  get worldW() { let w = CFG.world.w; for (const d of CFG.districts) { if (this.lv[d.upg] >= 1) w += d.w; else break; } return w; }   // 개척한 만큼 세계 너비(순서대로)
   // 그 물건이 2분 넘게 과잉(가게 가득)이었나 → 확장 조기 해금에 쓴다
   longGlut(good) { return this.adviceSince[good] === good + ':glut' && this.t - (this.adviceSinceT[good] || 0) > 120; }
 
@@ -240,6 +244,8 @@ class Game {
     this.hut = { x: CFG.hut.x, y: CFG.hut.y, maxhp: this.hutMax(this.lv.fence) };
     this.hut.hp = s.hutHp != null ? Math.max(1, Math.min(s.hutHp, this.hut.maxhp)) : this.hut.maxhp;
     this.towerHp = []; { const m = this.towerMax(this.lv.tower); for (let i = 0; i < CFG.tower.sites.length; i++) this.towerHp[i] = s.towerHp && s.towerHp[i] != null ? Math.max(0, Math.min(m, s.towerHp[i])) : m; }
+    this.weather = { kind: (s.weather && CFG.weather.kinds[s.weather.kind]) ? s.weather.kind : 'snow', t: s.weather && s.weather.t != null ? s.weather.t : CFG.weather.first };
+    this.orders = (s.orders || []).map(o => Object.assign({}, o)); this.orderT = s.orderT != null ? s.orderT : 40; this.orderSeq = this.orders.reduce((a, o) => Math.max(a, o.id || 0), 0);
     this.wave = { n: s.waveN || 0, nextAt: s.waveNextAt != null ? s.waveNextAt : CFG.wave.first, warned: false, active: false };
     if (s.waveActive && this.wave.n > 0) { this.wave.n--; this.wave.nextAt = this.t + 30; }   // 습격 도중 저장됐으면 그 웨이브를 30초 뒤 다시 치른다
     else if (this.wave.nextAt < this.t + 20) this.wave.nextAt = this.t + 30;
@@ -258,11 +264,11 @@ class Game {
     this.trees = FOREST_SPOTS.map((p, i) => ({ x: p.x, y: p.y, logs: CFG.tree.logs, regrowT: 0, user: null, i, grove: p.grove, active: true }));
     this.workers = []; for (let i = 0; i < this.lv.worker; i++) this.addWorker();
     this.guards = []; for (let i = 0; i < this.lv.guard; i++) this.addGuard(false); for (let i = 0; i < this.lv.militia; i++) this.addGuard(true);
+    if (s.guards) s.guards.forEach((sg, i) => { const g = this.guards[i]; if (!g || !!g.militia !== !!sg.militia) return; g.hp = Math.max(0, Math.min(g.maxhp, sg.hp != null ? sg.hp : g.maxhp)); if (sg.down > 0) { g.down = sg.down; g.bleed = sg.bleed != null ? sg.bleed : CFG.guard.bleedOut; } else if (g.hp <= 0) g.hp = 1; });   // 쓰러진 채 저장됐으면 그대로(새로고침이 공짜 치료가 되지 않게)
     this.hunters = []; for (let i = 0; i < this.lv.hunter; i++) this.addHunter();
     if (!this.lv.martLanes && this.lv.mart >= 2) this.lv.martLanes = Math.min(2, this.lv.mart - 1);   // 예전 저장 호환
-    this.crafters = {}; for (const id of CRAFT_SHOPS) this.crafters[id] = [];
-    for (let i = 0; i < this.lv.smoker; i++) this.addCrafter('smoke'); for (let i = 0; i < this.lv.meatworker; i++) this.addCrafter('meatproc');
-    for (let i = 0; i < this.lv.craftsman; i++) this.addCrafter('furn'); for (let i = 0; i < this.lv.cook; i++) this.addCrafter('rest'); for (let i = 0; i < this.lv.tailorman; i++) this.addCrafter('tailor');
+    this.crafters = {}; for (const id of CRAFT_SHOPS) { this.crafters[id] = []; for (let i = 0; i < (this.lv[CFG.shops[id].worker] || 0); i++) this.addCrafter(id); }
+    this.initFarms(s);
     this.inn = { guests: (s.innGuests || []).slice() };
     this.ship = Object.assign({ state: 'away', t: CFG.ship.every * 0.5, demand: null, done: false }, s.ship || {});
     if (this.ship.state === 'docked') this.ship.t = Math.min(this.ship.t, CFG.ship.stay);
@@ -301,7 +307,7 @@ class Game {
     const shops = {}; for (const id of Object.keys(this.shops)) shops[id] = Object.assign({}, this.shops[id].stock);
     const add = (shopId, g, n) => { if (shopId && shops[shopId] && n > 0) shops[shopId][g] = (shops[shopId][g] || 0) + n; };
     // 일꾼이 들고 있는 물건은 목적지 가게에 넣은 것으로 친다
-    const carriers = [].concat(this.workers, this.hunters, this.fishers, this.fishFarmers, this.ranchers, this.collectors, this.slaughtermen, ...CRAFT_SHOPS.map(id => this.crafters[id]), ...CRAFT_SHOPS.map(id => this.runners[id]));
+    const carriers = [].concat(this.workers, this.hunters, this.fishers, this.fishFarmers, this.ranchers, this.collectors, this.slaughtermen, this.farmWorkers, ...CRAFT_SHOPS.map(id => this.crafters[id]), ...CRAFT_SHOPS.map(id => this.runners[id]));
     for (const e of carriers) for (const g of ALL_GOODS) if (e.inv && e.inv[g] > 0) add(g === 'animal' ? (this.shopOpen('slaughter') ? 'slaughter' : null) : CFG.goods[g].tier ? (this.lv.mart ? 'mart' : CFG.goods[g].shop) : this.destFor(g), g, e.inv[g]);
     // 제작·도축 중인 재료는 돌려놓는다
     const jobs = [].concat(...CRAFT_SHOPS.map(id => this.crafters[id]), [this.player]);
@@ -310,6 +316,9 @@ class Game {
     return {
       t: this.t, money: this.money, earned: this.earned, lv: this.lv, paid: this.paid,
       fenceHp: this.fence.hp, hutHp: this.hut.hp, towerHp: this.towerHp.slice(), waveN: this.wave.n, waveNextAt: this.wave.nextAt, waveActive: this.wave.active,
+      guards: this.guards.map(g => ({ hp: Math.round(g.hp * 10) / 10, down: g.down > 0 ? Math.round(g.down * 10) / 10 : 0, bleed: g.down > 0 && g.bleed != null ? Math.round(g.bleed * 10) / 10 : null, militia: !!g.militia })),
+      farms: Object.fromEntries(Object.entries(this.farms).map(([id, f]) => [id, f.plots.map(p => [['empty', 'grow', 'ready'].indexOf(p.state), Math.round(p.grow * 1000) / 1000])])),
+      weather: { kind: this.weather.kind, t: Math.round(this.weather.t) }, orders: this.orders.map(o => Object.assign({}, o)), orderT: this.orderT,
       bills: this.bills.filter(b => b.state === 'ground').map(b => ({ x: Math.round(b.x), y: Math.round(b.y), amount: b.amount, shop: b.shop })),
       drops: this.drops.filter(d => d.state === 'ground').map(d => ({ kind: d.kind, x: Math.round(d.x), y: Math.round(d.y) })),
       tipQueue: this.tipQueue.map(t => t.id),
@@ -429,7 +438,7 @@ class Game {
     const R = CFG.ranch.rect, gt = this.growTime;
     for (const a of this.animals) {
       a.moving = false;
-      if (a.grow < 1) a.grow = Math.min(1, a.grow + dt / gt);
+      if (a.grow < 1) a.grow = Math.min(1, a.grow + dt * this.growMul / gt);
       if (a.waitT > 0) { a.waitT -= dt; if (a.waitT <= 0) { a.tx = rnd(R.x + 40, R.x + R.w - 40); a.ty = rnd(R.y + 60, R.y + R.h - 30); } continue; }
       if (moveToward(a, a.tx, a.ty, CFG.ranch.speed, dt)) a.waitT = rnd(1.5, 4);
       if (a.moving) a.anim += dt * 6;
@@ -529,7 +538,7 @@ class Game {
   // short 생산 부족 / stuck 운반 지연(쌓여 있는데 가게는 빔) / glut 과잉(가게 가득) / ok
   advice() {
     const out = [];
-    for (const good of ['wood', 'meat', 'fish', 'pelt']) {
+    for (const good of ['wood', 'meat', 'fish', 'pelt', 'milk', 'ore', 'grain']) {
       const dests = [this.deliveryShop(good)].concat(CRAFT_SHOPS.filter(id => this.shopOpen(id) && CFG.shops[id].accepts.includes(good))).filter(Boolean);
       if (!dests.length) continue;
       let stock = 0, cap = 0;
@@ -576,12 +585,13 @@ class Game {
 
   // ---- 더미: 운반 분업 뒤 생산자가 물건을 쌓아 두는 곳 ----
   // 역할별로 몇 단계 분업부터 더미를 쓰는지
-  usesPile(role) { return this.lv.logistics >= ({ hunter: 1, slaughter: 1, fisher: 2, fishFarmer: 2, worker: 3 })[role]; }
+  usesPile(role) { return this.lv.logistics >= ({ hunter: 1, slaughter: 1, fisher: 2, fishFarmer: 2, worker: 3, forester: 3, dairyman: 3, miner: 3, farmer: 3 })[role]; }
   pileActive(p) {
     if (p.stock > 0) return true;
     if (this.lv.logistics < CFG.piles[p.id].lv) return false;
     if (p.id === 'woodGrove') return this.lv.grove > 0;
     if (p.id === 'fishFarm') return this.lv.fishFarm > 0;
+    if (CFG.piles[p.id].farm) return this.lv[CFG.farms[CFG.piles[p.id].farm].upg] > 0;
     return true;
   }
   nearestPile(x, y, good, needRoom) {
@@ -891,6 +901,7 @@ class Game {
     this.updateHunters(dt);
     this.updateFishers(dt);
     this.updateFishFarm(dt);
+    this.updateFarms(dt); this.updateWeather(dt); this.updateOrders(dt);
     this.updateAnimals(dt);
     this.updateRanchers(dt);
     this.updateSlaughtermen(dt);
@@ -958,7 +969,7 @@ class Game {
       if (id === 'mart') { if (this.lv.mart) pushOutRect(e, r, MART_RECT); }
       else if (id === 'furn') { /* FURN_RECT로 처리 */ }
       else if (id === 'slaughter' || id === 'furn') { /* 별도 처리 */ }
-      else if (id === 'rest' || id === 'tailor' || id === 'inn' || id === 'smoke' || id === 'meatproc') { if (this.shopOpen(id)) pushOutRect(e, r, { x: CFG.shops[id].x - CFG.shops[id].w / 2, y: CFG.shops[id].y - 50, w: CFG.shops[id].w, h: 70 }); }
+      else if ((CFG.shops[id].upg && id !== 'furn') || id === 'inn') { if (this.shopOpen(id)) pushOutRect(e, r, { x: CFG.shops[id].x - CFG.shops[id].w / 2, y: CFG.shops[id].y - 50, w: CFG.shops[id].w, h: 70 }); }
       else if (this.shopOpen(id)) pushOutRect(e, r, shopRect(CFG.shops[id]));
     }
     if (this.lv.workshop) pushOutRect(e, r, FURN_RECT);
@@ -968,7 +979,7 @@ class Game {
     if (this.lv.infirmary) pushOutRect(e, r, { x: CFG.infirmary.x - 40, y: CFG.infirmary.y - 30, w: 80, h: 44 });
     if (this.lv.mess) pushOutRect(e, r, { x: CFG.mess.x - 50, y: CFG.mess.y - 30, w: 100, h: 44 });
     pushOutRect(e, r, HUT_RECT);
-    pushOutRect(e, r, { x: RIVER_RECT.x, y: RIVER_RECT.y - 40, w: RIVER_RECT.w + 40, h: RIVER_RECT.h + 8 });
+    pushOutRect(e, r, { x: RIVER_RECT.x, y: RIVER_RECT.y - 40, w: this.worldW + 40, h: RIVER_RECT.h + 8 });
   }
 
   chop(tree, who) {
@@ -1311,7 +1322,7 @@ class Game {
   updateFishFarm(dt) {
     while (this.pens.length < Math.min(this.lv.fishFarm, CFG.fishFarm.pens.length)) this.addPen(0);
     const gt = this.fishGrowTime;
-    for (const p of this.pens) if (p.grow < 1) p.grow = Math.min(1, p.grow + dt / gt);
+    for (const p of this.pens) if (p.grow < 1) p.grow = Math.min(1, p.grow + dt * this.growMul / gt);
     const F = CFG.fishFarm, cap = F.carry + this.lv.bag;
     for (const f of this.fishFarmers) {
       const shopId = f.dest && this.shopOpen(f.dest) ? f.dest : this.destFor('fish');
@@ -1361,11 +1372,11 @@ class Game {
       for (const g of base) want[g] = rndi(CFG.customer.wantMin, this.wantMax) + this.lv.martBulk + extra;
       // 제작품(가구·요리·의복): 재고가 있는 것 중에서 재고가 많은 쪽이 더 자주 팔린다. 품목 확장 레벨만큼 종류를 담는다
       const crafted = this.shopGoods('mart').filter(g => CFG.goods[g].tier && st[g] > 0);
-      let picks = Math.min(crafted.length, rndi(0, 1) + Math.ceil(this.lv.martGoods / 2));
-      const pool = crafted.slice();
+      let picks = Math.min(crafted.length, rndi(0, 1) + Math.ceil(this.lv.martGoods / 2) + (extra >= 3 ? 1 : 0));   // 귀족·왕족은 제작품을 한 가지 더
+      const pool = crafted.slice(), wgt = g => st[g] * (extra >= 3 ? 1 + CFG.goods[g].tier : 1);   // 귀족·왕족은 비싼(높은 단계) 물건을 더 찾는다
       while (picks-- > 0 && pool.length) {
-        const tot = pool.reduce((a, g) => a + st[g], 0); let r = Math.random() * tot, g = pool[pool.length - 1];
-        for (const q of pool) { r -= st[q]; if (r <= 0) { g = q; break; } }
+        const tot = pool.reduce((a, g) => a + wgt(g), 0); let r = Math.random() * tot, g = pool[pool.length - 1];
+        for (const q of pool) { r -= wgt(q); if (r <= 0) { g = q; break; } }
         pool.splice(pool.indexOf(g), 1);
         want[g] = Math.min(st[g], 1 + Math.floor(this.lv.martBulk / 3) + (st[g] >= 20 ? 1 : 0));
       }
@@ -1579,11 +1590,8 @@ class Game {
     else if (u.id === 'militia') this.addGuard(true);
     else if (u.id === 'hunter') this.addHunter();
     else if (u.id === 'fisher') this.addFisher();
-    else if (u.id === 'craftsman') this.addCrafter('furn');
-    else if (u.id === 'cook') this.addCrafter('rest');
-    else if (u.id === 'tailorman') this.addCrafter('tailor');
-    else if (u.id === 'smoker') this.addCrafter('smoke');
-    else if (u.id === 'meatworker') this.addCrafter('meatproc');
+    else if (CRAFT_SHOPS.some(id => CFG.shops[id].worker === u.id)) this.addCrafter(CRAFT_SHOPS.find(id => CFG.shops[id].worker === u.id));
+    else if (Object.keys(CFG.farms).some(k => CFG.farms[k].worker === u.id)) this.addFarmWorker(Object.keys(CFG.farms).find(k => CFG.farms[k].worker === u.id));
     else if (u.id === 'rancher') this.addRancher();
     else if (u.id === 'slaughterman') this.addSlaughterman();
     else if (u.id === 'collector') this.addCollector();
@@ -1629,7 +1637,8 @@ class Game {
         const fname = TIERS.fence[tierOf('fence', lv)].name, hname = TIERS.hut[tierOf('hut', lv)].name;
         this.text(this.hut.x, this.hut.y - 150, `🧱 ${fname}으로 강화! 🏠 ${hname}`, '#ffd166', 2.6); this.shake = 0.6; this.emit('tierUp', this.hut.x, this.hut.y);
       }
-    } else if (id === 'tower') { this.pops.tower = 1; this.sparkle(CFG.tower.x, CFG.tower.y - 80, 16, '#ffe08a'); if (changed) { this.text(CFG.tower.x, CFG.tower.y - 170, `🏹 ${TIERS.tower[tierOf('tower', lv)].name}으로 증축!`, '#ffd166', 2.4); this.emit('tierUp'); } }
+    } else if (id === 'tower') { this.pops.tower = 1; this.sparkle(CFG.tower.x, CFG.tower.y - 80, 16, '#ffe08a'); if (changed) { this.text(CFG.tower.x, CFG.tower.y - 170, `🏹 ${TIERS.tower[tierOf('tower', lv)].name}으로 증축!`, '#ffd166', 2.4); this.emit('tierUp'); }
+      if (lv % CFG.tower.per === 0 && lv / CFG.tower.per < CFG.tower.sites.length) { const S = CFG.tower.sites[this.towerCount - 1]; this.sparkle(S.x, S.y - 60, 24, '#ffd166'); this.text(S.x, S.y - 140, `🏹 감시탑 ${this.towerCount}호 완성!`, '#ffd166', 2.5); } }
     else if (id === 'price' || id === 'promo' || id === 'cashier') { this.pops.wood = 1; const sh = CFG.shops[this.lv.mart ? 'mart' : 'wood']; this.sparkle(sh.x, sh.y - 40, 14, '#7CFC9A'); if (changed) { this.text(sh.x, sh.y - 120, `🏪 ${TIERS.stall[tierOf('stall', lv)].name}으로 확장!`, '#ffd166', 2.4); this.emit('tierUp'); } }
     else if (id === 'meatPrice') { this.pops.meat = 1; this.sparkle(CFG.shops.meat.x, CFG.shops.meat.y - 40, 12, '#ffb4b4'); }
     else if (id === 'fishPrice' || id === 'rod') { this.pops.fish = 1; this.sparkle(CFG.shops.fish.x, CFG.shops.fish.y - 40, 12, '#9ad0ff'); }
@@ -1666,9 +1675,11 @@ class Game {
     else if (id === 'tanning') { const R = CFG.shops.slaughter.rack; this.sparkle(R.x, R.y - 20, 16, '#a67c52'); this.pops.slaughter = 1; }
     else if (id === 'fishFarm' || id === 'fishFeed') { for (const p of this.pens) this.sparkle(p.x, p.y, 6, '#9ad0ff'); }
     else if (id === 'fishFarmer') { const f = this.fishFarmers[this.fishFarmers.length - 1]; if (f) this.sparkle(f.x, f.y - 40, 10, '#fff'); }
-    else if (id === 'tower' && this.lv.tower % CFG.tower.per === 0 && this.lv.tower / CFG.tower.per < CFG.tower.sites.length) { const S = CFG.tower.sites[this.towerCount - 1]; this.sparkle(S.x, S.y - 60, 24, '#ffd166'); this.text(S.x, S.y - 140, `🏹 감시탑 ${this.towerCount}호 완성!`, '#ffd166', 2.5); }
     else if (id === 'expandEast') { this.text(CFG.east.x + 200, CFG.east.road.y - 60, '🧭 동쪽 벌판 개척! 세계가 넓어졌어요', '#ffd166', 3); for (let i = 0; i < 12; i++) this.sparkle(CFG.east.x + rnd(40, 600), rnd(300, 2200), 4, '#ffe08a'); this.pops.east = 1; }
-    else if (id === 'smoke' || id === 'meatproc') { this.pops[id] = 1; this.sparkle(CFG.shops[id].x, CFG.shops[id].y - 40, 16, '#ffd166'); }
+    else if (CFG.shops[id] && CFG.shops[id].upg === id) { this.pops[id] = 1; this.sparkle(CFG.shops[id].x, CFG.shops[id].y - 40, 16, '#ffd166'); }
+    else if (id === 'expandMine' || id === 'expandFarm') { const D = CFG.districts.find(d => d.upg === id); this.text(D.x + 200, CFG.east.road.y - 60, `${D.icon} ${D.name} 개척! 세계가 넓어졌어요`, '#ffd166', 3); for (let i = 0; i < 12; i++) this.sparkle(D.x + rnd(40, 600), rnd(300, 2200), 4, '#ffe08a'); this.pops[D.id] = 1; this.setWeather(id === 'expandMine' ? 'fog' : 'thaw'); }
+    else if (FARM_BY_UPG[id]) { const F = CFG.farms[FARM_BY_UPG[id]]; this.pops[id] = 1; this.sparkle(F.rect.x + F.rect.w / 2, F.rect.y + 40, 14, '#7CFC9A'); if (lv === 1) this.text(F.rect.x + F.rect.w / 2, F.rect.y - 20, `${F.icon} ${F.name} 완성! ${UPG.find(u => u.id === F.worker).name}으로 일꾼을 두세요`, '#ffd166', 2.5); }
+    else if (id === 'board') { this.pops.board = 1; this.sparkle(CFG.orders.pos.x, CFG.orders.pos.y - 40, 12, '#ffd166'); }
     else if (id === 'coldstore') { this.pops.slaughter = 1; this.sparkle(CFG.shops.slaughter.x, CFG.shops.slaughter.y - 40, 16, '#9ad0ff'); }
     else if (id === 'manager') { if (this.manager) this.sparkle(this.manager.x, this.manager.y - 40, 14, '#ffd166'); }
     else if (id === 'infirmary') { this.sparkle(CFG.infirmary.x, CFG.infirmary.y - 30, 16, '#ff8a80'); }
@@ -1755,7 +1766,7 @@ class Game {
     this.text(f.x + rnd(-10, 10), f.y - 70, `-${dmg}`, '#ff8a80', 0.6);
     this.emit('hurt', f.x, f.y);
     if (f.hp <= 0) {
-      f.hp = 0; f.down = isPlayer ? CFG.player.downTime : CFG.guard.downTime;
+      f.hp = 0; f.down = isPlayer ? CFG.player.downTime : CFG.guard.bleedOut; if (!isPlayer) f.bleed = CFG.guard.bleedOut;   // 경비병은 치료받거나 전사할 때까지 쓰러져 있다(출혈 시계와 같은 시계)
       this.text(f.x, f.y - 90, isPlayer ? '😵 기절! 잠시 못 움직여요' : '💫 경비병이 쓰러졌다!', '#ff8a80', 1.6);
       this.emit(isPlayer ? 'playerDown' : 'guardDown', f.x, f.y);
     }
@@ -1779,7 +1790,7 @@ class Game {
     else if (b.ability === 'howl') { const n = 2 + Math.floor(b.n / 20); for (let i = 0; i < n; i++) this.summonWolf(b); this.text(b.x, b.y - 120, '🐺 울부짖음! 늑대 소환', '#ff8a80', 1.5); this.emit('wave', b.x, b.y, b.n); }
   }
   updateBears(dt) {
-    const camp = CFG.camp, hut = this.hut, CB = CFG.combat;
+    const camp = CFG.camp, hut = this.hut, CB = CFG.combat, em = this.weatherDef.enemy || 1;   // 눈보라면 적도 느리다
     for (const b of this.bears) {
       if (b.dead) continue;
       b.moving = false; b.flash = Math.max(0, b.flash - dt * 6); b.lunge = Math.max(0, b.lunge - dt * 3);
@@ -1795,7 +1806,7 @@ class Game {
         const fd = dist(b.x, b.y, f.x, f.y);
         if (!f || f.down > 0 || fd > CB.disengageRange) { b.state = 'walk'; b.foe = null; continue; }
         b.facing = f.x < b.x ? -1 : 1;
-        if (fd > CB.engageRange - 12) { moveToward(b, f.x, f.y, b.speed * 1.3, dt); b.anim += dt * 8; }   // 밀려났으면 다시 다가온다
+        if (fd > CB.engageRange - 12) { moveToward(b, f.x, f.y, b.speed * 1.3 * em, dt); b.anim += dt * 8; }   // 밀려났으면 다시 다가온다
         else if (b.atkT <= 0) { b.atkT = 1; b.lunge = 1; this.hurt(f, b.dmg, b.foeIsPlayer); }
         continue;
       }
@@ -1814,14 +1825,14 @@ class Game {
         const S = CFG.tower.sites[b.tower];
         if (b.tower == null || b.tower >= this.towerCount || !this.towerAlive(b.tower)) { b.state = 'walk'; b.tower = null; continue; }
         const side = b.x < S.x ? -1 : 1, px = S.x + side * (36 + b.r * 0.4), py = S.y + 8;
-        if (dist(b.x, b.y, px, py) > 10) { moveToward(b, px, py, b.speed, dt); b.anim += dt * 8; b.facing = S.x < b.x ? -1 : 1; }
+        if (dist(b.x, b.y, px, py) > 10) { moveToward(b, px, py, b.speed * em, dt); b.anim += dt * 8; b.facing = S.x < b.x ? -1 : 1; }
         else if (b.atkT <= 0) { b.atkT = 1; b.lunge = 1; b.facing = S.x < b.x ? -1 : 1; this.hitTower(b.tower, b.dmg, b); }
         continue;
       }
       if (b.state === 'walk') {
         const d = dist(b.x, b.y, b.tx, b.ty);
         if (d <= 6) { b.state = 'hut'; continue; }
-        const nx = b.x + ((b.tx - b.x) / d) * b.speed * dt, ny = b.y + ((b.ty - b.y) / d) * b.speed * dt;
+        const nx = b.x + ((b.tx - b.x) / d) * b.speed * em * dt, ny = b.y + ((b.ty - b.y) / d) * b.speed * em * dt;
         if (this.fence.hp > 0 && inRect(nx, ny, camp) && !inRect(b.x, b.y, camp)) { b.state = 'fence'; b.facing = hut.x < b.x ? -1 : 1; continue; }
         b.x = nx; b.y = ny; b.moving = true; b.anim += dt * 8; b.facing = b.tx < b.x ? -1 : 1;
       } else if (b.state === 'fence') {
@@ -1867,8 +1878,8 @@ class Game {
       g.moving = false; g.atkT -= dt; g.swing = Math.max(0, g.swing - dt * 4); g.flash = Math.max(0, g.flash - dt * 6); g.flashT = Math.max(0, (g.flashT || 0) - dt);
       if (g.down > 0) {   // 쓰러짐: 치료(의무병·플레이어)를 기다린다. 시간 안에 못 받으면 전사
         g.down -= dt; g.bleed = (g.bleed != null ? g.bleed : CFG.guard.bleedOut) - dt;
-        if (dist(g.x, g.y, this.player.x, this.player.y) < 44 && this.player.down <= 0) this.healGuard(g, dt * 1.2);   // 내가 옆에 서면 치료
-        if (g.bleed <= 0) { g.dead = true; this.text(g.x, g.y - 70, g.militia ? '💀 방위대원 전사…' : '💀 경비병 전사…', '#ff5252', 2.2); this.emit('guardDead', g.x, g.y); }
+        if (dist(g.x, g.y, this.player.x, this.player.y) < 44 && this.player.down <= 0 && this.healGuard(g, dt * 1.2)) continue;   // 내가 옆에 서면 치료
+        if (g.bleed != null && g.bleed <= 0) { g.dead = true; this.text(g.x, g.y - 70, g.militia ? '💀 방위대원 전사…' : '💀 경비병 전사…', '#ff5252', 2.2); this.emit('guardDead', g.x, g.y); }
         continue;
       }
       if (g.hp < g.maxhp && this.bears.length === 0) g.hp = Math.min(g.maxhp, g.hp + (g.maxhp / G.regenTime) * dt);
@@ -1920,6 +1931,139 @@ class Game {
         else { m.facing = g.x < m.x ? -1 : 1; m.healing = true; if (this.healGuard(g, dt)) { m.target = null; m.state = 'find'; m.healing = false; } }
       }
       if (m.moving) m.anim += dt * 11;
+    }
+  }
+  // ---- 농장류(묘목장·낙농장·광산·밀밭): 자리(plot)가 자라면 일꾼이 거둬 더미·가게로 나른다 ----
+  farmCount(id) { const F = CFG.farms[id]; return Math.min((this.lv[F.upg] || 0) * F.perLevel, F.cols * F.rows); }
+  farmGrowTime(id) { const F = CFG.farms[id], b = F.boost ? this.lv[F.boost] : 0; return F.growTime * Math.pow(0.9, b) / this.growMul; }
+  farmYield(id) { const F = CFG.farms[id], b = F.boost ? this.lv[F.boost] : 0; return F.yield + Math.floor(b / (id === 'mine' ? 2 : 3)); }
+  farmHarvestTime(id) { const F = CFG.farms[id], b = F.boost ? this.lv[F.boost] : 0; return F.harvestTime * (id === 'mine' ? Math.pow(0.92, b) : 1); }
+  initFarms(s) {
+    this.farms = {};
+    for (const [id, F] of Object.entries(CFG.farms)) {
+      const plots = [], sv = s.farms && s.farms[id];
+      for (let r = 0; r < F.rows; r++) for (let c = 0; c < F.cols; c++) {
+        const i = plots.length, saved = sv && sv[i];
+        plots.push({ x: F.origin.x + c * F.dx + (r % 2) * 14, y: F.origin.y + r * F.dy, i, state: saved ? ['empty', 'grow', 'ready'][saved[0]] || 'grow' : 'grow', grow: saved ? Math.max(0, Math.min(1, saved[1] || 0)) : Math.random() * 0.5, claim: null, workT: 0, active: false });
+      }
+      this.farms[id] = { plots, workers: [] };
+      for (let i = 0; i < (this.lv[F.worker] || 0); i++) this.addFarmWorker(id);
+    }
+  }
+  addFarmWorker(id) {
+    const F = CFG.farms[id], list = this.farms[id].workers, i = list.length;
+    list.push({ x: F.post.x + i * 26, y: F.post.y, farm: id, inv: emptyInv(), state: 'find', target: null, dest: null, pile: null, dropT: 0, holdT: 0, swing: 0, facing: 1, moving: false, anim: 0, i });
+  }
+  get farmWorkers() { return [].concat(...Object.values(this.farms || {}).map(f => f.workers)); }
+  farmHaul(w, F) {
+    const pile = this.usesPile(F.worker) ? this.nearestPile(w.x, w.y, F.good, true) : null;
+    if (pile) { w.pile = pile; w.state = 'toPile'; return true; }
+    const d = this.destFor(F.good); if (!d) return false;
+    w.dest = d; w.state = 'toShop'; return true;
+  }
+  updateFarms(dt) {
+    for (const [id, F] of Object.entries(CFG.farms)) {
+      const farm = this.farms[id], n = this.farmCount(id);
+      farm.plots.forEach((p, i) => { p.active = i < n; });
+      if (!n) continue;
+      const gt = this.farmGrowTime(id);
+      for (const p of farm.plots) if (p.active && p.state === 'grow') { p.grow = Math.min(1, p.grow + dt / gt); if (p.grow >= 1) p.state = 'ready'; }
+      const cap = F.carry + this.lv.bag, yld = this.farmYield(id), ht = this.farmHarvestTime(id);
+      for (const w of farm.workers) {
+        const shopId = w.dest && this.shopOpen(w.dest) ? w.dest : null;
+        w.moving = false; w.swing = Math.max(0, w.swing - dt * 4); w.holdT = Math.max(0, w.holdT - dt);
+        if (w.state === 'find') {
+          if (w.inv[F.good] >= cap && w.holdT <= 0) { if (this.farmHaul(w, F)) continue; w.holdT = 3; }
+          const pick = st => { let best = null, bd = Infinity; for (const p of farm.plots) { if (!p.active || p.state !== st || (p.claim && p.claim !== w)) continue; const d = dist(w.x, w.y, p.x, p.y); if (d < bd) { bd = d; best = p; } } return best; };
+          const ready = w.inv[F.good] < cap ? pick('ready') : null;
+          if (ready) { ready.claim = w; w.target = ready; w.state = 'harvest'; continue; }
+          const empty = F.plant ? pick('empty') : null;
+          if (empty) { empty.claim = w; w.target = empty; w.state = 'plant'; continue; }
+          if (w.inv[F.good] > 0 && w.holdT <= 0) { if (this.farmHaul(w, F)) continue; w.holdT = 3; }
+          moveToward(w, F.post.x + w.i * 26, F.post.y, this.workerSpeed, dt);
+        } else if (w.state === 'harvest' || w.state === 'plant') {
+          const p = w.target, want = w.state === 'harvest' ? 'ready' : 'empty';
+          if (!p || !p.active || p.state !== want || (want === 'ready' && w.inv[F.good] >= cap)) { if (p && p.claim === w) p.claim = null; w.target = null; w.state = 'find'; continue; }
+          if (dist(w.x, w.y, p.x + 26, p.y + 6) > 6) { moveToward(w, p.x + 26, p.y + 6, this.workerSpeed, dt); p.workT = 0; continue; }
+          w.facing = -1; if (w.swing <= 0.2) w.swing = 1;
+          p.workT += dt * this.effMul;
+          if (p.workT >= (want === 'ready' ? ht : F.plantTime)) {
+            p.workT = 0; p.claim = null; w.target = null; w.state = 'find';
+            if (want === 'ready') {
+              const n2 = Math.max(1, Math.min(yld, cap - w.inv[F.good])); w.inv[F.good] += n2; this.recordFlow('prod', F.good, n2); this.stats.crops = (this.stats.crops || 0) + n2;
+              p.state = F.plant ? 'empty' : 'grow'; p.grow = 0;
+              this.text(p.x, p.y - 44, `${CFG.goods[F.good].emoji} +${n2}`, '#ffd166', 1); this.emit('harvest', p.x, p.y);
+            } else { p.state = 'grow'; p.grow = 0; this.emit('drop', p.x, p.y); }
+          }
+        } else if (this.pileStates(w, dt, this.workerSpeed, () => { w.state = 'find'; w.holdT = 2; }, 'find')) { /* 더미로 */
+        } else if (w.state === 'toShop') {
+          if (!shopId) { w.state = 'find'; w.dest = null; continue; }
+          const dz = CFG.shops[shopId].drop, ang = (w.i / 4) * Math.PI * 2 + 2;
+          if (moveToward(w, dz.x + Math.cos(ang) * 22, dz.y + Math.sin(ang) * 16, this.workerSpeed, dt)) { w.state = 'drop'; w.dropT = 0; }
+        } else if (w.state === 'drop') {
+          if (!shopId) { w.state = 'find'; w.dest = null; continue; }
+          if (dist(w.x, w.y, CFG.shops[shopId].drop.x, CFG.shops[shopId].drop.y) > CFG.shops[shopId].drop.r + 40) { w.state = 'toShop'; continue; }
+          if (!this.deposit(w, shopId, dt, CFG.worker.dropRate)) { w.state = 'find'; w.dest = null; }
+          else if (this.shopFull(w, shopId)) { const alt = this.destFor(F.good); if (alt && alt !== shopId) { w.dest = alt; w.state = 'toShop'; } else { w.state = 'find'; w.dest = null; w.holdT = 4; } }
+        }
+        if (w.moving) w.anim += dt * 11;
+      }
+      separate(farm.workers, 22, 0.3);
+    }
+  }
+  // ---- 날씨: 개척할수록 종류가 는다. 손님·성장·이동·적 속도·탑 사거리·판매가에 영향 ----
+  weatherOptions() { return Object.entries(CFG.weather.kinds).filter(([k, W]) => !W.need || this.lv[W.need] >= 1); }
+  setWeather(kind) {
+    const W = CFG.weather.kinds[kind]; if (!W) return;
+    this.weather.kind = kind; this.weather.t = rnd(W.dur[0], W.dur[1]);
+    if (this.t > 5) { this.text(this.player.x, this.player.y - 120, `${W.icon} 날씨: ${W.name}`, '#9ad0ff', 2.5); this.emit('weather', this.player.x, this.player.y, kind); }
+  }
+  updateWeather(dt) {
+    const w = this.weather;
+    if (!this.lv.expandEast) { w.kind = 'snow'; return; }
+    w.t -= dt; if (w.t > 0) return;
+    const opts = this.weatherOptions().filter(([k]) => k !== w.kind);
+    const tot = opts.reduce((a, [, W]) => a + W.w, 0); let r = Math.random() * tot, pick = opts[0][0];
+    for (const [k, W] of opts) { r -= W.w; if (r <= 0) { pick = k; break; } }
+    this.setWeather(pick);
+  }
+  // ---- 주문 게시판: 상인·귀족·왕족의 대량 주문. 마트(또는 만드는 가게) 재고에서 1초에 1개씩 채운다 ----
+  orderGoods(cls) {
+    const open = []; for (const id of CRAFT_SHOPS) if (this.shopOpen(id)) for (const g of this.shopGoods(id)) open.push(g);
+    const raw = ['wood', 'meat', 'fish', 'pelt', 'milk', 'ore', 'grain'].filter(g => this.deliveryShop(g));
+    if (cls <= 2) return raw.concat(open.filter(g => CFG.goods[g].tier <= 1));
+    if (cls === 3) { const o = open.filter(g => CFG.goods[g].tier >= 2 && CFG.goods[g].tier <= 3); return o.length ? o : open; }
+    const o = open.filter(g => CFG.goods[g].tier >= 3); return o.length ? o : open;
+  }
+  orderSource(good) {
+    if (this.lv.mart && this.shopGoods('mart').includes(good)) return 'mart';
+    const G = CFG.goods[good]; if (G.shop && this.shopOpen(G.shop)) return G.shop;
+    return this.deliveryShop(good);
+  }
+  newOrder() {
+    const O = CFG.orders, vt = tierOf('village', this.lv.townhall);
+    const cls = vt >= 3 && Math.random() < 0.35 ? 4 : vt >= 2 && Math.random() < 0.5 ? 3 : 2;
+    const goods = this.orderGoods(cls); if (!goods.length) return;
+    const good = goods[rndi(0, goods.length - 1)], G = CFG.goods[good];
+    const qty = G.tier ? Math.max(2, Math.round((6 - G.tier) * (1 + vt * 0.3))) : rndi(12, 20) + vt * 4;
+    const reward = Math.round(qty * this.price(good) * O.bonus[cls]);
+    this.orders.push({ id: ++this.orderSeq, cls, good, qty, done: 0, t: O.duration, reward, rep: O.rep[cls], fillT: 0 });
+    this.text(O.pos.x + 40, O.pos.y - 80, `📜 ${CFG.customer.classes[cls].name}의 주문: ${G.emoji} ${G.name} ×${qty}`, '#ffd166', 2.5);
+    this.emit('sell', O.pos.x, O.pos.y);
+  }
+  updateOrders(dt) {
+    if (!this.lv.board) return;
+    const O = CFG.orders;
+    this.orderT -= dt;
+    if (this.orderT <= 0) { this.orderT = O.every; if (this.orders.length < O.max) this.newOrder(); }
+    for (let i = this.orders.length - 1; i >= 0; i--) {
+      const o = this.orders[i]; o.t -= dt; o.fillT += dt;
+      while (o.fillT >= 1 && o.done < o.qty) { o.fillT -= 1; const src = this.orderSource(o.good); if (!src || !(this.shops[src].stock[o.good] > 0)) { o.fillT = 0; break; } this.shops[src].stock[o.good]--; o.done++; this.recordFlow('cons', o.good, 1); }
+      if (o.done >= o.qty) {
+        this.money += o.reward; this.earned += o.reward; this.rep = Math.min(100, this.rep + o.rep); this.stats.orders = (this.stats.orders || 0) + 1;
+        this.text(O.pos.x + 40, O.pos.y - 90, `📜 주문 완료! +$${Math.round(o.reward).toLocaleString('en-US')} · 평판 +${o.rep}`, '#7CFC9A', 2.5); this.sparkle(O.pos.x, O.pos.y - 40, 14, '#ffd166'); this.emit('sell', O.pos.x, O.pos.y);
+        this.orders.splice(i, 1);
+      } else if (o.t <= 0) { this.rep = Math.max(0, this.rep - 2); this.text(O.pos.x + 40, O.pos.y - 90, `📜 ${CFG.goods[o.good].emoji} 주문 기한 만료… 평판 −2`, '#ff8a80', 2); this.orders.splice(i, 1); }
     }
   }
   // ---- 수리공: 부서진 감시탑 → 본부 → 상한 탑 → 울타리 순으로 돌며 고친다 ----
@@ -2040,7 +2184,7 @@ class Game {
     if (m.moving) m.anim += dt * 11;
   }
   // ---- 급식소: 직원 수만큼 고기·생선을 먹는다. fed = 최근에 얼마나 잘 먹었나(0~1) ----
-  get staffCount() { return this.workers.length + this.hunters.length + this.fishers.length + this.fishFarmers.length + this.collectors.length + this.ranchers.length + this.slaughtermen.length + this.crafters.furn.length + this.crafters.rest.length + this.crafters.tailor.length + this.runners.furn.length + this.runners.rest.length + this.runners.tailor.length + this.medics.length + this.repairmen.length + this.guards.length; }
+  get staffCount() { return this.workers.length + this.hunters.length + this.fishers.length + this.fishFarmers.length + this.collectors.length + this.ranchers.length + this.slaughtermen.length + CRAFT_SHOPS.reduce((a, id) => a + this.crafters[id].length + this.runners[id].length, 0) + this.farmWorkers.length + this.medics.length + this.repairmen.length + this.guards.length; }
   updateMeals(dt) {
     if (!this.lv.mess) return;
     this.mealT += dt; if (this.mealT < 10) return; this.mealT -= 10;
@@ -2184,4 +2328,4 @@ class Game {
   }
 }
 
-if (typeof module !== 'undefined') module.exports = { Game, dist, clamp, lerp, moveToward, HUT_RECT, MART_RECT, FURN_RECT, SLAUGHTER_RECT, shopRect, GOOD_IDS, ALL_GOODS, FURN_IDS };
+if (typeof module !== 'undefined') module.exports = { Game, dist, clamp, lerp, moveToward, HUT_RECT, MART_RECT, FURN_RECT, SLAUGHTER_RECT, shopRect, GOOD_IDS, ALL_GOODS, FURN_IDS, CRAFT_SHOPS, COLLECTOR_GOODS };

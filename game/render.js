@@ -86,15 +86,18 @@ function fmtMoney(n) {
 // 눈 바닥의 점, 장식(바위·고목)은 매번 같은 자리에 찍히도록 미리 만들어 둔다
 const GROUND = (() => {
   let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const dots = []; for (let i = 0; i < 520; i++) dots.push({ x: r() * (CFG.world.w + CFG.east.w), y: 160 + r() * (CFG.world.h - 160), s: 2 + r() * 5, a: 0.25 + r() * 0.35 });
+  const FULL_W = CFG.world.w + CFG.districts.reduce((a, d) => a + d.w, 0);
+  const dots = []; for (let i = 0; i < 900; i++) dots.push({ x: r() * FULL_W, y: 160 + r() * (CFG.world.h - 160), s: 2 + r() * 5, a: 0.25 + r() * 0.35 });
   const flakes = []; for (let i = 0; i < 70; i++) flakes.push({ x: r(), y: r(), s: 1 + r() * 2.2, v: 18 + r() * 30, w: r() * 6.28 });
-  const floes = []; for (let i = 0; i < 14; i++) floes.push({ x: r() * (CFG.world.w + CFG.east.w), y: CFG.river.y + 20 + r() * (CFG.river.h - 40), w: 24 + r() * 40, h: 12 + r() * 10, v: 8 + r() * 10 });
+  const gusts = []; for (let i = 0; i < 60; i++) gusts.push({ x: r(), y: r(), l: 20 + r() * 50, v: 1.2 + r() * 1.5 });   // 눈보라 줄기
+  const floes = []; for (let i = 0; i < 22; i++) floes.push({ x: r() * FULL_W, y: CFG.river.y + 20 + r() * (CFG.river.h - 40), w: 24 + r() * 40, h: 12 + r() * 10, v: 8 + r() * 10 });
   const H = CFG.hunt.rect, rocks = []; for (let i = 0; i < 7; i++) rocks.push({ x: H.x + 30 + r() * (H.w - 60), y: H.y + 30 + r() * (H.h - 60), s: 10 + r() * 14 });
   const W = CFG.wild.rect, dead = []; for (let i = 0; i < 10; i++) dead.push({ x: W.x + 30 + r() * (W.w - 60), y: W.y + 40 + r() * (W.h - 80), s: 0.7 + r() * 0.6, k: r() });
-  return { dots, flakes, floes, rocks, dead };
+  return { dots, flakes, gusts, floes, rocks, dead, FULL_W };
 })();
 
 function drawGround(ctx, g, view, time) {
+  const vis = (x, y, m) => x > view.x0 - m && x < view.x1 + m && y > view.y0 - m && y < view.y1 + m;
   ctx.fillStyle = PAL.snow; ctx.fillRect(view.x0 - 50, view.y0 - 50, view.x1 - view.x0 + 100, view.y1 - view.y0 + 100);
   const F = CFG.forest.rect, C = CFG.camp, H = CFG.hunt.rect, W = CFG.wild.rect;
   ctx.fillStyle = PAL.snow2; rrect(ctx, F.x, F.y, F.w, F.h, 24);
@@ -102,7 +105,17 @@ function drawGround(ctx, g, view, time) {
   ctx.fillStyle = PAL.wildSnow; rrect(ctx, W.x, W.y, W.w, W.h, 40);
   if (g.lv.ranch) { const Rr = CFG.ranch.rect; ctx.fillStyle = '#e3e6d6'; rrect(ctx, Rr.x, Rr.y, Rr.w, Rr.h, 18); }
   if (g.lv.grove) { const Gr = CFG.grove.rect; ctx.fillStyle = PAL.snow2; rrect(ctx, Gr.x, Gr.y, Gr.w, Gr.h, 24); }
-  if (g.lv.expandEast) { const E = CFG.east; ctx.fillStyle = '#e4ebf2'; ctx.fillRect(E.x, 160, E.w, CFG.world.h - 160); ctx.strokeStyle = PAL.path; ctx.lineWidth = 50; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(E.x - 40, E.road.y); ctx.lineTo(E.x + 520, E.road.y); ctx.moveTo(E.x + 330, E.road.y); ctx.lineTo(E.x + 330, 700); ctx.moveTo(E.x + 330, E.road.y); ctx.lineTo(E.x + 330, 1330); ctx.stroke(); }
+  for (const D of CFG.districts) {   // 개척지: 바닥, 큰길(세로·가로), 산(광산 골짜기)
+    if (!g.lv[D.upg]) break;
+    if (!vis(D.x + D.w / 2, 1300, D.w)) continue;
+    ctx.fillStyle = D.ground; ctx.fillRect(D.x, 160, D.w, CFG.world.h - 160);
+    ctx.strokeStyle = PAL.path; ctx.lineWidth = 50; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(D.x - 40, CFG.east.road.y); ctx.lineTo(D.x + 520, CFG.east.road.y); ctx.moveTo(D.x + 330, CFG.east.road.y); ctx.lineTo(D.x + 330, 700); ctx.moveTo(D.x + 330, CFG.east.road.y); ctx.lineTo(D.x + 330, 1330); ctx.stroke();
+  }
+  for (const [fid, F] of Object.entries(CFG.farms)) if (g.lv[F.upg] && vis(F.rect.x + F.rect.w / 2, F.rect.y + F.rect.h / 2, F.rect.w)) { ctx.fillStyle = F.sprite === 'vein' ? '#cfd6de' : F.sprite === 'field' ? '#e3dcc2' : F.sprite === 'cow' ? '#e3e6d6' : PAL.snow2; rrect(ctx, F.rect.x, F.rect.y, F.rect.w, F.rect.h, 22); }
+  for (const D of CFG.districts) if (D.mountain && g.lv[D.upg] && vis(D.x + D.w / 2, 300, D.w)) {   // 광산 골짜기: 강 아래 산줄기(광산 위쪽 배경)
+    ctx.fillStyle = '#b9c3ce'; for (let i = 0; i < 5; i++) { const mx = D.x + 60 + i * 165, mh = 120 + (i % 2) * 60; tri(ctx, mx - 120, 345, mx, 345 - mh, mx + 120, 345); }
+    ctx.fillStyle = '#f4f8fb'; for (let i = 0; i < 5; i++) { const mx = D.x + 60 + i * 165, mh = 120 + (i % 2) * 60; tri(ctx, mx - 30, 345 - mh + 40, mx, 345 - mh, mx + 30, 345 - mh + 40); }
+  }
   ctx.fillStyle = PAL.snowShade; rrect(ctx, C.x - 16, C.y - 16, C.w + 32, C.h + 32, 22);
   ctx.fillStyle = PAL.snow2; rrect(ctx, C.x - 8, C.y - 8, C.w + 16, C.h + 16, 18);
   // 길
@@ -115,7 +128,7 @@ function drawGround(ctx, g, view, time) {
   ctx.moveTo(1560, 1120); ctx.lineTo(1300, 1405); ctx.lineTo(1500, 1620);                                                  // 정육점 ↔ 도축장 ↔ 목장
   ctx.stroke();
   // 강
-  const R = CFG.river;
+  const R = { x: CFG.river.x, y: CFG.river.y, w: Math.max(CFG.river.w, g.worldW), h: CFG.river.h };
   ctx.fillStyle = PAL.ice; ctx.fillRect(R.x, R.y - 14, R.w, R.h + 28);
   const grd = ctx.createLinearGradient(0, R.y, 0, R.y + R.h); grd.addColorStop(0, PAL.water2); grd.addColorStop(1, PAL.water);
   ctx.fillStyle = grd; ctx.fillRect(R.x, R.y, R.w, R.h);
@@ -638,6 +651,7 @@ function drawSlaughterhouse(ctx, g, time) {
   pill(ctx, x, y - h + 6, `마리당 ${Math.round(g.slaughterTime * 10) / 10}초 → 🥩${g.meatPerAnimal}${g.peltPerAnimal ? ' 🐾' + g.peltPerAnimal : ''}`, 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
   ctx.restore();
 }
+const MART_CAT_GOOD = { furn: 'chair', rest: 'stew', tailor: 'coat', smoke: 'smoked', meatproc: 'sausage', cream: 'cheese', smith: 'nails', jewel: 'ring', bakery: 'bread', brew: 'ale' };   // 마트 선반·내려놓기 표시용 대표 상품
 function drawMart(ctx, g, time) {
   if (!g.lv.mart) return;
   const sh = CFG.shops.mart, tier = tierOf('mart', g.lv.mart), x = sh.x, y = sh.y, w = sh.w + tier * 20, h = 100 + tier * 14;
@@ -650,7 +664,7 @@ function drawMart(ctx, g, time) {
   ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - w / 2 + 14, y - h + 56, w - 28, 8);
   // 선반에 진열된 재고
   const st = g.shops.mart.stock, cap = g.shopCap('mart');
-  const shelves = [['wood', '🪵'], ['meat', '🥩'], ['fish', '🐟'], ['pelt', '🧥']].concat(g.martCategories().map(c => [c, c === 'furn' ? '🪑' : c === 'rest' ? '🍲' : '🧥']));
+  const shelves = CFG.shops.mart.goods.filter(gd => st[gd] > 0 || ['wood', 'meat', 'fish', 'pelt'].includes(gd)).map(gd => [gd, CFG.goods[gd].emoji]).concat(g.martCategories().map(c => [c, CFG.goods[MART_CAT_GOOD[c]].emoji]));
   const catCount = c => g.shopGoods(c).reduce((a, gd) => a + st[gd], 0);
   shelves.forEach(([gd, em], i) => { const sx = x - w / 2 + 36 + i * ((w - 72) / Math.max(1, shelves.length - 1)); if (!(gd in st)) { ctx.fillStyle = '#5b4636'; ctx.fillRect(sx - 28, y - 30, 56, 3); ctx.fillRect(sx - 28, y - 52, 56, 3); emoji(ctx, sx, y - 40, em, 16); pill(ctx, sx, y - 14, `${catCount(gd)}`, 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); return; } ctx.fillStyle = '#5b4636'; ctx.fillRect(sx - 28, y - 30, 56, 3); ctx.fillRect(sx - 28, y - 52, 56, 3); emoji(ctx, sx, y - 40, em, 16); pill(ctx, sx, y - 14, `${st[gd]}`, st[gd] >= cap ? '#c0392b' : 'rgba(20,30,45,0.7)', '#fff', 'bold 10px system-ui, sans-serif'); });
   // 간판
@@ -713,7 +727,9 @@ function drawBench(ctx, g, b, worker, time, shopId) {
 function drawCraftHouse(ctx, g, shopId, time) {
   if (!g.shopOpen(shopId)) return;
   const sh = CFG.shops[shopId], lvl = g.lv[sh.upg], tier = tierOf(shopId, lvl), x = sh.x, y = sh.y, w = sh.w, h = 76 + tier * 10;
-  const isRest = shopId === 'rest', ST = { rest: { wall: '#e8d9b8', roof: '#b03a2e', band: '#c0392b', emo: '🍲', sign: '식당 메뉴', chimney: true }, tailor: { wall: '#cfc3d9', roof: '#5e3b73', band: '#8e44ad', emo: '🧵', sign: '옷 가게' }, smoke: { wall: '#d9c7a8', roof: '#5b3a1a', band: '#8b5a2b', emo: '🐠', sign: '훈제 가게', chimney: true }, meatproc: { wall: '#e8cfcf', roof: '#7b2d26', band: '#c0392b', emo: '🌭', sign: '육가공 매장' } }[shopId];
+  const isRest = shopId === 'rest', ST = { rest: { wall: '#e8d9b8', roof: '#b03a2e', band: '#c0392b', emo: '🍲', sign: '식당 메뉴', chimney: true }, tailor: { wall: '#cfc3d9', roof: '#5e3b73', band: '#8e44ad', emo: '🧵', sign: '옷 가게' }, smoke: { wall: '#d9c7a8', roof: '#5b3a1a', band: '#8b5a2b', emo: '🐠', sign: '훈제 가게', chimney: true }, meatproc: { wall: '#e8cfcf', roof: '#7b2d26', band: '#c0392b', emo: '🌭', sign: '육가공 매장' },
+    cream: { wall: '#f4f6f8', roof: '#5dade2', band: '#5dade2', emo: '🧀', sign: '유제품 가게' }, smith: { wall: '#bfc5cc', roof: '#3b3b3b', band: '#e67e22', emo: '⚒️', sign: '철물 가게', chimney: true },
+    jewel: { wall: '#e8dff0', roof: '#6c3483', band: '#f1c40f', emo: '💎', sign: '보석 가게' }, bakery: { wall: '#f5e6c8', roof: '#c0392b', band: '#e67e22', emo: '🍞', sign: '빵 가게', chimney: true }, brew: { wall: '#d9c7a8', roof: '#4a2d12', band: '#d4b24c', emo: '🍺', sign: '술 가게' } }[shopId];
   ctx.save(); const sc = popScale(g, shopId); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
   shadow(ctx, x, y + 30, w / 2 + 6, 14);
   ctx.fillStyle = ST.wall; ctx.fillRect(x - w / 2, y - h + 30, w, h);
@@ -735,7 +751,7 @@ function drawCraftHouse(ctx, g, shopId, time) {
   ctx.fillStyle = PAL.ink; ctx.font = 'bold 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${ST.emo} ${TIERS[shopId][tier].name} Lv${lvl}`, x, y - h + 47);
   const mats = sh.accepts.map(m => `${CFG.goods[m].emoji} ${st[m]}`).join(' ');
   pill(ctx, x, y - h + 6, `재료 ${mats} / ${sh.matCap}`, sh.accepts.some(m => st[m] >= sh.matCap) ? '#c0392b' : sh.accepts.every(m => st[m] === 0) ? 'rgba(120,60,60,0.75)' : 'rgba(20,30,45,0.75)');
-  drawSign(ctx, x + w / 2 + 22 * open.length + 40, y + 70, ST.sign, `${open.map(gd => CFG.goods[gd].emoji + '$' + fmtMoney(g.price(gd))).join(' ')}`);
+  drawSign(ctx, x + w / 2 + 44 * open.length + 56, y + 70, ST.sign, `${open.map(gd => CFG.goods[gd].emoji + '$' + fmtMoney(g.price(gd))).join(' ')}`);
   ctx.restore();
 }
 function drawInn(ctx, g, time) {
@@ -768,10 +784,10 @@ function drawDock(ctx, g, time) {
 function drawShip(ctx, g, time) {
   const B = CFG.ship.berth, sp = g.ship, S = CFG.ship;
   let x = B.x;
-  if (sp.state === 'away') { const k = 1 - sp.t / S.every; x = k < 0.5 ? B.x + 300 + k * 2 * 1700 : CFG.world.w + 400 - (k - 0.5) * 2 * (CFG.world.w + 400 - B.x) ; if (sp.t > S.every - 1) x = B.x; }
+  if (sp.state === 'away') { const k = 1 - sp.t / S.every; x = k < 0.5 ? B.x + 300 + k * 2 * 1700 : g.worldW + 400 - (k - 0.5) * 2 * (g.worldW + 400 - B.x) ; if (sp.t > S.every - 1) x = B.x; }
   else if (sp.t > S.stay - 1.5) x = B.x + (S.stay - sp.t) / 1.5 * 0 ;
   const y = B.y + Math.sin(time * 1.5) * 2;
-  if (x < -300 || x > CFG.world.w + 300) return;
+  if (x < -300 || x > g.worldW + 300) return;
   ctx.fillStyle = 'rgba(20,40,70,0.25)'; ellipse(ctx, x, y + 22, 80, 10);
   ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.moveTo(x - 80, y); ctx.lineTo(x + 70, y); ctx.lineTo(x + 90, y - 22); ctx.lineTo(x - 90, y - 22); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#8b5a2b'; ctx.fillRect(x - 80, y - 20, 150, 6);
@@ -784,7 +800,7 @@ function drawShip(ctx, g, time) {
 
 function drawDropZone(ctx, g, id, time) {
   const sh = CFG.shops[id], d = sh.drop;
-  const acc = g.shopAccepts(id), accepts = (id === 'mart' ? ['wood', 'meat', 'fish', 'pelt'].concat(g.martCategories().map(c => c === 'furn' ? 'chair' : c === 'rest' ? 'stew' : 'coat')) : acc).map(gd => CFG.goods[gd].emoji).join('');
+  const acc = g.shopAccepts(id), accepts = (id === 'mart' ? ['wood', 'meat', 'fish', 'pelt'].concat(CFG.shops.mart.goods.slice(4).filter(gd => g.shops.mart.stock[gd] > 0 || ['milk', 'ore', 'grain'].some(k => k === gd && g.deliveryShop(k) && (g.lv.dairy || g.lv.mine || g.lv.field))), g.martCategories().map(c => MART_CAT_GOOD[c])) : acc).map(gd => CFG.goods[gd].emoji).join('');
   ctx.save(); ctx.translate(d.x, d.y); ctx.scale(1, 0.72);
   ctx.fillStyle = 'rgba(46,204,113,0.22)'; circle(ctx, 0, 0, d.r);
   ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 4; ctx.setLineDash([14, 10]); ctx.lineDashOffset = -time * 30;
@@ -905,12 +921,105 @@ function drawMess(ctx, g, time) {
   label(ctx, x, y + 26, '급식소', 10, '#fff');
 }
 // 동쪽 벌판 팻말
-function drawEastSign(ctx, g, time) {
-  const E = CFG.east, x = E.x + 60, y = E.road.y - 40;
+function drawDistrictSign(ctx, D) {
+  const x = D.x + 60, y = CFG.east.road.y - 40;
   shadow(ctx, x, y + 2, 14, 5);
   ctx.fillStyle = PAL.woodDark; ctx.fillRect(x - 3, y - 50, 6, 52);
-  ctx.fillStyle = PAL.wood; rrect(ctx, x - 44, y - 62, 88, 22, 4);
-  ctx.fillStyle = PAL.ink; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🧭 ${E.name}`, x, y - 51);
+  ctx.fillStyle = PAL.wood; rrect(ctx, x - 50, y - 62, 100, 22, 4);
+  label(ctx, x, y - 51, `${D.icon} ${D.name}`, 12, PAL.ink, 'rgba(0,0,0,0)');
+}
+// 농장류: 묘목장(나무) · 낙농장(젖소 순록) · 광산(광맥) · 밀밭(밭)
+function drawPlot(ctx, F, p, time) {
+  const x = p.x, y = p.y, k = p.state === 'ready' ? 1 : p.state === 'empty' ? 0 : p.grow;
+  if (F.sprite === 'tree') {
+    if (p.state === 'empty') { shadow(ctx, x, y + 2, 14, 5); ctx.fillStyle = '#8b6b4a'; ellipse(ctx, x, y - 2, 16, 7); ctx.fillStyle = '#6d4c33'; ellipse(ctx, x, y - 3, 8, 3); return; }
+    const sc = 0.35 + 0.65 * k;
+    ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y); drawTree(ctx, { x, y, logs: CFG.tree.logs, regrowT: 0 }, time); ctx.restore();
+    if (p.state === 'grow') bar(ctx, x - 14, y + 6, 28, 3, k, '#7CFC9A');
+  } else if (F.sprite === 'cow') {
+    const fc = (p.i % 2) ? -1 : 1;
+    drawReindeer(ctx, { x, y, grow: 1, facing: fc, moving: false, anim: 0, harvestT: 0, i: p.i, led: true }, time);
+    ctx.fillStyle = '#f5d9c8'; ellipse(ctx, x - fc * 4, y - 11, 7, 4);
+    if (p.state === 'ready') drawBubble(ctx, x, y - 70 + Math.sin(time * 4 + p.i) * 2, '🥛'); else bar(ctx, x - 14, y - 60, 28, 3, k, '#9ad0ff');
+  } else if (F.sprite === 'vein') {
+    shadow(ctx, x, y + 3, 24, 8);
+    ctx.fillStyle = PAL.stoneDark; ellipse(ctx, x, y - 14, 26, 18); ctx.fillStyle = PAL.stone; ellipse(ctx, x - 4, y - 18, 18, 11);
+    const n = Math.round(k * 5); ctx.fillStyle = '#b87333'; for (let i = 0; i < n; i++) circle(ctx, x - 14 + i * 7, y - 16 + (i % 2) * 6, 3);
+    if (p.state === 'ready') { ctx.fillStyle = `rgba(255,230,120,${0.5 + Math.sin(time * 5 + p.i) * 0.3})`; circle(ctx, x + 10, y - 26, 3.5); }
+    else bar(ctx, x - 14, y + 6, 28, 3, k, '#d4b24c');
+  } else {   // field
+    ctx.fillStyle = '#8b6b4a'; rrect(ctx, x - 40, y - 26, 80, 30, 5);
+    ctx.fillStyle = '#6d4c33'; for (let r = 0; r < 3; r++) ctx.fillRect(x - 36, y - 20 + r * 9, 72, 2);
+    if (p.state !== 'empty') {
+      const h = 4 + k * 18; ctx.fillStyle = k >= 1 ? '#d4b24c' : k > 0.6 ? '#b8c45a' : '#5cb85c';
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) ctx.fillRect(x - 34 + c * 12, y - 20 + r * 9 - h, 2.5, h);
+      if (k >= 1) { ctx.fillStyle = '#f1c40f'; for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) ellipse(ctx, x - 33 + c * 12, y - 20 + r * 9 - h, 2.5, 4); }
+    }
+    if (p.state === 'grow') bar(ctx, x - 14, y + 8, 28, 3, k, '#7CFC9A');
+  }
+}
+const FARM_LOOK = {
+  nursery: { sprite: 'forester', coat: '#2e8b57', pants: '#2b3a55', hat: '#d4b24c', hatBand: '#8b5a2b', pom: '#d4b24c', tool: 'axe' },
+  dairy:   { sprite: 'dairyman', coat: '#f4f6f8', pants: '#2b3a55', cap: '#5dade2', apron: '#d6eaf8', belt: '#5b4636' },
+  mine:    { sprite: 'miner', coat: '#5d6d7e', pants: '#2b3a55', helmet: '#f1c40f', belt: '#5b4636', tool: 'hammer' },
+  grain:   { sprite: 'farmer', coat: '#a0522d', pants: '#2b3a55', hat: '#e8d9b8', hatBand: '#c0392b', pom: '#e8d9b8', vest: '#d4b24c' },
+};
+function drawFarm(ctx, g, id, items, vis, time) {
+  const F = CFG.farms[id]; if (!g.lv[F.upg]) return;
+  const R = F.rect, farm = g.farms[id], n = g.farmCount(id);
+  if (F.sprite !== 'vein') {   // 울타리
+    for (let x = R.x; x < R.x + R.w; x += 40) { if (vis(x, R.y, 60)) items.push({ y: R.y, f: () => drawDecorFence(ctx, x, R.y, Math.min(x + 40, R.x + R.w), R.y) }); if (vis(x, R.y + R.h, 60)) items.push({ y: R.y + R.h, f: () => drawDecorFence(ctx, x, R.y + R.h, Math.min(x + 40, R.x + R.w), R.y + R.h) }); }
+    for (let y = R.y; y < R.y + R.h; y += 40) { if (vis(R.x, y, 60)) items.push({ y: y + 40, f: () => drawDecorFence(ctx, R.x, y + 40, R.x, y) }); if (vis(R.x + R.w, y, 60)) items.push({ y: y + 40, f: () => drawDecorFence(ctx, R.x + R.w, y + 40, R.x + R.w, y) }); }
+  }
+  // 건물·간판
+  const bx = F.sprite === 'field' ? R.x + R.w - 70 : F.sprite === 'vein' ? R.x + R.w / 2 : R.x + R.w / 2, by = F.sprite === 'vein' ? R.y + 150 : R.y + 50;
+  items.push({ y: by, f: () => {
+    ctx.save(); const sc = popScale(g, F.upg); ctx.translate(bx, by); ctx.scale(sc, sc); ctx.translate(-bx, -by);
+    if (F.sprite === 'vein') {   // 갱도 입구
+      shadow(ctx, bx, by + 4, 60, 14);
+      ctx.fillStyle = PAL.stoneDark; ellipse(ctx, bx, by - 30, 70, 50); ctx.fillStyle = PAL.stone; ellipse(ctx, bx - 10, by - 44, 50, 30);
+      ctx.fillStyle = '#1b2631'; rrect(ctx, bx - 28, by - 46, 56, 50, 20); ctx.fillStyle = PAL.woodDark; ctx.fillRect(bx - 34, by - 50, 8, 54); ctx.fillRect(bx + 26, by - 50, 8, 54); ctx.fillRect(bx - 36, by - 54, 72, 8);
+      ctx.fillStyle = '#5b4636'; ctx.fillRect(bx - 50, by - 2, 100, 3); ctx.fillRect(bx - 50, by + 4, 100, 3);   // 레일
+      ctx.fillStyle = '#7f8c8d'; rrect(ctx, bx + 44, by - 22, 34, 22, 4); ctx.fillStyle = '#b87333'; for (let i = 0; i < 3; i++) circle(ctx, bx + 52 + i * 9, by - 24, 4); ctx.fillStyle = '#2b3442'; circle(ctx, bx + 50, by + 2, 4); circle(ctx, bx + 72, by + 2, 4);   // 광차
+    } else if (F.sprite === 'cow') {   // 작은 축사
+      shadow(ctx, bx, by + 22, 54, 12);
+      ctx.fillStyle = '#f4f6f8'; ctx.fillRect(bx - 46, by - 30, 92, 50); ctx.fillStyle = '#5dade2'; ctx.fillRect(bx - 46, by - 30, 92, 6);
+      ctx.fillStyle = '#b03a2e'; ctx.beginPath(); ctx.moveTo(bx - 56, by - 28); ctx.lineTo(bx, by - 66); ctx.lineTo(bx + 56, by - 28); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = PAL.treeTop; ctx.beginPath(); ctx.moveTo(bx - 50, by - 30); ctx.lineTo(bx, by - 62); ctx.lineTo(bx + 50, by - 30); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#4a2d12'; rrect(ctx, bx - 12, by - 8, 24, 28, 4); ctx.fillStyle = '#9ad0ff'; rrect(ctx, bx - 40, by - 20, 16, 12, 2); rrect(ctx, bx + 24, by - 20, 16, 12, 2);
+      ctx.fillStyle = '#dfe3e8'; rrect(ctx, bx + 48, by - 14, 16, 30, 5); ctx.fillStyle = '#9aa7b5'; ctx.fillRect(bx + 48, by - 10, 16, 3);   // 우유 통
+    } else if (F.sprite === 'field') {   // 풍차
+      shadow(ctx, bx, by + 24, 36, 10);
+      ctx.fillStyle = '#d9c7a8'; ctx.beginPath(); ctx.moveTo(bx - 26, by + 22); ctx.lineTo(bx - 16, by - 60); ctx.lineTo(bx + 16, by - 60); ctx.lineTo(bx + 26, by + 22); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#b03a2e'; tri(ctx, bx - 22, by - 58, bx, by - 84, bx + 22, by - 58); ctx.fillStyle = '#4a2d12'; rrect(ctx, bx - 8, by - 4, 16, 26, 3);
+      ctx.save(); ctx.translate(bx, by - 64); ctx.rotate(time * 0.8); ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 3; for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -46); ctx.stroke(); ctx.fillStyle = 'rgba(245,240,230,0.9)'; ctx.fillRect(2, -44, 10, 34); } ctx.restore();
+    } else {   // 묘목장: 온실
+      shadow(ctx, bx, by + 20, 50, 10);
+      ctx.fillStyle = 'rgba(154,208,255,0.6)'; ctx.beginPath(); ctx.moveTo(bx - 44, by + 18); ctx.lineTo(bx - 44, by - 20); ctx.quadraticCurveTo(bx, by - 62, bx + 44, by - 20); ctx.lineTo(bx + 44, by + 18); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#f4f6f8'; ctx.lineWidth = 2.5; for (let i = -33; i <= 33; i += 22) { ctx.beginPath(); ctx.moveTo(bx + i, by + 18); ctx.lineTo(bx + i, by - 20 - (1 - Math.abs(i) / 44) * 36); ctx.stroke(); }
+      ctx.fillStyle = PAL.treeL; for (let i = 0; i < 4; i++) tri(ctx, bx - 30 + i * 20 - 6, by + 12, bx - 30 + i * 20, by - 2, bx - 30 + i * 20 + 6, by + 12);
+    }
+    ctx.restore();
+    const ready = farm.plots.filter(p => p.active && p.state === 'ready').length;
+    pill(ctx, bx, by - (F.sprite === 'vein' ? 74 : F.sprite === 'field' ? 100 : 76), `${F.icon} ${F.name} Lv${g.lv[F.upg]} · 자리 ${n} · 수확 가능 ${ready} · 일꾼 ${farm.workers.length}`, 'rgba(20,30,45,0.75)');
+  } });
+  for (const p of farm.plots) if (p.active && vis(p.x, p.y, 70)) items.push({ y: p.y + (F.sprite === 'field' ? 4 : 0), f: () => drawPlot(ctx, F, p, time) });
+  const look = FARM_LOOK[id];
+  for (const w of farm.workers) if (vis(w.x, w.y, 80)) items.push({ y: w.y, f: () => { drawPerson(ctx, w, look, g); if (w.target && (w.state === 'harvest' || w.state === 'plant') && w.target.workT > 0) bar(ctx, w.x - 18, w.y - 76, 36, 4, w.target.workT / (w.state === 'plant' ? F.plantTime : g.farmHarvestTime(id)), '#ffd166'); } });
+}
+// 주문 게시판(회관 왼쪽)
+function drawBoard(ctx, g, time) {
+  if (!g.lv.board) return;
+  const P = CFG.orders.pos, x = P.x, y = P.y;
+  ctx.save(); const sc = popScale(g, 'board'); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
+  shadow(ctx, x, y + 2, 34, 8);
+  ctx.fillStyle = PAL.woodDark; ctx.fillRect(x - 34, y - 74, 6, 76); ctx.fillRect(x + 28, y - 74, 6, 76);
+  ctx.fillStyle = '#d9c7a8'; rrect(ctx, x - 46, y - 98, 92, 52, 5); ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.roundRect(x - 46, y - 98, 92, 52, 5); ctx.stroke();
+  ctx.fillStyle = '#5b3a1a'; tri(ctx, x - 52, y - 96, x, y - 114, x + 52, y - 96);
+  g.orders.slice(0, 3).forEach((o, i) => { const px = x - 30 + i * 28; ctx.fillStyle = '#fff'; ctx.fillRect(px - 10, y - 92, 22, 30); ctx.fillStyle = '#e74c3c'; circle(ctx, px + 1, y - 92, 2.5); emoji(ctx, px + 1, y - 78, CFG.goods[o.good].emoji, 12); ctx.fillStyle = '#2ecc71'; ctx.fillRect(px - 10, y - 64, 22 * Math.min(1, o.done / o.qty), 2.5); });
+  ctx.restore();
+  label(ctx, x, y - 124, `📜 주문 게시판 · ${g.orders.length}건`, 11, '#fff');
+  if (g.orders.length) { const o = g.orders[0]; pill(ctx, x, y + 12, `${CFG.goods[o.good].emoji} ${o.done}/${o.qty} · ${Math.ceil(o.t)}초`, 'rgba(20,30,45,0.75)'); }
 }
 function drawTownhall(ctx, g, time) {
   if (!g.lv.townhall) return;
@@ -927,7 +1036,7 @@ function drawTownhall(ctx, g, time) {
   if (tier >= 4) { ctx.fillStyle = '#3b6fd1'; tri(ctx, x + 2, y - h - 64, x + 22, y - h - 58, x + 2, y - h - 52); ctx.fillStyle = PAL.woodDark; ctx.fillRect(x, y - h - 66, 2, 20); }
   ctx.fillStyle = '#f5e6c8'; rrect(ctx, x - 60, y - h + 2, 120, 24, 5); ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x - 60, y - h + 2, 120, 24, 5); ctx.stroke();
   ctx.fillStyle = PAL.ink; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🏛️ ${TIERS.village[tier].name} 회관 Lv${g.lv.townhall}`, x, y - h + 14);
-  pill(ctx, x, y + 44, `효율 ×${g.effMul.toFixed(2)} · 가격 +${5 * g.lv.townhall}%`, 'rgba(20,30,45,0.75)');
+  pill(ctx, x, y - h - (tier >= 2 ? 80 : 38), `효율 ×${g.effMul.toFixed(2)} · 가격 +${5 * g.lv.townhall}%`, 'rgba(20,30,45,0.75)');
   ctx.restore();
 }
 function drawBeacon(ctx, g, time) {
@@ -1149,7 +1258,8 @@ function drawMinimap(ctx, g, cam, ui) {
   ctx.fillStyle = '#dfe8f1'; rrect(ctx, x0 - 3, y0 - 3, W + 6, H + 6, 8);
   ctx.fillStyle = PAL.snow; ctx.fillRect(x0, y0, W, H);
   const R = (r, c) => { ctx.fillStyle = c; ctx.fillRect(x0 + r.x * k, y0 + r.y * k, r.w * k, r.h * k); };
-  if (g.lv.expandEast) R({ x: CFG.east.x, y: 160, w: CFG.east.w, h: CFG.world.h - 160 }, '#e4ebf2');
+  for (const D of CFG.districts) { if (!g.lv[D.upg]) break; R({ x: D.x, y: 160, w: D.w, h: CFG.world.h - 160 }, D.ground); }
+  for (const F of Object.values(CFG.farms)) if (g.lv[F.upg]) R(F.rect, F.sprite === 'vein' ? '#b9c2cc' : F.sprite === 'field' ? '#d8cf9c' : '#9ad8ac');
   R({ x: 0, y: CFG.river.y, w: g.worldW, h: CFG.river.h }, PAL.water); R(CFG.forest.rect, '#9ad8ac'); if (g.lv.grove) R(CFG.grove.rect, '#9ad8ac'); R(CFG.hunt.rect, '#d3c3a8'); R(CFG.wild.rect, '#c9cfd6'); R(CFG.camp, '#c9a47a'); if (g.lv.ranch) R(CFG.ranch.rect, '#cfd6b8');
   const dot = (x, y, c, r) => { ctx.fillStyle = c; circle(ctx, x0 + x * k, y0 + y * k, r); };
   for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id)) dot(CFG.shops[id].x, CFG.shops[id].y, id === 'mart' ? '#e74c3c' : id === 'furn' ? '#d35400' : id === 'meat' ? '#c0392b' : id === 'fish' ? '#2980b9' : id === 'pelt' ? '#6d4c41' : id === 'slaughter' ? '#7b2d26' : id === 'rest' ? '#e67e22' : id === 'tailor' ? '#8e44ad' : id === 'inn' ? '#f1c40f' : '#8b5a2b', 3);
@@ -1206,7 +1316,10 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   items.push({ y: CFG.shops.tailor.y + 30, f: () => drawCraftHouse(ctx, g, 'tailor', time) });
   items.push({ y: CFG.shops.smoke.y + 30, f: () => drawCraftHouse(ctx, g, 'smoke', time) });
   items.push({ y: CFG.shops.meatproc.y + 30, f: () => drawCraftHouse(ctx, g, 'meatproc', time) });
-  if (g.lv.expandEast) items.push({ y: CFG.east.road.y - 40, f: () => drawEastSign(ctx, g, time) });
+  for (const sid of ['cream', 'smith', 'jewel', 'bakery', 'brew']) if (g.shopOpen(sid) && vis(CFG.shops[sid].x, CFG.shops[sid].y, 300)) items.push({ y: CFG.shops[sid].y + 30, f: () => drawCraftHouse(ctx, g, sid, time) });
+  for (const D of CFG.districts) { if (!g.lv[D.upg]) break; if (vis(D.x + 60, CFG.east.road.y - 40, 80)) items.push({ y: CFG.east.road.y - 40, f: () => drawDistrictSign(ctx, D) }); }
+  for (const fid of Object.keys(CFG.farms)) drawFarm(ctx, g, fid, items, vis, time);
+  if (g.lv.board) items.push({ y: CFG.orders.pos.y + 2, f: () => drawBoard(ctx, g, time) });
   items.push({ y: CFG.shops.inn.y + 30, f: () => drawInn(ctx, g, time) });
   if (g.lv.mart) { items.push({ y: CFG.ship.dock.y + 10, f: () => drawDock(ctx, g, time) }); items.push({ y: CFG.ship.berth.y + 60, f: () => drawShip(ctx, g, time) }); }
   items.push({ y: CFG.shops.slaughter.y + 24, f: () => drawSlaughterhouse(ctx, g, time) });
@@ -1244,7 +1357,7 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   for (const wk of g.workers) if (vis(wk.x, wk.y, 80)) items.push({ y: wk.y, f: () => drawPerson(ctx, wk, { sprite: 'worker', coat: '#d35400', vest: '#f39c12', hat: '#f1c40f', pom: '#fff', tool: 'axe' }, g) });
   const wt = tierOf('weapon', g.lv.weapon), guardLook = { sprite: 'guard', coat: wt >= 3 ? '#5d6d7e' : '#2c3e50', pants: '#1b2631', helmet: TIERS.weapon[wt].color, hat: '#34495e', tool: TIERS.weapon[wt].shape || 'spear', shield: wt >= 1 ? (wt >= 2 ? '#b8860b' : '#8b5a2b') : null, shieldKite: wt >= 2, armor: wt >= 3 ? '#aab4c0' : null };
   const militiaLook = { ...guardLook, sprite: 'militia', coat: '#8e2b2b', pants: '#2b1b1b', helmet: '#d4af37', shield: '#b8860b', shieldKite: true, armor: wt >= 2 ? '#c9c2b2' : null };
-  for (const gd of g.guards) if (vis(gd.x, gd.y, 80)) items.push({ y: gd.y, f: () => { drawPerson(ctx, gd, Object.assign({ flashT: gd.flashT || 0 }, gd.militia ? militiaLook : guardLook), g); if (gd.down > 0) { const bl = gd.bleed != null ? gd.bleed : CFG.guard.bleedOut; bar(ctx, gd.x - 18, gd.y - 44, 36, 4, bl / CFG.guard.bleedOut, '#ff5252'); label(ctx, gd.x, gd.y - 56, `🩸 ${Math.ceil(bl)}초`, 11, '#fff'); } if (gd.hp < gd.maxhp && gd.down <= 0) bar(ctx, gd.x - 18, gd.y - 72, 36, 4, gd.hp / gd.maxhp, '#2ecc71'); if (gd.down > 0) label(ctx, gd.x, gd.y - 40, `💫 ${Math.ceil(gd.down)}`, 12, '#fff'); } });
+  for (const gd of g.guards) if (vis(gd.x, gd.y, 80)) items.push({ y: gd.y, f: () => { drawPerson(ctx, gd, Object.assign({ flashT: gd.flashT || 0 }, gd.militia ? militiaLook : guardLook), g); if (gd.down > 0) { const bl = gd.bleed != null ? gd.bleed : CFG.guard.bleedOut; bar(ctx, gd.x - 18, gd.y - 44, 36, 4, bl / CFG.guard.bleedOut, '#ff5252'); label(ctx, gd.x, gd.y - 56, `🩸 ${Math.ceil(bl)}초`, 11, '#fff'); } if (gd.hp < gd.maxhp && gd.down <= 0) bar(ctx, gd.x - 18, gd.y - 72, 36, 4, gd.hp / gd.maxhp, '#2ecc71'); } });
   for (const hn of g.hunters) if (vis(hn.x, hn.y, 80)) items.push({ y: hn.y, f: () => drawPerson(ctx, hn, { sprite: 'hunter', coat: '#6d4c41', pants: '#3e2723', fur: '#a1887f', tool: 'spear' }, g) });
   for (const fs of g.fishers) if (vis(fs.x, fs.y, 80)) items.push({ y: fs.y, f: () => { drawPerson(ctx, fs, { sprite: 'fisher', coat: '#f1c40f', pants: '#2b3a55', cap: '#e67e22', tool: 'rod' }, g); if (fs.fishing) { drawFishingLine(ctx, fs, time); bar(ctx, fs.x - 18, fs.y - 76, 36, 4, fs.fishT / (g.fishTime * CFG.fishing.fisherMul / g.effMul), '#5aa9e6'); } } });
   for (const cl of g.collectors) if (vis(cl.x, cl.y, 90)) items.push({ y: cl.y, f: () => {
@@ -1258,7 +1371,9 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   if (g.lv.collector) for (const P of [CFG.hunt.collectorPost, CFG.hunt.collectorPostSouth]) if ((P === CFG.hunt.collectorPost || g.collectors.length >= 2) && vis(P.x, P.y, 60)) items.push({ y: P.y - 30, f: () => drawCollectorPost(ctx, P) });
   if (g.lv.bait) { const B = CFG.hunt.rect; const bx = B.x + B.w / 2 + 40, by = B.y + 40; if (vis(bx, by, 40)) items.push({ y: by, f: () => { shadow(ctx, bx, by + 2, 18, 6); for (let i = 0; i < 3; i++) fishShape(ctx, bx - 10 + i * 10, by - 6 - (i % 2) * 5, 0.9); } }); }
   for (const sm of g.slaughtermen) if (vis(sm.x, sm.y, 80)) items.push({ y: sm.y, f: () => drawPerson(ctx, sm, { sprite: 'slaughterman', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', cap: '#7b2d26', tool: 'hammer' }, g) });
-  const crafterLook = { furn: { sprite: 'craftsman', coat: '#5d6d7e', pants: '#2b3a55', apron: '#8b5a2b', cap: '#c0392b', tool: 'hammer' }, rest: { sprite: 'cook', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', hat: '#fff', pom: '#fff', tool: 'hammer' }, tailor: { sprite: 'tailor', coat: '#8e44ad', pants: '#2b3a55', apron: '#f5e6c8', cap: '#5e3b73', tool: null }, smoke: { sprite: 'smoker', coat: '#8b5a2b', pants: '#2b3a55', apron: '#5b4636', cap: '#e67e22', tool: 'hammer' }, meatproc: { sprite: 'meatworker', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', cap: '#c0392b', tool: 'hammer' } };
+  const crafterLook = { furn: { sprite: 'craftsman', coat: '#5d6d7e', pants: '#2b3a55', apron: '#8b5a2b', cap: '#c0392b', tool: 'hammer' }, rest: { sprite: 'cook', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', hat: '#fff', pom: '#fff', tool: 'hammer' }, tailor: { sprite: 'tailor', coat: '#8e44ad', pants: '#2b3a55', apron: '#f5e6c8', cap: '#5e3b73', tool: null }, smoke: { sprite: 'smoker', coat: '#8b5a2b', pants: '#2b3a55', apron: '#5b4636', cap: '#e67e22', tool: 'hammer' }, meatproc: { sprite: 'meatworker', coat: '#ecf0f1', pants: '#2b3a55', apron: '#c0392b', cap: '#c0392b', tool: 'hammer' },
+    cream: { sprite: 'creamer', coat: '#f4f6f8', pants: '#2b3a55', apron: '#5dade2', hat: '#fff', pom: '#fff', tool: null }, smith: { sprite: 'smithman', coat: '#5d6d7e', pants: '#1b2631', apron: '#4a3b2a', cap: '#2c3e50', tool: 'hammer' },
+    jewel: { sprite: 'jeweler', coat: '#6c3483', pants: '#2b3a55', apron: '#f5e6c8', hat: '#f1c40f', pom: '#f1c40f', tool: null }, bakery: { sprite: 'baker', coat: '#f5e6c8', pants: '#2b3a55', apron: '#fff', hat: '#fff', pom: '#fff', tool: null }, brew: { sprite: 'brewer', coat: '#8b5a2b', pants: '#2b3a55', apron: '#d4b24c', cap: '#4a2d12', tool: 'hammer' } };
   for (const shopId of CRAFT_SHOPS) for (const cm of g.crafters[shopId]) if (vis(cm.x, cm.y, 80)) items.push({ y: cm.y, f: () => drawPerson(ctx, cm, crafterLook[shopId], g) });
   for (const c of g.customers) if (vis(c.x, c.y, 90)) items.push({ y: c.y, f: () => {
     if (c.big) { drawSled(ctx, c); drawPerson(ctx, c, { sprite: 'bigbuyer', coat: c.coat, pants: '#3b2a1a', hat: '#8b1e1e', pom: '#fff', beard: '#d9c7a8' }, g); }
@@ -1316,10 +1431,26 @@ function render(ctx, g, cam, time, dtv, js, ui) {
 
   // 화면 공간: 눈, 경고, 미니맵, 조이스틱
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  for (const f of GROUND.flakes) {
-    f.y += (f.v * dtv) / h; f.w += dtv; if (f.y > 1) { f.y -= 1; f.x = Math.random(); }
+  const WK = g.weather ? g.weather.kind : 'snow', fv = WK === 'blizzard' ? 3.5 : (WK === 'clear' || WK === 'aurora' || WK === 'thaw') ? 0 : WK === 'fog' ? 0.5 : 1;
+  if (fv > 0) for (const f of GROUND.flakes) {
+    f.y += (f.v * fv * dtv) / h; f.w += dtv; if (WK === 'blizzard') f.x += dtv * 0.35; if (f.y > 1) { f.y -= 1; f.x = Math.random(); } if (f.x > 1.05) f.x -= 1.1;
     ctx.fillStyle = 'rgba(255,255,255,0.8)'; circle(ctx, (f.x + Math.sin(f.w) * 0.01) * w, f.y * h, f.s);
   }
+  if (WK === 'blizzard') {   // 눈보라: 바람 줄기 + 푸른 기운
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5;
+    for (const q of GROUND.gusts) { q.x += q.v * dtv * 0.6; q.y += q.v * dtv * 0.25; if (q.x > 1.1) { q.x = -0.1; q.y = Math.random(); } if (q.y > 1.1) q.y -= 1.2; ctx.beginPath(); ctx.moveTo(q.x * w, q.y * h); ctx.lineTo(q.x * w - q.l, q.y * h - q.l * 0.4); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(215,228,248,0.22)'; ctx.fillRect(0, 0, w, h);
+  } else if (WK === 'fog') {   // 안개: 뿌연 막과 흐르는 덩어리
+    ctx.fillStyle = 'rgba(238,243,248,0.4)'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 6; i++) { const fx = ((time * 0.02 + i * 0.17) % 1.2 - 0.1) * w, fy = (0.15 + i * 0.14) * h; const gr = ctx.createRadialGradient(fx, fy, 10, fx, fy, w * 0.35); gr.addColorStop(0, 'rgba(255,255,255,0.28)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h); }
+  } else if (WK === 'aurora') {   // 오로라: 어두운 밤 + 초록·보라 띠
+    ctx.fillStyle = 'rgba(8,16,48,0.34)'; ctx.fillRect(0, 0, w, h);
+    for (let k = 0; k < 3; k++) { ctx.beginPath(); for (let x = 0; x <= w; x += 12) { const y = h * (0.08 + k * 0.06) + Math.sin(x * 0.012 + time * 0.8 + k * 1.7) * 18 + Math.sin(x * 0.03 - time * 0.5) * 8; if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.lineTo(w, h * 0.42); ctx.lineTo(0, h * 0.42); ctx.closePath(); const gr = ctx.createLinearGradient(0, 0, 0, h * 0.42); gr.addColorStop(0, k % 2 ? 'rgba(180,120,255,0.22)' : 'rgba(80,255,170,0.22)'); gr.addColorStop(1, 'rgba(80,255,170,0)'); ctx.fillStyle = gr; ctx.fill(); }
+    for (let i = 0; i < 30; i++) { const sx = ((i * 97) % 100) / 100 * w, sy = ((i * 53) % 40) / 100 * h; ctx.fillStyle = `rgba(255,255,255,${0.4 + Math.sin(time * 3 + i) * 0.3})`; circle(ctx, sx, sy, 1.2); }
+  } else if (WK === 'clear') {   // 맑음: 따뜻한 빛과 해
+    ctx.fillStyle = 'rgba(255,238,190,0.13)'; ctx.fillRect(0, 0, w, h);
+    const gr = ctx.createRadialGradient(w - 60, ui.topPad + 40, 10, w - 60, ui.topPad + 40, 120); gr.addColorStop(0, 'rgba(255,230,140,0.55)'); gr.addColorStop(1, 'rgba(255,230,140,0)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
+  } else if (WK === 'thaw') { ctx.fillStyle = 'rgba(200,240,200,0.12)'; ctx.fillRect(0, 0, w, h); }
   if (g.wave.warned || g.wave.active) {
     const a = g.wave.active ? 0.18 : 0.25 + Math.sin(time * 6) * 0.2;
     const grd = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.75);
@@ -1361,6 +1492,17 @@ function drawPile(ctx, g, pl) {
     const k = Math.min(6, Math.ceil(n / 10));
     for (let i = 0; i < k; i++) fishShape(ctx, x - 15 + (i % 3) * 15, y - 24 - Math.floor(i / 3) * 7, 0.75);
     ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y - 20, 22, Math.PI, 0); ctx.stroke();
+  } else if (pl.good === 'milk') {   // 우유 통
+    const k = Math.min(4, Math.ceil(n / 25));
+    for (let i = 0; i < Math.max(1, k); i++) { const cx = x - 24 + i * 16; ctx.fillStyle = k ? '#dfe3e8' : 'rgba(200,205,210,0.5)'; rrect(ctx, cx - 7, y - 30, 14, 30, 4); ctx.fillStyle = '#9aa7b5'; ctx.fillRect(cx - 7, y - 24, 14, 3); ctx.fillRect(cx - 7, y - 8, 14, 3); ctx.fillStyle = '#5dade2'; rrect(ctx, cx - 4, y - 34, 8, 5, 2); }
+  } else if (pl.good === 'ore') {   // 광석 더미
+    const k = Math.min(9, Math.ceil(n / 14));
+    for (let i = 0; i < k; i++) { const row = Math.floor(i / 4), col = i % 4; ctx.fillStyle = '#7f8c8d'; ellipse(ctx, x - 20 + col * 13 + (row % 2) * 6, y - 4 - row * 9, 8, 6); ctx.fillStyle = '#b87333'; circle(ctx, x - 22 + col * 13 + (row % 2) * 6, y - 6 - row * 9, 2.5); }
+    if (!k) { ctx.fillStyle = 'rgba(90,70,50,0.25)'; ellipse(ctx, x, y, 28, 8); }
+  } else if (pl.good === 'grain') {   // 곡물 자루
+    const k = Math.min(6, Math.ceil(n / 20));
+    for (let i = 0; i < k; i++) { const row = Math.floor(i / 3), col = i % 3; const sx = x - 18 + col * 18 + (row % 2) * 9, sy = y - row * 14; ctx.fillStyle = '#d9c7a8'; rrect(ctx, sx - 8, sy - 22, 16, 24, 5); ctx.fillStyle = '#b8962e'; ctx.fillRect(sx - 6, sy - 22, 12, 3); ctx.fillStyle = '#d4b24c'; ellipse(ctx, sx, sy - 12, 4, 2); }
+    if (!k) { ctx.fillStyle = 'rgba(90,70,50,0.25)'; ellipse(ctx, x, y, 28, 8); }
   } else if (pl.good === 'meat') {   // 고기 걸이: 가로대에 고기 덩어리를 매단다
     ctx.fillStyle = '#5b4636'; ctx.fillRect(x - 28, y - 40, 5, 44); ctx.fillRect(x + 23, y - 40, 5, 44); ctx.fillRect(x - 30, y - 42, 60, 4);
     const k = Math.min(5, Math.ceil(n / 12));

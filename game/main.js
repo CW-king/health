@@ -118,7 +118,7 @@
         <li><b>벌목 · 낚시 · 제작</b> 나무 옆 / 강가 낚시터 / 공방 작업대에 서면 저절로 합니다</li>
         <li><b>판매</b> 가게의 초록 칸에 서면 물건을 내려놓고, 손님이 사 가며 돈을 둡니다. 돈 가까이 가면 저절로 줍습니다</li>
         <li><b>업그레이드</b> 바닥의 원 위에 서면 돈이 빠져나가며 결제됩니다. 원은 그 행동이 일어나는 자리 옆에 있습니다</li>
-        <li><b>사냥</b> 사냥터(오른쪽 위)의 🐻 야생 곰 옆에 서면 도끼로 때립니다. ⚔️ 사냥 버튼(또는 F·스페이스)을 누르면 가까운 적에게 알아서 달려갑니다. 잡으면 🧥 모피와 현상금. 모피는 모피 상점에서 팝니다. 🧺 수거꾼은 바닥에 남은 고기·모피를 주워 나릅니다</li>
+        <li><b>사냥</b> 사냥터(오른쪽 위)의 🐻 야생 곰 옆에 서면 도끼로 때립니다. ⚔️ 사냥 버튼(또는 F·스페이스)을 누르면 가까운 적에게 알아서 달려갑니다. 잡으면 🐾 모피와 현상금. 모피는 모피 상점에서 팝니다. 🧺 수거꾼은 바닥에 남은 고기·모피를 주워 나릅니다</li>
         <li><b>고기</b> 정육점 → 🦌 목장(순록 키우기) → 🔪 도축장(순록을 고기로) 순서로 열립니다. 목동이 출하 순록을 도축장에 데려가고, 도축업자가 고기로 만들어 정육점에 나릅니다</li>
         <li><b>습격</b> 남쪽 황무지에서 북극곰이 본부를 노립니다. 울타리 → 본부 순서로 부수고, 본부 내구도가 0이 되면 끝. 곰은 경비병과 나도 공격해서 쓰러뜨립니다</li>
         <li><b>끝없는 위협</b> 3의 배수 웨이브엔 🐺 늑대 무리, 10의 배수 웨이브엔 👹 보스(설인 → 설인 전사 → 설인 왕 → 고대 설인 → 얼음 거인). 보스는 체력이 낮아지면 분노합니다</li>
@@ -130,6 +130,12 @@
         <li><b>부상 · 치료</b> 쓰러진 경비병은 30초 안에 치료받지 못하면 전사하고 경비병 레벨이 깎입니다(다시 고용해 채우세요). 🏥 의무소를 짓고 🩺 의무병을 두면 달려가 치료하고, 급하면 내가 옆에 서도 치료됩니다</li>
         <li><b>급식소 · 배달부</b> 🍲 급식소를 지으면 직원들이 고기·생선을 먹어 배부르면 효율 +15%, 굶으면 −20%. 🚚 공방·식당·재단소 배달부는 더미·마트에서 재료를 직접 가져옵니다. 여관 객실은 무제한(객잔 → 호텔 → 리조트)</li>
         <li><b>운반 분업</b> 수거꾼 2명 이상이면 📦 운반 분업(사냥터 입구)을 열 수 있습니다. 1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미(가죽 더미·생선 바구니·통나무 더미·도축장 보관함)에 쌓으면 수거꾼이 실어 나릅니다. 더미가 차면 직접 나르니 수거꾼·썰매를 함께 늘리세요. 더미 위에 서면 직접 가져갈 수도 있습니다</li>
+        <li><b>감시탑 내구도 · 수리</b> 적은 지나가며 탑을 부수고 보스는 탑부터 노립니다. 부서진 탑은 쏘지 못하니 🔧 수리(본부 왼쪽 원)로 고치거나 🔨 수리공(캠프 남서쪽)을 두면 탑·본부·울타리를 알아서 고칩니다</li>
+        <li><b>동쪽 벌판 아래</b> 🌱 묘목장(산림꾼이 나무를 심고 베어 목재), 🥛 낙농장(목장 3레벨 뒤 · 낙농꾼이 젖을 짜 우유), 🧀 유제품 공방(치즈·버터·아이스크림)</li>
+        <li><b>광산 골짜기</b> 🧭 동쪽 길 끝에서 개척. ⛏️ 광산(광부가 광석 채굴), ⚒️ 대장간(광석+목재 → 철물·연장·갑옷·태엽), 💎 보석 세공소(반지·목걸이·왕관 — 귀족·왕족이 찾는 사치품)</li>
+        <li><b>평원 농장</b> 광산 길 끝에서 개척. 🌾 밀밭(농부가 씨를 뿌리고 거둬 곡물), 🍞 빵집(곡물+우유 → 빵·파이·케이크), 🍺 양조장(맥주·벌꿀술·위스키). 마트 품목 확장 6~10단계로 새 상품을 마트에서도 팝니다</li>
+        <li><b>날씨</b> 동쪽 개척 뒤 날씨가 바뀝니다. ☀️ 맑음(손님·성장 +15%) · ❄️ 눈보라(모두 느려지고 손님 −30%) · 🌫️ 안개(광산 뒤 · 탑 사거리 −30%) · 🌌 오로라(판매가 +20%) · 🌤️ 해빙(농장 뒤 · 작물 성장 +60%). 위쪽 ❄ 줄과 📊 창에 표시됩니다</li>
+        <li><b>📜 주문 게시판</b> 회관 왼쪽에 세우면 상인·귀족·왕족이 대량 주문을 냅니다. 마트(또는 만드는 가게) 재고에서 1초에 1개씩 채워지고 기한 안에 다 채우면 가격의 1.5~1.9배 보상과 평판. 📊 창에서 진행을 봅니다</li>
         <li><b>눈송이 ❄</b> 끝나도 격퇴한 습격 3번마다 눈송이 1개. 다음 판 수입이 영구히 +3%씩</li>
       </ul>
       <p class="dim">자리를 비우면 일꾼들이 최대 2시간까지 대신 벌어 두고, 곰은 그동안 오지 않습니다. 3초마다 자동 저장됩니다.</p>`;
@@ -144,7 +150,9 @@
     }).join('');
     const mgr = game.lv.manager ? `<p><button class="btn ${game.autoInvest ? 'primary' : ''}" id="btn-auto" style="width:100%">🧑‍💼 관리인 자동 투자: ${game.autoInvest ? '켬' : '끔'}</button></p>${game.managerLog.length ? `<p class="dim">최근 구매<br>${game.managerLog.slice().reverse().join('<br>')}</p>` : ''}` : '';
     const vt = TIERS.village[tierOf('village', game.lv.townhall)].name, repTxt = `<p class="dim">👥 마을 등급 <b>${vt}</b> · 손님 평판 <b>${Math.round(game.rep)}</b>/100 — 평판이 높으면 상인·귀족·왕족이 더 자주 오고 팁을 줍니다. 화나서 돌아가는 손님은 평판을 떨어뜨립니다.</p>`;
-    return `<h2>📊 수급 현황</h2>${repTxt}${mgr}
+    const W = game.weatherDef, weatherTxt = game.lv.expandEast ? `<p class="dim">${W.icon} 지금 날씨 <b>${W.name}</b>${game.weather.kind === 'snow' ? '' : ` (${Math.max(0, Math.ceil(game.weather.t))}초 남음)`} — ☀️ 맑음: 손님·성장 +15% · ❄️ 눈보라: 손님 −30%, 성장 −40%, 이동 −20% · 🌫️ 안개: 탑 사거리 −30% · 🌌 오로라: 판매가 +20% · 🌤️ 해빙: 작물 성장 +60%</p>` : '';
+    const ordersTxt = game.lv.board ? `<h3>📜 주문 게시판</h3>${game.orders.length ? `<table class="supply"><tr><th>주문자</th><th>물건</th><th>진행</th><th>남은 시간</th><th>보상</th></tr>${game.orders.map(o => `<tr><td>${['', '', '🧳 상인', '🎩 귀족', '👑 왕족'][o.cls]}</td><td>${CFG.goods[o.good].emoji} ${CFG.goods[o.good].name}</td><td>${o.done}/${o.qty}</td><td>${Math.floor(o.t / 60)}:${String(Math.ceil(o.t) % 60).padStart(2, '0')}</td><td>$${fmt(o.reward)} · 평판 +${o.rep}</td></tr>`).join('')}</table><p class="dim">마트(또는 만드는 가게) 재고에서 1초에 1개씩 채워집니다. 기한을 넘기면 평판 −2.</p>` : '<p class="dim">지금은 주문이 없어요. 110초마다 새 주문이 붙습니다.</p>'}` : '';
+    return `<h2>📊 수급 현황</h2>${repTxt}${weatherTxt}${ordersTxt}${mgr}
       <p class="dim">최근 2분 기준 분당 생산·소비입니다. 🔴 부족이면 생산 업그레이드, 🟠 운반 지연이면 수거꾼·썰매, 🟡 과잉이면 수요(홍보·제작·마트)를 올리세요. 90초 넘게 이어지는 문제는 새 소식으로도 알려 줍니다.</p>
       <table class="supply"><tr><th>품목</th><th>생산/분</th><th>소비/분</th><th>가게 재고</th><th>상태 · 추천</th></tr>${rows || '<tr><td colspan="5" class="dim">아직 파는 가게가 없어요</td></tr>'}</table>`;
   }
@@ -173,7 +181,7 @@
   function showMenu() {
     modal(`<h2>메뉴</h2>
       <p>${game.wave.n}차 습격까지 버팀 · 누적 $${fmt(game.earned)} · 경과 ${fmtTime(game.t)}</p>
-      <p class="dim">잡은 곰 ${game.stats.kills} · 순록 출하 ${game.stats.harvests} · 도축 ${game.stats.slaughters} · 투숙객 ${game.stats.guests} · 무역 ${game.stats.trades}회 · 생선 ${game.stats.fish}(양식 ${game.stats.farmed || 0}) · 수거 ${game.stats.collected || 0} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
+      <p class="dim">잡은 곰 ${game.stats.kills} · 순록 출하 ${game.stats.harvests} · 도축 ${game.stats.slaughters} · 투숙객 ${game.stats.guests} · 무역 ${game.stats.trades}회 · 생선 ${game.stats.fish}(양식 ${game.stats.farmed || 0}) · 수거 ${game.stats.collected || 0} · 농장 수확 ${game.stats.crops || 0} · 주문 완료 ${game.stats.orders || 0} · 부서진 탑 ${game.stats.towersBroken || 0} · 만든 가구 ${game.stats.crafts} · 판매 ${game.stats.sales}회</p>
       <p class="dim">최고 기록 ${game.meta.bestWave}웨이브 · 눈송이 ❄ ${game.meta.snowflakes} (수입 +${Math.round((game.bonus - 1) * 100)}%) · ${game.meta.runs}번째 판</p>`,
       [{ label: '계속하기', cls: 'primary' },
        { label: '📊 수급 현황', onClick: () => setTimeout(showSupply, 0) },
@@ -288,7 +296,10 @@
     const hint = HINTS[game.tutorial];
     const hidden = !hint; if (hud.hint.hidden !== hidden) hud.hint.hidden = hidden;
     if (hint) setText(hud.hintText, 'hint', hint.text);
-    setText(hud.bonus, 'bonus', game.meta.snowflakes > 0 ? `❄ ${game.meta.snowflakes} · 수입 +${Math.round((game.bonus - 1) * 100)}%` : '');
+    const W = game.weatherDef, wk = game.weather ? game.weather.kind : 'snow';
+    const wtxt = game.lv.expandEast ? `${W.icon} ${W.name}${wk === 'snow' ? '' : ` ${Math.max(0, Math.ceil(game.weather.t))}초`}${W.cust && W.cust !== 1 ? ` · 손님 ${W.cust > 1 ? '+' : ''}${Math.round((W.cust - 1) * 100)}%` : ''}${W.grow && W.grow !== 1 ? ` · 성장 ${W.grow > 1 ? '+' : ''}${Math.round((W.grow - 1) * 100)}%` : ''}${W.move && W.move !== 1 ? ` · 이동 ${Math.round((W.move - 1) * 100)}%` : ''}${W.tower ? ` · 탑 사거리 ${Math.round((W.tower - 1) * 100)}%` : ''}${W.price ? ` · 판매가 +${Math.round((W.price - 1) * 100)}%` : ''}` : '';
+    const otxt = game.orders && game.orders.length ? ` · 📜 주문 ${game.orders.length}건` : '';
+    setText(hud.bonus, 'bonus', [game.meta.snowflakes > 0 ? `❄ ${game.meta.snowflakes} · 수입 +${Math.round((game.bonus - 1) * 100)}%` : '', wtxt + otxt].filter(Boolean).join('  |  '));
     const warnHidden = !(w.warned && !w.active);
     if (hud.warn.hidden !== warnHidden) hud.warn.hidden = warnHidden;
     if (!warnHidden) setText(hud.warn, 'warn', `⚠️ ${game.waveSummary(w.n + 1)} 접근 중! ${Math.ceil(game.timeToWave)}초`);
