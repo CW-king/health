@@ -62,6 +62,7 @@ const FURN_RECT = { x: CFG.shops.furn.x - CFG.shops.furn.w / 2, y: CFG.shops.fur
 const RIVER_RECT = CFG.river;
 const MAIN_TREES = FOREST_SPOTS.filter(p => p.grove == null).length;   // 남쪽 숲 앞의 본 숲 나무 수
 const COLLECTOR_GOODS = ['meat', 'pelt', 'fish', 'wood'];
+const HUNT_GOODS = ['pelt', 'meat'];   // 사냥꾼이 사냥터에서 직접 챙기는 것
 // 무한 업그레이드 가격: 20레벨까지는 표대로, 그 뒤 40레벨은 10%씩, 그 뒤로는 4%씩만 오른다(300레벨까지 가도 천문학적이 되지 않게)
 function softCost(u, l) {
   if (u.max !== Infinity || l <= 20) return u.cost(l);
@@ -1178,23 +1179,39 @@ class Game {
     separate(this.wild, 40, 0.5);
   }
 
+  // 사냥꾼이 든 모피·고기를 어디로: 분업 뒤엔 사냥터 더미(가죽 더미·고기 걸이), 아니면 받는 가게. true면 출발
+  hunterHaul(h, k) {
+    const pile = this.usesPile('hunter') ? this.nearestPile(h.x, h.y, k, true) : null;
+    if (pile) { h.pile = pile; h.state = 'toPile'; return true; }
+    const d = this.destFor(k); if (!d) return false;
+    h.dest = d; h.state = 'toShop'; return true;
+  }
+  // 사냥터에 떨어진 모피·고기 중 가장 가까운 것(수거꾼이 예약한 것은 제외)
+  nearestHuntDrop(h, cap, range) {
+    let best = null, bd = range;
+    for (const d of this.drops) {
+      if (d.state !== 'ground' || !HUNT_GOODS.includes(d.kind) || h.inv[d.kind] >= cap || !this.destFor(d.kind) || (d.claim && d.claim !== h)) continue;
+      const dd = dist(h.x, h.y, d.x, d.y); if (dd < bd) { bd = dd; best = d; }
+    }
+    return best;
+  }
   updateHunters(dt) {
     const H = CFG.hunt, cap = H.hunterCarry + this.lv.bag;
     for (const h of this.hunters) {
-      const shopId = this.destFor('pelt');
+      const shopId = h.dest && this.shopOpen(h.dest) ? h.dest : null;
       h.moving = false; h.atkT -= dt; h.swing = Math.max(0, h.swing - dt * 4); h.holdT = Math.max(0, (h.holdT || 0) - dt);
-      // 근처 모피 줍기
-      if (shopId) for (const d of this.drops) if (d.kind === 'pelt' && d.state === 'ground' && h.inv.pelt < cap && dist(d.x, d.y, h.x, h.y) < H.pickup) { d.state = 'fly'; d.to = h; }
+      // 근처 모피·고기 줍기: 사냥꾼은 자기 사냥감을 직접 챙긴다(수거꾼은 더미에서 실어 간다)
+      for (const d of this.drops) if (d.state === 'ground' && HUNT_GOODS.includes(d.kind) && h.inv[d.kind] < cap && this.destFor(d.kind) && dist(d.x, d.y, h.x, h.y) < H.pickup) { d.state = 'fly'; d.to = h; d.claim = null; }
       if (h.state === 'find') {
-        const ppile = this.usesPile('hunter') ? this.nearestPile(h.x, h.y, 'pelt', true) : null;
-        if (h.inv.pelt >= cap && h.holdT <= 0 && (ppile || shopId)) { if (ppile) { h.pile = ppile; h.state = 'toPile'; } else h.state = 'toShop'; continue; }
+        const fullK = HUNT_GOODS.find(k => h.inv[k] >= cap);   // 가득 찬 종류부터 내려놓는다
+        if (fullK && h.holdT <= 0 && this.hunterHaul(h, fullK)) continue;
         const b = this.nearestWild(h.x, h.y, Infinity);
-        const drop = shopId && h.inv.pelt < cap ? this.nearestDrop('pelt', h.x, h.y, 260) : null;
+        const drop = this.nearestHuntDrop(h, cap, 260);
         if (drop) { h.target = drop; h.state = 'collect'; }
         else if (b) { h.target = b; h.state = 'chase'; }
-        else if (h.inv.pelt > 0 && h.holdT <= 0 && (ppile || shopId)) { if (ppile) { h.pile = ppile; h.state = 'toPile'; } else h.state = 'toShop'; }
+        else if (h.holdT <= 0 && HUNT_GOODS.some(k => h.inv[k] > 0 && this.hunterHaul(h, k))) { /* 사냥감이 없으면 든 것을 내려놓으러 */ }
         else moveToward(h, H.post.x + (h.i % 3) * 30, H.post.y + Math.floor(h.i / 3) * 26, this.guardSpeed, dt);
-      } else if (this.pileStates(h, dt, this.guardSpeed, () => { h.state = shopId ? 'toShop' : 'find'; }, 'find')) { /* 더미로 */
+      } else if (this.pileStates(h, dt, this.guardSpeed, () => { h.state = 'find'; h.holdT = 2; }, 'find')) { /* 더미로 */
       } else if (h.state === 'chase') {
         const b = h.target;
         if (!b || b.dead) { h.target = null; h.state = 'find'; continue; }
@@ -1202,17 +1219,17 @@ class Game {
         else { h.facing = b.x < h.x ? -1 : 1; if (h.atkT <= 0) { h.atkT = H.hunterCd; h.swing = 1; this.hitBear(b, this.hunterDmg, 'hunter', h); } }
       } else if (h.state === 'collect') {
         const d = h.target;
-        if (!d || d.state !== 'ground' || h.inv.pelt >= cap) { h.target = null; h.state = 'find'; continue; }
+        if (!d || d.state !== 'ground' || h.inv[d.kind] >= cap) { h.target = null; h.state = 'find'; continue; }
         moveToward(h, d.x, d.y, this.guardSpeed, dt);
       } else if (h.state === 'toShop') {
-        if (!shopId) { h.state = 'find'; continue; }
+        if (!shopId) { h.state = 'find'; h.dest = null; continue; }
         const dz = CFG.shops[shopId].drop, ang = (h.i / 6) * Math.PI * 2 + 1;
         if (moveToward(h, dz.x + Math.cos(ang) * 22, dz.y + Math.sin(ang) * 16, this.guardSpeed, dt)) { h.state = 'drop'; h.dropT = 0; }
       } else if (h.state === 'drop') {
-        if (!shopId) { h.state = 'find'; continue; }
+        if (!shopId) { h.state = 'find'; h.dest = null; continue; }
         if (dist(h.x, h.y, CFG.shops[shopId].drop.x, CFG.shops[shopId].drop.y) > CFG.shops[shopId].drop.r + 40) { h.state = 'toShop'; continue; }
-        if (!this.deposit(h, shopId, dt, CFG.worker.dropRate)) h.state = 'find';
-        else if (this.shopFull(h, shopId)) { h.state = 'find'; h.holdT = 8; }   // 가게가 가득: 모피를 든 채 8초 동안 사냥(현상금)부터
+        if (!this.deposit(h, shopId, dt, CFG.worker.dropRate)) { h.state = 'find'; h.dest = null; }
+        else if (this.shopFull(h, shopId)) { h.state = 'find'; h.dest = null; h.holdT = 8; }   // 가게가 가득: 든 채 8초 동안 사냥(현상금)부터
       }
       if (h.moving) h.anim += dt * 11;
     }

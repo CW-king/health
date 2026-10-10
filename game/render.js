@@ -1289,6 +1289,11 @@ function drawPile(ctx, g, pl) {
     const k = Math.min(6, Math.ceil(n / 10));
     for (let i = 0; i < k; i++) fishShape(ctx, x - 15 + (i % 3) * 15, y - 24 - Math.floor(i / 3) * 7, 0.75);
     ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y - 20, 22, Math.PI, 0); ctx.stroke();
+  } else if (pl.good === 'meat') {   // 고기 걸이: 가로대에 고기 덩어리를 매단다
+    ctx.fillStyle = '#5b4636'; ctx.fillRect(x - 28, y - 40, 5, 44); ctx.fillRect(x + 23, y - 40, 5, 44); ctx.fillRect(x - 30, y - 42, 60, 4);
+    const k = Math.min(5, Math.ceil(n / 12));
+    for (let i = 0; i < k; i++) { const mx = x - 20 + i * 10, my = y - 30 + (i % 2) * 4; ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(mx, y - 40); ctx.lineTo(mx, my - 6); ctx.stroke(); ctx.fillStyle = '#c0392b'; rrect(ctx, mx - 5, my - 6, 10, 14, 4); ctx.fillStyle = '#f5cba7'; rrect(ctx, mx - 3, my - 4, 3, 10, 2); }
+    if (!k) { ctx.fillStyle = '#a67c52'; ellipse(ctx, x, y - 30, 10, 5); }
   } else {
     ctx.fillStyle = '#5b4636'; ctx.fillRect(x - 28, y - 40, 5, 44); ctx.fillRect(x + 23, y - 40, 5, 44); ctx.fillRect(x - 30, y - 42, 60, 4);   // 걸이
     const k = Math.min(5, Math.ceil(n / 12));

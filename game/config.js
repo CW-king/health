@@ -133,6 +133,7 @@ const CFG = {
   // 더미: 운반 분업(logistics) 뒤 생산자가 물건을 쌓아 두는 곳. 수거꾼이 여기서 실어 가게로 나른다. lv = 열리는 분업 단계
   piles: {
     pelt:      { x: 1560, y: 520,  good: 'pelt', name: '가죽 더미',   cap: 100, lv: 1 },   // 사냥꾼 초소 옆
+    huntMeat:  { x: 1470, y: 540,  good: 'meat', name: '고기 걸이',   cap: 100, lv: 1 },   // 사냥꾼이 사냥터 고기를 걸어 두는 곳
     fish:      { x: 900,  y: 162,  good: 'fish', name: '생선 바구니', cap: 100, lv: 2 },   // 낚시터 물가
     fishFarm:  { x: 520,  y: 200,  good: 'fish', name: '양식 바구니', cap: 100, lv: 2 },   // 양식장 둑
     woodMain:  { x: 740,  y: 840,  good: 'wood', name: '통나무 더미', cap: 120, lv: 3 },   // 숲 동쪽 울타리 밖(벌목꾼 대기 자리 옆)
@@ -273,7 +274,7 @@ const UPG = [
   { id: 'martLanes', icon: '🛒', name: '계산대 추가', desc: '마트 계산대 +1줄(최대 5줄). 손님을 동시에 더 받습니다', max: 4,
     cost: l => [8000, 16000, 32000, 64000][l],     pad: { x: 1900, y: 2360 }, unlock: g => g.lv.mart >= 1 },
   { id: 'martGoods', icon: '📦', name: '품목 확장', desc: '1: 🪑 가구 · 2: 🍲 요리 · 3: 🧥 의복 · 4: 🐠 훈제 · 5: 🌭 육가공을 마트에서도 팝니다. 공방 직원이 남는 완제품을 마트로 나릅니다', max: 5,
-    cost: l => [10000, 25000, 60000][l],           pad: { x: 1900, y: 2480 }, unlock: g => g.lv.mart >= 1 },
+    cost: tbl([10000, 25000, 60000, 120000, 240000], 2), pad: { x: 1900, y: 2480 }, unlock: g => g.lv.mart >= 1 },
   { id: 'martBulk', icon: '🛍️', name: '묶음 구매', desc: '마트 손님이 품목마다 +1개씩 더 삽니다', max: 6,
     cost: l => Math.round(5000 * Math.pow(1.6, l)), pad: { x: 1900, y: 2240 }, unlock: g => g.lv.mart >= 1 },
 
