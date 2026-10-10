@@ -123,6 +123,8 @@
         <li><b>마트 이후</b> 판매대·정육점·어물전·모피 상점은 마트로 합쳐져 사라지고, 빈 자리에 🍲 식당(생선·고기 요리), 🧵 재단소(모피 옷), 🏨 여관(침대·의자로 객실), 🚢 무역 부두(3분마다 무역선이 마트 재고를 대량 매입)가 들어섭니다. 마트는 계산대·품목 확장·묶음 구매로 키웁니다</li>
         <li><b>모피 · 수거</b> 모피는 사냥터 곰, 습격 온 곰·늑대·설인의 전리품, 🧶 무두질(도축한 순록)에서 나옵니다. 🗡️ 가죽 손질·🐟 미끼로 사냥터 생산을 늘리고, 🧺 수거꾼은 맵 전체의 고기·모피와 습격 전리품을 주워 나릅니다(🛷 썰매로 강화). 🐠 양식장은 식당 이후 강 왼쪽에, 🌲 남쪽 숲은 공방 옆에 열립니다</li>
         <li><b>📊 수급 현황</b> 위쪽 📊 버튼을 누르면 품목별 생산·소비·재고와 무엇을 올려야 하는지 알려 줍니다. 🔴 부족은 생산, 🟠 운반 지연은 수거꾼·썰매, 🟡 과잉은 수요(홍보·제작·마트). 같은 문제가 90초 넘게 이어지면 새 소식으로도 알려 줍니다. 수거꾼은 가게에 모자란 비싼 물건부터 나릅니다</li>
+        <li><b>부상 · 치료</b> 쓰러진 경비병은 30초 안에 치료받지 못하면 전사하고 경비병 레벨이 깎입니다(다시 고용해 채우세요). 🏥 의무소를 짓고 🩺 의무병을 두면 달려가 치료하고, 급하면 내가 옆에 서도 치료됩니다</li>
+        <li><b>급식소 · 배달부</b> 🍲 급식소를 지으면 직원들이 고기·생선을 먹어 배부르면 효율 +15%, 굶으면 −20%. 🚚 공방·식당·재단소 배달부는 더미·마트에서 재료를 직접 가져옵니다. 여관 객실은 무제한(객잔 → 호텔 → 리조트)</li>
         <li><b>운반 분업</b> 수거꾼 2명 이상이면 📦 운반 분업(사냥터 입구)을 열 수 있습니다. 1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미(가죽 더미·생선 바구니·통나무 더미·도축장 보관함)에 쌓으면 수거꾼이 실어 나릅니다. 더미가 차면 직접 나르니 수거꾼·썰매를 함께 늘리세요. 더미 위에 서면 직접 가져갈 수도 있습니다</li>
         <li><b>눈송이 ❄</b> 끝나도 격퇴한 습격 3번마다 눈송이 1개. 다음 판 수입이 영구히 +3%씩</li>
       </ul>
@@ -141,6 +143,27 @@
       <table class="supply"><tr><th>품목</th><th>생산/분</th><th>소비/분</th><th>가게 재고</th><th>상태 · 추천</th></tr>${rows || '<tr><td colspan="5" class="dim">아직 파는 가게가 없어요</td></tr>'}</table>`;
   }
   function showSupply() { modal(supplyHtml(), [{ label: '닫기', cls: 'primary' }]); }
+  // 세이브 복사/붙여넣기: 다른 기기로 옮기거나 진행 상황을 공유할 때
+  function exportText() { try { save(); return btoa(unescape(encodeURIComponent(localStorage.getItem(CFG.saveKey) || ''))); } catch (e) { return ''; } }
+  function showExport() {
+    const txt = exportText();
+    modal(`<h2>💾 세이브 복사</h2><p class="dim">아래 글을 전부 복사해 두세요. 다른 기기의 "세이브 붙여넣기"에 넣으면 이어집니다.</p><textarea id="save-out" readonly style="width:100%;height:140px;font-size:11px;background:#0f1b2d;color:#aab8c8;border:1px solid var(--line);border-radius:8px;padding:8px">${txt}</textarea>`,
+      [{ label: '복사', cls: 'primary', keep: true, onClick: () => { const ta = document.getElementById('save-out'); ta.select(); try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); } } }, { label: '닫기' }]);
+  }
+  function showImport() {
+    modal(`<h2>📥 세이브 붙여넣기</h2><p class="dim">복사해 둔 세이브 글을 붙여넣으세요. 지금 진행은 덮어씌워집니다.</p><textarea id="save-in" style="width:100%;height:140px;font-size:11px;background:#0f1b2d;color:#f2f6fa;border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>`,
+      [{ label: '불러오기', cls: 'primary', onClick: () => {
+          try {
+            let raw = document.getElementById('save-in').value.trim();
+            if (!raw.startsWith('{')) raw = decodeURIComponent(escape(atob(raw)));
+            const data = JSON.parse(raw);
+            if (!data || typeof data !== 'object') throw new Error('bad');
+            localStorage.setItem(CFG.saveKey, JSON.stringify(data));
+            game.meta = Object.assign({ snowflakes: 0, bestWave: 0, bestEarned: 0, runs: 0 }, data.meta || {});
+            game.newRun(data.run || null); snapCam(); save(); startPlay();
+          } catch (e) { setTimeout(() => modal('<h2>불러오기 실패</h2><p>세이브 글이 올바르지 않아요.</p>', [{ label: '닫기', cls: 'primary' }]), 0); }
+        } }, { label: '취소' }]);
+  }
   function showMenu() {
     modal(`<h2>메뉴</h2>
       <p>${game.wave.n}차 습격까지 버팀 · 누적 $${fmt(game.earned)} · 경과 ${fmtTime(game.t)}</p>
@@ -148,6 +171,8 @@
       <p class="dim">최고 기록 ${game.meta.bestWave}웨이브 · 눈송이 ❄ ${game.meta.snowflakes} (수입 +${Math.round((game.bonus - 1) * 100)}%) · ${game.meta.runs}번째 판</p>`,
       [{ label: '계속하기', cls: 'primary' },
        { label: '📊 수급 현황', onClick: () => setTimeout(showSupply, 0) },
+       { label: '💾 세이브 복사', onClick: () => setTimeout(showExport, 0) },
+       { label: '📥 세이브 붙여넣기', onClick: () => setTimeout(showImport, 0) },
        { label: '도움말', onClick: () => setTimeout(showHelp, 0) },
        { label: '시작 화면으로', onClick: () => { save(); setTimeout(showTitle, 0); } },
        { label: '이번 판 포기', cls: 'danger', onClick: () => setTimeout(confirmRestart, 0) },

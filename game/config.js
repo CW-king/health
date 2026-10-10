@@ -16,7 +16,10 @@ const CFG = {
     hp: 100, hpPerWeapon: 20, downTime: 6, regenTime: 25,   // 플레이어 체력. 0이 되면 downTime초 기절
   },
   worker: { speed: 130, chopMul: 1.5, carry: 4, dropRate: 0.12, idle: { x: 720, y: 900 } },
-  guard:  { speed: 155, atkCd: 0.8, range: 55, dmg: 4, hp: 50, hpPerWeapon: 10, downTime: 20, regenTime: 30 },   // 경비병도 맞으면 쓰러진다
+  guard:  { speed: 155, atkCd: 0.8, range: 55, dmg: 4, hp: 50, hpPerWeapon: 10, downTime: 20, regenTime: 30, bleedOut: 30, healTime: 5, reviveHp: 0.6 },   // 쓰러진 경비병은 bleedOut초 안에 치료받지 못하면 전사한다
+  infirmary: { x: 150, y: 1560, post: { x: 150, y: 1600 } },   // 의무소(캠프 북서쪽)
+  // 급식소: 직원 1인당 분당 perWorker만큼 고기·생선을 먹는다. 배부르면 효율 bonus, 굶으면 penalty
+  mess: { x: 490, y: 1560, drop: { x: 480, y: 1630, r: 40 }, cap: 120, perWorker: 0.15, bonus: 1.15, penalty: 0.8 },
   weapon: { dmgPer: 2 },
   // 감시탑: 남문 앞이 첫 탑. per레벨마다 sites 순서대로 탑이 하나씩 더 선다(서쪽 담 밖 → 동쪽 담 밖 → 황무지 전진 초소)
   tower:  { x: 330, y: 1920, cd: 1.1, dmg: 6, dmgPer: 5, range: 320, rangePer: 14, per: 6,
@@ -85,6 +88,9 @@ const CFG = {
     inn: { name: '여관', goods: [], accepts: [], x: 1560, y: 1000, w: 170, cap: 0, rate: 1.2, mul: 1, stay: 40, rent: 25,
             drop: { x: 1560, y: 900, r: 0 }, moneySpot: { x: 1470, y: 1085 }, cashier: { x: 1615, y: 956 }, door: { x: 1560, y: 1050 },
             lanes: [{ x: 1660, y: 1070, dx: 0.25, dy: 0.97 }], gap: 46, max: 8, serve: 0.5 },
+    // 급식소 식량 창고: 고기·생선을 받아 직원들이 먹는다(손님 없음)
+    pantry: { name: '급식소', goods: [], accepts: ['meat', 'fish'], x: 490, y: 1560, w: 110, cap: 120, matCap: 120, rate: 1, mul: 1,
+            drop: { x: 480, y: 1630, r: 40 }, moneySpot: { x: 490, y: 1600 }, cashier: { x: 490, y: 1600 }, lanes: [], gap: 40, max: 0, serve: 1 },
     // 도축장: 출하 순록(accepts)을 받아 고기로 만든다. 손님은 오지 않고, 고기는 정육점·마트로 나른다
     slaughter: { name: '도축장', goods: [], accepts: ['animal'], x: 1300, y: 1500, w: 150, cap: 60, animalCap: 6, rate: 1, mul: 1,
             drop: { x: 1300, y: 1392, r: 48 }, pickup: { x: 1190, y: 1565, r: 46 }, work: { x: 1380, y: 1560 }, rack: { x: 1085, y: 1560 }, moneySpot: { x: 1300, y: 1560 }, cashier: { x: 1300, y: 1456 },
@@ -184,6 +190,12 @@ const UPG = [
     cost: tbl([350, 900, 2200, 5000, 11000, 20000, 35000, 60000], 1.6), pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
   { id: 'sled',   icon: '🛷', name: '수거 썰매',   desc: '수거꾼 운반량 +4(종류당), 줍는 반경 +12, 이동 속도 +12%. 썰매를 끌고 다닙니다', max: 5,
     cost: l => [700, 1800, 4500, 10000, 22000][l], pad: { x: 1340, y: 700 }, unlock: g => g.lv.collector >= 1 },
+  { id: 'runner_furn', icon: '🚚', name: '공방 배달부', desc: '통나무 더미·마트에서 목재를 공방으로 직접 가져옵니다(수거꾼을 기다리지 않음)', max: 2,
+    cost: tbl([1500, 4000], 1.8),                  pad: { x: 1240, y: 1920 }, unlock: g => g.lv.workshop >= 1 && (g.lv.logistics >= 1 || g.lv.mart >= 1) },
+  { id: 'runner_rest', icon: '🚚', name: '식당 배달부', desc: '바구니·도축장·마트에서 생선·고기를 식당으로 직접 가져옵니다', max: 2,
+    cost: tbl([1500, 4000], 1.8),                  pad: { x: 1270, y: 1010 }, unlock: g => g.lv.restaurant >= 1 },
+  { id: 'runner_tailor', icon: '🚚', name: '재단소 배달부', desc: '가죽 더미·도축장·마트에서 모피를 재단소로 직접 가져옵니다', max: 2,
+    cost: tbl([1500, 4000], 1.8),                  pad: { x: 1600, y: 900 }, unlock: g => g.lv.tailor >= 1 },
   { id: 'logistics', icon: '📦', name: '운반 분업', desc: '1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미에 쌓습니다. 운반은 수거꾼 몫(단계마다 수거꾼 2·3·4명 필요)', max: 3,
     cost: l => [2500, 6000, 12000][l],             pad: { x: 1480, y: 820 }, unlock: g => g.lv.collector >= 2 + g.lv.logistics },   // 단계마다 수거꾼이 한 명 더 필요(2/3/4명)
   { id: 'traps',  icon: '🪤', name: '덫',         desc: '사냥터 곰 +1마리, 리젠 7% 단축. 모피 생산량이 늘어납니다', max: Infinity,
@@ -255,7 +267,7 @@ const UPG = [
     cost: tbl([800, 2000], 1.8),                     pad: { x: 1720, y: 690 }, unlock: g => g.lv.tailor >= 1 },
   { id: 'clothPrice', icon: '🏷️', name: '의복 가격', desc: '의복 판매가 +12%',          max: Infinity,
     cost: l => Math.round(450 * Math.pow(1.4, l)),  pad: { x: 1850, y: 690 }, unlock: g => g.lv.tailor >= 1 },
-  { id: 'inn',    icon: '🏨', name: '여관',       desc: '객실 +1. 돈과 함께 공방의 🛏️ 침대 1 · 🪑 의자 1이 필요합니다. 손님이 묵고 숙박비를 냅니다', max: 12,
+  { id: 'inn',    icon: '🏨', name: '여관',       desc: '객실 +1(무제한). 돈과 함께 공방의 🛏️ 침대 1 · 🪑 의자 1이 필요합니다. 객실이 늘면 손님도 더 자주 옵니다. 8: 객잔 · 16: 호텔 · 30: 그랜드 호텔 · 50: 리조트', max: Infinity,
     cost: l => Math.round(6000 * Math.pow(1.35, l)), pad: { x: 1700, y: 990 }, unlock: g => g.lv.mart >= 1 && g.lv.workshop >= 3,
     needs: { bed: 1, chair: 1 } },
   { id: 'innPrice', icon: '🛎️', name: '숙박비',   desc: '숙박비 +12%',                max: Infinity,
@@ -278,12 +290,12 @@ const UPG = [
   { id: 'training', icon: '🎓', name: '일꾼 훈련', desc: '벌목꾼·사냥꾼·어부·목수 작업 효율 +10%', max: Infinity,
     cost: l => Math.round(500 * Math.pow(1.5, l)),  pad: { x: 720, y: 1000 }, unlock: g => g.lv.worker >= 2 },
   { id: 'townhall', icon: '🏛️', name: '마을 회관', desc: '마을 단위 투자. 모두의 작업 효율 +8%, 판매가 +5%, 마을 등급 상승. 방위대·봉화대가 열립니다', max: Infinity,
-    cost: l => Math.round(20000 * Math.pow(2.2, l)), pad: { x: 460, y: 1420 },
+    cost: l => Math.round(20000 * Math.pow(1.45, l)), pad: { x: 460, y: 1420 },
     unlock: g => g.lv.mart >= 1 || g.lv.workshop >= 3 || (g.lv.butcher >= 1 && g.lv.fishShop >= 1 && g.lv.worker >= 5) },
   { id: 'militia', icon: '🪖', name: '마을 방위대', desc: '황무지 경계를 지키는 정예 병사(체력 2.2배, 공격 1.6배)', max: 6,
     cost: l => Math.round(15000 * Math.pow(1.8, l)), pad: { x: 620, y: 2080 }, unlock: g => g.lv.townhall >= 1 },
   { id: 'beacon', icon: '🔥', name: '봉화대',     desc: '습격 경고 +8초, 경비병·방위대 사기(공격력) +10%', max: Infinity,
-    cost: l => Math.round(30000 * Math.pow(1.9, l)), pad: { x: 60, y: 2010 }, unlock: g => g.lv.townhall >= 2 },
+    cost: l => Math.round(30000 * Math.pow(1.4, l)), pad: { x: 60, y: 2010 }, unlock: g => g.lv.townhall >= 2 },
 
   { id: 'fence',  icon: '🧱', name: '울타리 보강', desc: '울타리 내구도 ×1.22, 본부 +20', max: Infinity,
     cost: l => Math.round(60 * Math.pow(1.3, l)),  pad: { x: 660, y: 1560 }, unlock: () => true },
@@ -293,6 +305,12 @@ const UPG = [
     cost: l => Math.round(80 * Math.pow(1.3, l)),  pad: { x: 440, y: 1960 }, unlock: g => g.lv.guard >= 1 },
   { id: 'tower',  icon: '🏹', name: '감시탑',     desc: '공격력 +5, 사거리 +12. 6레벨마다 탑 +1(최대 4). 12: 쇠뇌 · 16: 대포 · 20: 소총 · 26: 기관총, 36부터 10레벨마다 새 포대(300레벨까지)', max: Infinity,
     cost: l => Math.round(250 * Math.pow(1.4, l)), pad: { x: 580, y: 1900 }, unlock: g => g.lv.guard >= 1 && g.wave.n >= 2 },
+  { id: 'infirmary', icon: '🏥', name: '의무소',   desc: '캠프에 의무소를 짓습니다. 쓰러진 경비병은 30초 안에 치료받지 못하면 전사해 경비병 레벨이 깎입니다(내가 옆에 서도 치료)', max: 1,
+    cost: () => 600,                               pad: { x: 160, y: 1460 }, unlock: g => g.lv.guard >= 1 && g.wave.n >= 1 },
+  { id: 'medic',  icon: '🩺', name: '의무병 고용', desc: '쓰러진 경비병·방위대에게 달려가 치료합니다(5초, 체력 60%로 복귀)', max: 4,
+    cost: tbl([700, 1800, 4000, 9000], 1.8),       pad: { x: 270, y: 1470 }, unlock: g => g.lv.infirmary >= 1 },
+  { id: 'mess',   icon: '🍲', name: '급식소',     desc: '직원들이 고기·생선을 먹습니다(1인당 분당 0.15). 배부르면 모두의 작업 효율 +15%, 굶으면 −20%. 수거꾼이 식량 창고에 나릅니다', max: 1,
+    cost: () => 2500,                              pad: { x: 590, y: 1460 }, unlock: g => (g.lv.butcher >= 1 || g.lv.fishShop >= 1 || g.lv.mart >= 1) && g.lv.worker >= 3 },
   { id: 'repair', icon: '🔧', name: '본부 수리',  desc: '본부 내구도 전부 회복',     max: Infinity,
     cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 },
 ];
@@ -316,12 +334,23 @@ const BOSS = [
 const ADVICE = {
   more: { wood: ['worker', 'axe', 'forest', 'grove', 'training'], meat: ['ranch', 'slaughterman', 'breed', 'feed', 'rancher', 'hunter'],
           fish: ['fisher', 'rod', 'fishFarm', 'fishFarmer', 'fishFeed'], pelt: ['traps', 'bait', 'skinning', 'tanning', 'hunter'] },
-  haul: ['collector', 'sled', 'shoes'],
+  haul: ['collector', 'sled', 'runner_tailor', 'runner_rest', 'runner_furn', 'shoes'],
   sell: { wood: ['promo', 'workshop', 'craftsman', 'mart', 'martLanes'], meat: ['promo', 'restaurant', 'cook', 'mart', 'martLanes'],
           fish: ['promo', 'restaurant', 'cook', 'mart', 'martLanes'], pelt: ['promo', 'tailor', 'tailorman', 'mart', 'martLanes'] },
 };
 const bossTier = n => Math.min(BOSS.length - 1, Math.max(0, Math.floor(n / 10) - 1));
 const ENRAGE = { at: 0.35, speed: 1.5, dmg: 1.4 };   // 체력 35% 이하에서 분노
+// 보스 종류: 10웨이브마다 순서대로 돌아가며 나온다(설인 → 거대 북극곰 → 늑대 왕 → 얼음 골렘 → …). 한 바퀴 돌 때마다 계급이 올라 hp·dmg ×(1+0.6×계급)
+// ability: charge 돌진(주기마다 3배 속도로 달려듦) · howl 울부짖기(늑대 소환) · armor 서리 갑옷(탑 투사체 피해 반감)
+const BOSS_KINDS = [
+  { type: 'yeti' },
+  { type: 'gbear', name: '거대 북극곰', emoji: '🐻‍❄️', hp: 7, dmg: 2.2, speed: 0.95, scale: 1.6, bounty: 9, meat: 18, pelt: 6, r: 48, ability: 'charge', every: 6 },
+  { type: 'wolfking', name: '늑대 왕', emoji: '🐺', hp: 5, dmg: 1.8, speed: 1.4, scale: 1.5, bounty: 9, meat: 6, pelt: 8, r: 40, ability: 'howl', every: 11 },
+  { type: 'golem', name: '얼음 골렘', emoji: '🧊', hp: 9, dmg: 3, speed: 0.55, scale: 1.3, bounty: 13, meat: 0, pelt: 0, r: 50, ability: 'armor' },
+];
+const BOSS_RANKS = ['', ' 장로', ' 군주', ' 고대', ' 태초', ' 신화'];
+// n웨이브 보스: 몇 번째 보스(k)인지로 종류와 계급을 정한다
+const bossKindFor = n => { const k = Math.max(0, Math.floor(n / 10) - 1), i = k % BOSS_KINDS.length, rank = Math.min(BOSS_RANKS.length - 1, Math.floor(k / BOSS_KINDS.length)); return { kind: BOSS_KINDS[i], rank, k }; };
 
 // 외형 단계: 레벨이 at 이상이면 그 단계의 모습으로 그려진다
 const TIERS = {
@@ -336,6 +365,7 @@ const TIERS = {
   mart:  [{ at: 1, name: '동네 마트' }, { at: 3, name: '마트' }, { at: 6, name: '대형 마트' }, { at: 10, name: '백화점' }],
   rest: [{ at: 1, name: '포장마차' }, { at: 2, name: '식당' }, { at: 4, name: '연회장' }],
   tailor: [{ at: 1, name: '재단소' }, { at: 3, name: '양장점' }],
+  inn: [{ at: 1, name: '여관' }, { at: 8, name: '객잔' }, { at: 16, name: '호텔' }, { at: 30, name: '그랜드 호텔' }, { at: 50, name: '리조트' }],
   ranch: [{ at: 1, name: '울타리 목장' }, { at: 4, name: '축사' }, { at: 8, name: '대형 축사' }],
   village: [{ at: 0, name: '개척지' }, { at: 1, name: '마을' }, { at: 3, name: '큰 마을' }, { at: 6, name: '읍내' }, { at: 10, name: '도시' }],
   axe:   [{ at: 0, name: '쇠도끼', color: '#9aa7b5' }, { at: 3, name: '강철 도끼', color: '#6fa8dc' }, { at: 6, name: '황금 도끼', color: '#f1c40f' }, { at: 10, name: '수정 도끼', color: '#b388ff' }],
@@ -383,7 +413,7 @@ const FOREST_SPOTS = (() => {
 
 // 경비병이 평소에 서 있는 자리
 const GUARD_POSTS = [
-  { x: 180, y: 1800 }, { x: 480, y: 1800 }, { x: 180, y: 1560 }, { x: 480, y: 1560 }, { x: 540, y: 1690 },
+  { x: 180, y: 1800 }, { x: 480, y: 1800 }, { x: 230, y: 1600 }, { x: 420, y: 1600 }, { x: 540, y: 1690 },
   { x: 260, y: 1835 }, { x: 400, y: 1835 }, { x: 330, y: 1545 },
 ];
 
@@ -406,6 +436,9 @@ const TIPS = [
   { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. 잡으면 🧥 모피! ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
   { id: 'pelt',    when: g => g.drops.some(d => d.kind === 'pelt'),  text: '🧥 모피가 떨어졌어요! 주워 두세요. 사냥터 옆 모피 상점을 열면 비싸게 팝니다' },
   { id: 'collector', when: g => g.padVisible(UPG.find(u => u.id === 'collector')) && g.drops.length >= 4, text: '바닥에 고기·모피가 남아 있어요. 🧺 수거꾼(사냥터 입구)을 고용하면 맵 전체를 돌며 주워 가게에 나릅니다. 2명째부터는 캠프 옆 초소에서 습격 전리품을 기다립니다' },
+  { id: 'infirmary', when: g => g.padVisible(UPG.find(u => u.id === 'infirmary')), text: '⚠️ 쓰러진 경비병은 30초 안에 치료받지 못하면 전사하고 경비병 레벨이 깎입니다. 🏥 의무소(캠프 북서쪽)를 짓고 🩺 의무병을 두세요. 급하면 내가 옆에 서도 치료됩니다' },
+  { id: 'mess', when: g => g.lv.mess >= 1, text: '🍲 급식소 개업! 캠프 북동쪽 식량 창고에 고기·생선을 두면 직원들이 먹고 효율이 15% 오릅니다. 비면 20% 떨어지니 수거꾼이 채우게 두세요' },
+  { id: 'runner', when: g => g.padVisible(UPG.find(u => u.id === 'runner_tailor')) || g.padVisible(UPG.find(u => u.id === 'runner_rest')), text: '🚚 배달부를 두면 식당·재단소·공방이 더미와 마트에서 재료를 직접 가져옵니다. 수거꾼이 바쁠 때 재료 대기를 줄입니다' },
   { id: 'logipad', when: g => g.padVisible(UPG.find(u => u.id === 'logistics')), text: '📦 운반 분업(사냥터 입구)을 하면 사냥꾼·도축업자부터 자리에서 일만 하고 더미에 쌓습니다. 운반은 수거꾼 몫이 되니 수거꾼과 썰매를 함께 늘리세요' },
   { id: 'logi1',   when: g => g.lv.logistics >= 1, text: '운반 분업 1단계! 사냥꾼은 🧥 가죽 더미(사냥꾼 초소 옆)에 쌓고 도축업자는 도축장 보관함에 둡니다. 수거꾼이 실어 나릅니다. 더미가 가득 차면 직접 나릅니다' },
   { id: 'logi2',   when: g => g.lv.logistics >= 2, text: '운반 분업 2단계! 어부는 🐟 생선 바구니(낚시터 옆), 양식업자는 양식 바구니(둑)에 담습니다' },
@@ -434,4 +467,4 @@ const TIPS = [
   { id: 'martopen', when: g => g.lv.mart >= 1,                       text: '마트 개업! 이제 목재·고기·생선·모피를 마트 왼쪽 칸에 내려놓으세요. 가게 재고는 마트로 옮겨졌습니다(가구 공방과 도축장은 그대로)' },
 ];
 
-if (typeof module !== 'undefined') module.exports = { CFG, UPG, ENEMY, FOREST_SPOTS, GUARD_POSTS, MILITIA_POSTS, TOWNHALL, BEACON, HINTS, TIPS, TIERS, tierOf, BOSS, bossTier, ENRAGE, ADVICE, MATERIALS, WEAPON_FAMILIES };
+if (typeof module !== 'undefined') module.exports = { CFG, UPG, ENEMY, FOREST_SPOTS, GUARD_POSTS, MILITIA_POSTS, TOWNHALL, BEACON, HINTS, TIPS, TIERS, tierOf, BOSS, bossTier, ENRAGE, ADVICE, MATERIALS, WEAPON_FAMILIES, BOSS_KINDS, BOSS_RANKS, bossKindFor };

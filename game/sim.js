@@ -83,7 +83,10 @@ class Game {
   get bonus() { return 1 + this.meta.snowflakes * CFG.meta.bonusPer; }
   price(good) { const G = CFG.goods[good]; return Math.round(G.base * Math.pow(CFG.price.growth, this.lv[G.priceUp]) * this.bonus * (1 + 0.05 * this.lv.townhall)); }
   get chopMul() { return Math.max(0.09, Math.pow(0.89, this.lv.axe)); }
-  get effMul() { return (1 + 0.08 * this.lv.townhall) * (1 + 0.1 * this.lv.training); }   // 일꾼 작업 효율
+  // 식량 창고는 고기+생선 합산 상한이라, 종류별 '상한'을 지금 남은 자리만큼으로 돌려준다
+  pantryRoomCap(shop) { const room = Math.max(0, CFG.mess.cap - (shop.stock.meat + shop.stock.fish)); return room > 0 ? Math.max(shop.stock.meat, shop.stock.fish) + room : Math.min(shop.stock.meat, shop.stock.fish); }
+  get mealMul() { if (!this.lv.mess) return 1; return this.fed >= 0.5 ? CFG.mess.bonus : CFG.mess.penalty; }
+  get effMul() { return ((1 + 0.08 * this.lv.townhall) * (1 + 0.1 * this.lv.training)) * this.mealMul; }   // 일꾼 작업 효율
   get warnTime() { return CFG.wave.warn + 8 * this.lv.beacon; }
   get moraleMul() { return 1 + 0.1 * this.lv.beacon; }
   get fishTime() { return Math.max(0.3, CFG.fishing.time * Math.pow(0.89, this.lv.rod)); }
@@ -132,6 +135,7 @@ class Game {
     if (id === 'tailor') return this.lv.tailor >= 1;
     if (id === 'inn') return this.lv.inn >= 1;
     if (id === 'slaughter') return this.lv.slaughter >= 1;
+    if (id === 'pantry') return this.lv.mess >= 1;
     if (id === 'pelt') return this.lv.furShop >= 1 && this.lv.mart < 1;
     if (this.lv.mart >= 1) return false;
     if (id === 'meat') return this.lv.butcher >= 1;
@@ -149,6 +153,7 @@ class Game {
     const main = this.deliveryShop(good);
     if (main) cands.push([main, this.shops[main].stock[good] / this.shopCap(main)]);
     for (const id of CRAFT_SHOPS) if (this.shopOpen(id) && CFG.shops[id].accepts.includes(good)) cands.push([id, this.shops[id].stock[good] / CFG.shops[id].matCap]);
+    if (this.shopOpen('pantry') && CFG.shops.pantry.accepts.includes(good)) cands.push(['pantry', (this.shops.pantry.stock.meat + this.shops.pantry.stock.fish) / CFG.mess.cap]);   // 급식소 식량 창고(둘 합쳐서 상한)
     if (!cands.length) return null;
     cands.sort((a, b) => a[1] - b[1]);
     return cands[0][0];
@@ -162,12 +167,24 @@ class Game {
     const out = [];
     for (let i = 0; i < this.bearCount(n); i++) out.push('bear');
     if (n >= 4 && n % 3 === 0) for (let i = 0; i < 2 + Math.floor(n / 6); i++) out.push('wolf');
-    if (n >= 10 && n % 10 === 0) out.push('yeti');
+    if (n >= 10 && n % 10 === 0) out.push(bossKindFor(n).kind.type);   // 보스는 종류를 돌아가며
     return out;
   }
   waveSummary(n) {
     const c = {}; for (const t of this.waveComposition(n)) c[t] = (c[t] || 0) + 1;
-    return Object.entries(c).map(([t, k]) => `${ENEMY[t].emoji} ${t === 'yeti' ? BOSS[bossTier(n)].name : ENEMY[t].name} ${k}`).join(' · ');
+    return Object.entries(c).map(([t, k]) => `${this.enemyEmoji(t)} ${this.enemyName(t, n)} ${k}`).join(' · ');
+  }
+  // 보스 정의(종류·계급 반영). 설인은 기존 5단계 표를 계급으로 쓴다
+  bossDef(n) {
+    const B = bossKindFor(n);
+    if (B.kind.type === 'yeti') { const Y = BOSS[Math.min(BOSS.length - 1, B.rank)]; return Object.assign({ type: 'yeti', emoji: '👹', speed: ENEMY.yeti.speed, r: ENEMY.yeti.r, pelt: ENEMY.yeti.pelt + B.rank * 2, rank: B.rank }, Y); }
+    const K = B.kind, m = 1 + 0.6 * B.rank;
+    return Object.assign({}, K, { name: K.name + BOSS_RANKS[B.rank], hp: K.hp * m, dmg: K.dmg * m, bounty: Math.round(K.bounty * m), meat: Math.round(K.meat * m), pelt: K.pelt + B.rank * 2, rank: B.rank });
+  }
+  enemyName(t, n) { return ENEMY[t] ? ENEMY[t].name : this.bossDef(n).name; }
+  enemyEmoji(t) { return ENEMY[t] ? ENEMY[t].emoji : (BOSS_KINDS.find(k => k.type === t) || {}).emoji || '👹'; }
+  isBossType(t) { return t === 'yeti' || BOSS_KINDS.some(k => k.type === t); }
+  _unusedWaveLabel() {
   }
   bearHP(n) { return Math.round(CFG.wave.hp * Math.pow(CFG.wave.hpGrowth, n - 1)); }
   bearDmg(n) { return CFG.wave.dmg * Math.pow(CFG.wave.dmgGrowth, n - 1); }
@@ -234,6 +251,9 @@ class Game {
     this.animals = []; for (let i = 0; i < this.animalCount; i++) this.addAnimal(s.animals && s.animals[i] != null ? s.animals[i] : Math.random() * 0.6);
     this.slaughtermen = []; for (let i = 0; i < this.lv.slaughterman; i++) this.addSlaughterman();
     this.collectors = []; for (let i = 0; i < this.lv.collector; i++) this.addCollector();
+    this.runners = { furn: [], rest: [], tailor: [] }; for (const id of CRAFT_SHOPS) for (let i = 0; i < (this.lv['runner_' + id] || 0); i++) this.addRunner(id);
+    this.medics = []; for (let i = 0; i < this.lv.medic; i++) this.addMedic();
+    this.fed = s.fed != null ? s.fed : 1; this.mealT = 0;
     this.player.proc = null;
     this.ranchers = []; for (let i = 0; i < this.lv.rancher; i++) this.addRancher();
     this.player.craft = null;
@@ -259,7 +279,7 @@ class Game {
     const shops = {}; for (const id of Object.keys(this.shops)) shops[id] = Object.assign({}, this.shops[id].stock);
     const add = (shopId, g, n) => { if (shopId && shops[shopId] && n > 0) shops[shopId][g] = (shops[shopId][g] || 0) + n; };
     // 일꾼이 들고 있는 물건은 목적지 가게에 넣은 것으로 친다
-    const carriers = [].concat(this.workers, this.hunters, this.fishers, this.fishFarmers, this.ranchers, this.collectors, this.slaughtermen, this.crafters.furn, this.crafters.rest, this.crafters.tailor);
+    const carriers = [].concat(this.workers, this.hunters, this.fishers, this.fishFarmers, this.ranchers, this.collectors, this.slaughtermen, this.crafters.furn, this.crafters.rest, this.crafters.tailor, this.runners.furn, this.runners.rest, this.runners.tailor);
     for (const e of carriers) for (const g of ALL_GOODS) if (e.inv && e.inv[g] > 0) add(g === 'animal' ? (this.shopOpen('slaughter') ? 'slaughter' : null) : CFG.goods[g].tier ? (this.lv.mart ? 'mart' : CFG.goods[g].shop) : this.destFor(g), g, e.inv[g]);
     // 제작·도축 중인 재료는 돌려놓는다
     const jobs = [].concat(this.crafters.furn, this.crafters.rest, this.crafters.tailor, [this.player]);
@@ -272,7 +292,7 @@ class Game {
       drops: this.drops.filter(d => d.state === 'ground').map(d => ({ kind: d.kind, x: Math.round(d.x), y: Math.round(d.y) })),
       tipQueue: this.tipQueue.map(t => t.id),
       shops, inv: this.player.inv, playerHp: this.player.hp, tutorial: this.tutorial, tips: this.tips, stats: this.stats,
-      animals: this.animals.map(a => a.grow), pens: this.pens.map(p => p.grow), piles: Object.fromEntries(Object.values(this.piles).map(p => [p.id, p.stock])), innGuests: this.inn.guests, ship: this.ship,
+      fed: this.fed, animals: this.animals.map(a => a.grow), pens: this.pens.map(p => p.grow), piles: Object.fromEntries(Object.values(this.piles).map(p => [p.id, p.stock])), innGuests: this.inn.guests, ship: this.ship,
     };
   }
 
@@ -510,7 +530,7 @@ class Game {
   }
   adviceText(a) {
     const G = CFG.goods[a.good], recs = a.recs.slice(0, 3).map(u => `${u.icon} ${u.name}`).join(' · ');
-    if (a.status === 'stuck') return `📊 ${G.emoji} ${G.name}: 더미·바닥에 ${a.held}개 쌓였는데 가게는 비었어요. 수거꾼이 모자랍니다 → ${recs || '🧺 수거꾼'}`;
+    if (a.status === 'stuck') { const maxed = this.lv.collector >= UPG.find(u => u.id === 'collector').max; return `📊 ${G.emoji} ${G.name}: 더미·바닥에 ${a.held}개 쌓였는데 가게는 비었어요. ${maxed ? '수거꾼은 다 고용했으니 썰매·배달부로' : '수거꾼이 모자랍니다'} → ${recs || '🧺 수거꾼'}`; }
     if (a.status === 'short') return `📊 ${G.emoji} ${G.name} 부족: 생산 ${Math.round(a.prod)}/분 · 소비 ${Math.round(a.cons)}/분. 생산을 올리세요 → ${recs || '생산 업그레이드'}`;
     return `📊 ${G.emoji} ${G.name} 과잉: 가게가 가득해요. 수요를 늘리세요 → ${recs || '📣 홍보'}`;
   }
@@ -852,6 +872,9 @@ class Game {
     this.updateRanchers(dt);
     this.updateSlaughtermen(dt);
     this.updateCollectors(dt);
+    this.updateRunners(dt);
+    this.updateMedics(dt);
+    this.updateMeals(dt);
     this.updateInn(dt);
     this.updateShip(dt);
     this.updateCraftsmen(dt);
@@ -918,6 +941,8 @@ class Game {
     if (this.lv.ranch) pushOutRect(e, r, { x: CFG.ranch.barn.x - 50, y: CFG.ranch.barn.y - 30, w: 100, h: 50 });
     if (this.lv.slaughter) pushOutRect(e, r, SLAUGHTER_RECT);
     if (this.lv.townhall) pushOutRect(e, r, { x: TOWNHALL.x - 80, y: TOWNHALL.y - 40, w: 160, h: 70 });
+    if (this.lv.infirmary) pushOutRect(e, r, { x: CFG.infirmary.x - 40, y: CFG.infirmary.y - 30, w: 80, h: 44 });
+    if (this.lv.mess) pushOutRect(e, r, { x: CFG.mess.x - 50, y: CFG.mess.y - 30, w: 100, h: 44 });
     pushOutRect(e, r, HUT_RECT);
     pushOutRect(e, r, { x: RIVER_RECT.x, y: RIVER_RECT.y - 40, w: RIVER_RECT.w + 40, h: RIVER_RECT.h + 8 });
   }
@@ -937,7 +962,7 @@ class Game {
   // 물건 내려놓기(가게가 받는 상품만). true면 내려놓을 게 남아 있음
   deposit(e, shopId, dt, rate) {
     const sh = CFG.shops[shopId], shop = this.shops[shopId];
-    const cap = CRAFT_SHOPS.includes(shopId) ? sh.matCap : shopId === 'slaughter' ? this.slaughterAnimalCap : this.shopCap(shopId);
+    const cap = CRAFT_SHOPS.includes(shopId) ? sh.matCap : shopId === 'slaughter' ? this.slaughterAnimalCap : shopId === 'pantry' ? this.pantryRoomCap(shop) : this.shopCap(shopId);
     const goods = this.shopAccepts(shopId);
     e.dropT += dt;
     let moved = false;
@@ -952,7 +977,10 @@ class Game {
     if (!moved) e.dropT = Math.min(e.dropT, rate);
     return goods.some(g => e.inv[g] > 0);
   }
-  shopFull(e, shopId) { const cap = CRAFT_SHOPS.includes(shopId) ? CFG.shops[shopId].matCap : shopId === 'slaughter' ? this.slaughterAnimalCap : this.shopCap(shopId); return this.shopAccepts(shopId).every(g => e.inv[g] === 0 || this.shops[shopId].stock[g] >= cap); }
+  shopFull(e, shopId) {
+    if (shopId === 'pantry') { const st = this.shops.pantry.stock; return st.meat + st.fish >= CFG.mess.cap || this.shopAccepts('pantry').every(g => e.inv[g] === 0); }
+    const cap = CRAFT_SHOPS.includes(shopId) ? CFG.shops[shopId].matCap : shopId === 'slaughter' ? this.slaughterAnimalCap : this.shopCap(shopId); return this.shopAccepts(shopId).every(g => e.inv[g] === 0 || this.shops[shopId].stock[g] >= cap);
+  }
 
   updatePlayer(dt) {
     const p = this.player;
@@ -1321,7 +1349,7 @@ class Game {
       shop.custT -= dt;
       if (shop.custT <= 0) {
         const sh = CFG.shops[id];
-        shop.custT = this.custInterval * sh.rate / (id === 'mart' ? 1 + 0.1 * Math.max(0, this.lv.mart - 1) : 1) * rnd(0.7, 1.3);
+        shop.custT = this.custInterval * sh.rate / (id === 'mart' ? 1 + 0.1 * Math.max(0, this.lv.mart - 1) : id === 'inn' ? Math.max(1, this.lv.inn / 10) : 1) * rnd(0.7, 1.3);
         this.spawnCustomer(id, false);
       }
     }
@@ -1504,6 +1532,8 @@ class Game {
     else if (u.id === 'slaughterman') this.addSlaughterman();
     else if (u.id === 'collector') this.addCollector();
     else if (u.id === 'fishFarmer') this.addFishFarmer();
+    else if (u.id === 'medic') this.addMedic();
+    else if (u.id.startsWith('runner_')) this.addRunner(u.id.slice(7));
     else if (u.id === 'fishFarm') { while (this.pens.length < Math.min(this.lv.fishFarm, CFG.fishFarm.pens.length)) this.addPen(0); }
     else if (u.id === 'ranch') { while (this.animals.length < this.animalCount) this.addAnimal(0); }
     else if (u.id === 'weapon') { for (const g of this.guards) { const m = Math.round(this.guardMaxHP * (g.militia ? 2.2 : 1)); g.hp += m - g.maxhp; g.maxhp = m; } const p = this.player; p.hp += this.playerMaxHP - p.maxhp; p.maxhp = this.playerMaxHP; }
@@ -1580,6 +1610,10 @@ class Game {
     else if (id === 'fishFarm' || id === 'fishFeed') { for (const p of this.pens) this.sparkle(p.x, p.y, 6, '#9ad0ff'); }
     else if (id === 'fishFarmer') { const f = this.fishFarmers[this.fishFarmers.length - 1]; if (f) this.sparkle(f.x, f.y - 40, 10, '#fff'); }
     else if (id === 'tower' && this.lv.tower % CFG.tower.per === 0 && this.lv.tower / CFG.tower.per < CFG.tower.sites.length) { const S = CFG.tower.sites[this.towerCount - 1]; this.sparkle(S.x, S.y - 60, 24, '#ffd166'); this.text(S.x, S.y - 140, `🏹 감시탑 ${this.towerCount}호 완성!`, '#ffd166', 2.5); }
+    else if (id === 'infirmary') { this.sparkle(CFG.infirmary.x, CFG.infirmary.y - 30, 16, '#ff8a80'); }
+    else if (id === 'medic') { const m = this.medics[this.medics.length - 1]; if (m) this.sparkle(m.x, m.y - 40, 10, '#fff'); }
+    else if (id === 'mess') { this.sparkle(CFG.mess.x, CFG.mess.y - 30, 16, '#ffd166'); this.text(CFG.mess.x, CFG.mess.y - 90, '🍲 급식소 개업! 고기·생선을 식량 창고에', '#ffd166', 2.5); }
+    else if (id.startsWith('runner_')) { const r = this.runners[id.slice(7)].slice(-1)[0]; if (r) this.sparkle(r.x, r.y - 40, 10, '#fff'); }
     else if (id === 'logistics') { for (const p of Object.values(this.piles)) if (this.pileActive(p)) this.sparkle(p.x, p.y - 10, 10, '#ffd166'); this.text(CFG.hunt.collectorPost.x, CFG.hunt.collectorPost.y - 70, `📦 운반 분업 ${lv}단계 — ${['사냥꾼·도축업자', '어부·양식업자', '벌목꾼'][lv - 1]}는 이제 자리에서 일만`, '#ffd166', 2.5); }
     else if (id === 'grove') { for (const t of this.trees) if (t.grove != null && t.active) this.sparkle(t.x, t.y - 30, 4, '#9ad8ac'); }
   }
@@ -1606,24 +1640,33 @@ class Game {
     }
   }
   spawnBear(n, type) {
-    const E = ENEMY[type || 'bear'];
+    type = type || 'bear';
+    const boss = this.isBossType(type) ? this.bossDef(n) : null, E = boss ? boss : ENEMY[type];
     const side = Math.random(), R = CFG.wild.rect;
     let x, y;
     if (side < 0.6) { x = rnd(R.x + 20, R.x + R.w); y = CFG.world.h - 30; }
     else { x = 25; y = rnd(R.y, CFG.world.h - 40); }
-    const boss = type === 'yeti' ? BOSS[bossTier(n)] : null;
-    const hp = Math.round(this.bearHP(n) * (boss ? boss.hp : E.hp)), a = rnd(0, Math.PI * 2);
-    this.bears.push({ x, y, hp, maxhp: hp, dmg: this.bearDmg(n) * (boss ? boss.dmg : E.dmg), speed: CFG.wave.speed * E.speed * rnd(0.95, 1.15), state: 'walk',
-                      tx: this.hut.x + Math.cos(a) * 45, ty: this.hut.y + 28 + Math.sin(a) * 22, type: type || 'bear', r: E.r * (boss ? boss.scale : 1), meat: boss ? boss.meat : E.meat, pelt: (boss ? E.pelt + bossTier(n) * 2 : E.pelt) + this.lv.skinning,
-                      bounty: Math.round(this.bounty(n) * (boss ? boss.bounty : E.bounty)), scale: boss ? boss.scale : 1, bossName: boss ? boss.name : null, enraged: false,
+    const hp = Math.round(this.bearHP(n) * E.hp), a = rnd(0, Math.PI * 2);
+    this.bears.push({ x, y, hp, maxhp: hp, dmg: this.bearDmg(n) * E.dmg, speed: CFG.wave.speed * E.speed * rnd(0.95, 1.15), baseSpeed: 0, state: 'walk',
+                      tx: this.hut.x + Math.cos(a) * 45, ty: this.hut.y + 28 + Math.sin(a) * 22, type, r: E.r * (boss ? boss.scale : 1), meat: E.meat, pelt: E.pelt + this.lv.skinning,
+                      bounty: Math.round(this.bounty(n) * E.bounty), scale: boss ? boss.scale : 1, bossName: boss ? boss.name : null, ability: boss ? boss.ability : null, abilityT: boss && boss.every ? boss.every * 0.6 : 0, chargeT: 0, rank: boss ? boss.rank : 0, enraged: false,
                       atkT: rnd(0.2, 0.8), lunge: 0, flash: 0, facing: -1, moving: false, anim: 0, n, dead: false });
-    if (boss) { this.text(x, y - 160, `👹 ${boss.name} 출현!`, '#ff5252', 3); this.emit('boss', x, y); }
+    if (boss) { this.text(x, y - 160, `${this.enemyEmoji(type)} ${boss.name} 출현!`, '#ff5252', 3); this.emit('boss', x, y); }
+  }
+  // 늑대 왕이 부르는 늑대: 보스 옆에서 나온다
+  summonWolf(boss) {
+    const n = boss.n, E = ENEMY.wolf, hp = Math.round(this.bearHP(n) * E.hp), a = rnd(0, Math.PI * 2), ta = rnd(0, Math.PI * 2);
+    this.bears.push({ x: boss.x + Math.cos(a) * 50, y: boss.y + Math.sin(a) * 30, hp, maxhp: hp, dmg: this.bearDmg(n) * E.dmg, speed: CFG.wave.speed * E.speed * rnd(0.95, 1.15), state: 'walk',
+                      tx: this.hut.x + Math.cos(ta) * 45, ty: this.hut.y + 28 + Math.sin(ta) * 22, type: 'wolf', r: E.r, meat: 0, pelt: E.pelt + this.lv.skinning, bounty: Math.round(this.bounty(n) * E.bounty * 0.5), scale: 1, bossName: null, enraged: false,
+                      atkT: rnd(0.2, 0.8), lunge: 0, flash: 0, facing: -1, moving: false, anim: 0, n, dead: false });
+    this.sparkle(boss.x, boss.y - 30, 10, '#9ad0ff');
   }
   hitBear(b, dmg, by, attacker) {
     if (b.dead) return;
+    if (b.ability === 'armor' && by === 'tower') dmg = Math.round(dmg * 0.5 * 10) / 10;   // 서리 갑옷: 탑 투사체 반감
     b.hp -= dmg; b.flash = 1;
-    if (CFG.combat.hitText) this.text(b.x + rnd(-12, 12), b.y - (b.type === 'yeti' ? 150 : 58), `-${dmg}`, by === 'player' ? '#ffd166' : '#fff', 0.6);
-    if (attacker && b.type !== 'yeti') {   // 밀려남
+    if (CFG.combat.hitText) this.text(b.x + rnd(-12, 12), b.y - (b.bossName ? 150 : 58), `-${dmg}`, by === 'player' ? '#ffd166' : '#fff', 0.6);
+    if (attacker && !b.bossName) {   // 밀려남(보스는 안 밀린다)
       const d = dist(b.x, b.y, attacker.x, attacker.y) || 1, k = CFG.combat.knockback * (by === 'player' ? 1 : 0.4);
       b.x += ((b.x - attacker.x) / d) * k; b.y += ((b.y - attacker.y) / d) * k;
       b.x = clamp(b.x, 10, CFG.world.w - 10); b.y = clamp(b.y, 10, CFG.world.h - 10);
@@ -1663,6 +1706,17 @@ class Game {
     if (p.down <= 0) { const d = dist(x, y, p.x, p.y); if (d < bd) { bd = d; best = p; isPlayer = true; } }
     return best ? { foe: best, isPlayer } : null;
   }
+  // 보스 능력: 돌진(gbear) · 울부짖기(wolfking: 늑대 소환) · 서리 갑옷은 hitBear에서
+  updateBossAbility(b, dt) {
+    if (b.chargeT > 0) { b.chargeT -= dt; if (b.chargeT <= 0) b.speed = b.baseSpeed; }
+    if (!b.ability || b.ability === 'armor') return;
+    b.abilityT -= dt;
+    if (b.abilityT > 0) return;
+    const K = BOSS_KINDS.find(k => k.type === b.type) || {};
+    b.abilityT = K.every || 8;
+    if (b.ability === 'charge') { b.baseSpeed = b.speed; b.speed = b.baseSpeed * 3; b.chargeT = 1.2; this.text(b.x, b.y - 120, '💨 돌진!', '#ff8a80', 1); this.shake = 0.4; }
+    else if (b.ability === 'howl') { const n = 2 + Math.floor(b.n / 20); for (let i = 0; i < n; i++) this.summonWolf(b); this.text(b.x, b.y - 120, '🐺 울부짖음! 늑대 소환', '#ff8a80', 1.5); this.emit('wave', b.x, b.y, b.n); }
+  }
   updateBears(dt) {
     const camp = CFG.camp, hut = this.hut, CB = CFG.combat;
     for (const b of this.bears) {
@@ -1671,7 +1725,8 @@ class Game {
       b.atkT -= dt;
       if (this.fence.hp > 0 && b.state !== 'hut' && inRect(b.x, b.y, camp)) { pushOutRect(b, 4, camp); if (b.state === 'walk') b.state = 'fence'; }   // 울타리가 서 있으면 밀려 들어오지 못한다
       // 보스 분노
-      if (b.type === 'yeti' && !b.enraged && b.hp <= b.maxhp * ENRAGE.at) { b.enraged = true; b.speed *= ENRAGE.speed; b.dmg *= ENRAGE.dmg; this.text(b.x, b.y - 170, `${b.bossName} 분노!!`, '#ff5252', 2); this.shake = 0.8; this.emit('enrage', b.x, b.y); }
+      if (b.bossName) this.updateBossAbility(b, dt);
+      if (b.bossName && !b.enraged && b.hp <= b.maxhp * ENRAGE.at) { b.enraged = true; b.speed *= ENRAGE.speed; b.dmg *= ENRAGE.dmg; this.text(b.x, b.y - 170, `${b.bossName} 분노!!`, '#ff5252', 2); this.shake = 0.8; this.emit('enrage', b.x, b.y); }
       // 가까운 경비병·플레이어와 싸운다
       if (b.state !== 'fight') { const f = this.nearestFoe(b.x, b.y, CB.engageRange); if (f) { b.state = 'fight'; b.foe = f.foe; b.foeIsPlayer = f.isPlayer; } }
       if (b.state === 'fight') {
@@ -1730,7 +1785,12 @@ class Game {
     this.assignGuardTargets();
     for (const g of this.guards) {
       g.moving = false; g.atkT -= dt; g.swing = Math.max(0, g.swing - dt * 4); g.flash = Math.max(0, g.flash - dt * 6); g.flashT = Math.max(0, (g.flashT || 0) - dt);
-      if (g.down > 0) { g.down -= dt; if (g.down <= 0) { g.hp = g.maxhp; this.text(g.x, g.y - 70, '경비병 복귀!', '#7CFC9A', 1.2); } continue; }
+      if (g.down > 0) {   // 쓰러짐: 치료(의무병·플레이어)를 기다린다. 시간 안에 못 받으면 전사
+        g.down -= dt; g.bleed = (g.bleed != null ? g.bleed : CFG.guard.bleedOut) - dt;
+        if (dist(g.x, g.y, this.player.x, this.player.y) < 44 && this.player.down <= 0) this.healGuard(g, dt * 1.2);   // 내가 옆에 서면 치료
+        if (g.bleed <= 0) { g.dead = true; this.text(g.x, g.y - 70, g.militia ? '💀 방위대원 전사…' : '💀 경비병 전사…', '#ff5252', 2.2); this.emit('guardDead', g.x, g.y); }
+        continue;
+      }
       if (g.hp < g.maxhp && this.bears.length === 0) g.hp = Math.min(g.maxhp, g.hp + (g.maxhp / G.regenTime) * dt);
       const b = g.target;
       if (b) {
@@ -1742,7 +1802,105 @@ class Game {
       } else moveToward(g, g.post.x, g.post.y, this.guardSpeed, dt);
       if (g.moving) g.anim += dt * 11;
     }
+    // 전사한 병사는 명단에서 빼고 레벨을 깎는다(다시 고용해 채운다)
+    const dead = this.guards.filter(g => g.dead);
+    if (dead.length) {
+      for (const g of dead) { const id = g.militia ? 'militia' : 'guard'; this.lv[id] = Math.max(0, this.lv[id] - 1); this.stats.guardDeaths = (this.stats.guardDeaths || 0) + 1; }
+      this.guards = this.guards.filter(g => !g.dead);
+      for (const m of this.medics) if (m.target && m.target.dead) { m.target = null; m.state = 'find'; }
+    }
     separate(this.guards, 26, 0.4);
+  }
+  // 치료: healTime초 치료받으면 체력 60%로 일어난다
+  healGuard(g, dt) {
+    g.healT = (g.healT || 0) + dt;
+    if (g.healT < CFG.guard.healTime) return false;
+    g.healT = 0; g.down = 0; g.bleed = null; g.hp = Math.round(g.maxhp * CFG.guard.reviveHp); g.target = null;
+    this.text(g.x, g.y - 70, '🩹 치료 완료! 복귀', '#7CFC9A', 1.2); this.sparkle(g.x, g.y - 30, 8, '#7CFC9A');
+    return true;
+  }
+  // ---- 의무병: 쓰러진 병사에게 달려가 치료한다 ----
+  addMedic() {
+    const i = this.medics.length, P = CFG.infirmary.post;
+    this.medics.push({ x: P.x + i * 24, y: P.y, state: 'find', target: null, facing: 1, moving: false, anim: 0, i });
+  }
+  updateMedics(dt) {
+    if (!this.lv.infirmary) return;
+    for (const m of this.medics) {
+      m.moving = false;
+      if (m.state === 'find') {
+        let best = null, bd = Infinity;
+        for (const g of this.guards) { if (g.down <= 0 || g.dead) continue; if (this.medics.some(o => o !== m && o.target === g)) continue; const d = dist(m.x, m.y, g.x, g.y); if (d < bd) { bd = d; best = g; } }
+        if (best) { m.target = best; m.state = 'go'; }
+        else moveToward(m, CFG.infirmary.post.x + m.i * 24, CFG.infirmary.post.y, this.guardSpeed, dt);
+      } else if (m.state === 'go') {
+        const g = m.target;
+        if (!g || g.dead || g.down <= 0) { m.target = null; m.state = 'find'; continue; }
+        if (dist(m.x, m.y, g.x, g.y) > 30) moveToward(m, g.x + 22, g.y + 4, this.guardSpeed, dt);
+        else { m.facing = g.x < m.x ? -1 : 1; m.healing = true; if (this.healGuard(g, dt)) { m.target = null; m.state = 'find'; m.healing = false; } }
+      }
+      if (m.moving) m.anim += dt * 11;
+    }
+  }
+  // ---- 급식소: 직원 수만큼 고기·생선을 먹는다. fed = 최근에 얼마나 잘 먹었나(0~1) ----
+  get staffCount() { return this.workers.length + this.hunters.length + this.fishers.length + this.fishFarmers.length + this.collectors.length + this.ranchers.length + this.slaughtermen.length + this.crafters.furn.length + this.crafters.rest.length + this.crafters.tailor.length + this.runners.furn.length + this.runners.rest.length + this.runners.tailor.length + this.medics.length + this.guards.length; }
+  updateMeals(dt) {
+    if (!this.lv.mess) return;
+    this.mealT += dt; if (this.mealT < 10) return; this.mealT -= 10;
+    const need = Math.max(1, Math.round(this.staffCount * CFG.mess.perWorker / 6)), st = this.shops.pantry.stock;
+    let got = 0;
+    for (let i = 0; i < need; i++) { if (st.meat > 0) { st.meat--; got++; } else if (st.fish > 0) { st.fish--; got++; } }
+    this.recordFlow('cons', 'meat', 0);
+    const ratio = got / need;
+    this.fed = this.fed * 0.7 + ratio * 0.3;   // 최근 식사 비율의 이동 평균
+    if (ratio < 1 && this.t % 60 < 10) this.text(CFG.mess.x, CFG.mess.y - 70, '🍲 식량이 모자라요! 효율 −20%', '#ff8a80', 1.5);
+  }
+  // ---- 배달부: 제작 가게 전용 운반인. 더미·도축장·마트에서 그 가게 재료를 가져온다 ----
+  addRunner(shopId) {
+    const list = this.runners[shopId], i = list.length, dz = CFG.shops[shopId].drop;
+    list.push({ x: dz.x + 30 + i * 24, y: dz.y + 44, shop: shopId, inv: emptyInv(), state: 'find', src: null, dropT: 0, holdT: 0, facing: 1, moving: false, anim: 0, i });
+  }
+  runnerSources(shopId) {
+    const acc = CFG.shops[shopId].accepts, out = this.collectorSources().filter(S => S.kinds().some(k => acc.includes(k)));
+    if (this.lv.mart) { const st = this.shops.mart.stock, M = CFG.shops.mart; out.push({ id: 'mart', x: M.drop.x, y: M.drop.y, kinds: () => acc.filter(k => st[k] > 12), count: k => Math.max(0, st[k] - 12), take: k => { st[k]--; }, has: () => acc.some(k => st[k] > 12), fill: () => 0.5 }); }
+    return out;
+  }
+  updateRunners(dt) {
+    for (const shopId of CRAFT_SHOPS) {
+      if (!this.shopOpen(shopId) || !this.runners[shopId].length) continue;
+      const acc = CFG.shops[shopId].accepts, matCap = CFG.shops[shopId].matCap, st = this.shops[shopId].stock, cap = 8 + this.lv.bag, dz = CFG.shops[shopId].drop;
+      for (const r of this.runners[shopId]) {
+        r.moving = false; r.holdT = Math.max(0, r.holdT - dt);
+        const carrying = acc.some(k => r.inv[k] > 0);
+        if (r.state === 'find') {
+          if (carrying) { r.state = 'toShop'; continue; }
+          if (r.holdT > 0) { moveToward(r, dz.x + 30 + r.i * 24, dz.y + 44, this.workerSpeed, dt); continue; }
+          const need = acc.filter(k => st[k] < matCap * 0.6).sort((a, b) => st[a] - st[b]);   // 모자란 재료부터
+          if (!need.length) { r.holdT = 2; continue; }
+          let best = null, bs = Infinity;
+          for (const S of this.runnerSources(shopId)) { const ks = S.kinds().filter(k => need.includes(k)); if (!ks.length) continue; const n = ks.reduce((a, k) => a + Math.min(S.count(k), cap), 0); const sc = dist(r.x, r.y, S.x, S.y) - 8 * n; if (sc < bs) { bs = sc; best = { S, ks }; } }
+          if (!best) { r.holdT = 3; continue; }
+          r.src = best; r.state = 'load';
+        } else if (r.state === 'load') {
+          const S = r.src && r.src.S;
+          if (!S || !S.has()) { r.src = null; r.state = carrying ? 'toShop' : 'find'; continue; }
+          if (dist(r.x, r.y, S.x, S.y) > 40) { moveToward(r, S.x + 28, S.y + 12, this.workerSpeed, dt); r.dropT = 0; }
+          else {
+            r.facing = -1; r.dropT += dt; let took = false;
+            const can = k => r.inv[k] < cap && S.count(k) > 0 && st[k] + r.inv[k] < matCap;
+            while (r.dropT >= CFG.worker.dropRate) { const k = r.src.ks.find(can); if (!k) break; S.take(k); r.inv[k]++; r.dropT -= CFG.worker.dropRate; took = true; this.emit('drop', r.x, r.y); }
+            if (!took && !r.src.ks.some(can)) { r.src = null; r.state = acc.some(k => r.inv[k] > 0) ? 'toShop' : 'find'; }
+          }
+        } else if (r.state === 'toShop') {
+          const ang = (r.i / 2) * Math.PI * 2 + 2.2;
+          if (moveToward(r, dz.x + Math.cos(ang) * 24, dz.y + Math.sin(ang) * 16, this.workerSpeed, dt)) { r.state = 'drop'; r.dropT = 0; }
+        } else if (r.state === 'drop') {
+          if (!this.deposit(r, shopId, dt, CFG.worker.dropRate)) r.state = 'find';
+          else if (this.shopFull(r, shopId)) { r.holdT = 3; r.state = 'find'; }
+        }
+        if (r.moving) r.anim += dt * 11;
+      }
+    }
   }
 
   // 감시탑: 탑마다 자기 사거리 안의 적에게 단계별 투사체를 쏜다
