@@ -39,6 +39,8 @@ const Sfx = {
       case 'hit': this.noise(0.05, 0.2, 1800); this.tone(140, 60, 0.08, 'square', 0.12); break;
       case 'kill': this.tone(200, 60, 0.3, 'sawtooth', 0.15); this.tone(660, 990, 0.12, 'sine', 0.12, 0.1); break;
       case 'arrow': this.noise(0.09, 0.12, 2500); break;
+      case 'shot': this.noise(0.05, 0.3, 3500); this.tone(220, 80, 0.05, 'square', 0.1); break;
+      case 'boom': this.noise(0.25, 0.4, 400); this.tone(80, 40, 0.3, 'sawtooth', 0.25); break;
       case 'hitFence': this.noise(0.06, 0.2, 0); this.tone(120, 80, 0.12, 'triangle', 0.2); break;
       case 'hitHut': this.noise(0.12, 0.3, 0); this.tone(90, 40, 0.25, 'sawtooth', 0.25); break;
       case 'fenceBroken': this.noise(0.3, 0.3, 0); this.tone(160, 50, 0.4, 'sawtooth', 0.2); break;

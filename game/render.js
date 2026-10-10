@@ -51,6 +51,10 @@ function fishShape(ctx, x, y, s, color) {
 function popScale(g, key) { const p = g.pops[key] || 0; return 1 + Math.sin(p * Math.PI) * 0.08; }
 function fmtMoney(n) {
   n = Math.floor(n);
+  if (n >= 1e18) return (n / 1e18).toFixed(n >= 1e19 ? 0 : 1) + 'Qi';
+  if (n >= 1e15) return (n / 1e15).toFixed(n >= 1e16 ? 0 : 1) + 'Qa';
+  if (n >= 1e12) return (n / 1e12).toFixed(n >= 1e13 ? 0 : 1) + 'T';
+  if (n >= 1e9) return (n / 1e9).toFixed(n >= 1e10 ? 0 : 1) + 'B';
   if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
   if (n >= 1e4) return (n / 1e3).toFixed(n >= 1e5 ? 0 : 1) + 'K';
   return n.toLocaleString('en-US');
@@ -168,7 +172,25 @@ function drawTool(ctx, o, sw, g) {
     ctx.fillStyle = wt >= 2 ? '#5b4636' : PAL.wood; ctx.beginPath(); ctx.roundRect(1, -34 - wt * 3, 3.5 + wt * 0.5, 44 + wt * 3, 1); ctx.fill(); ctx.stroke();
     ctx.fillStyle = T.color; ctx.beginPath(); ctx.moveTo(-1 - wt, -34 - wt * 3); ctx.lineTo(2.75, -48 - wt * 4); ctx.lineTo(6.5 + wt, -34 - wt * 3); ctx.closePath(); ctx.fill(); ctx.stroke();
     if (wt >= 2) { ctx.fillStyle = T.color; tri(ctx, 4, -40 - wt * 3, 14, -36 - wt * 3, 4, -30 - wt * 3); }   // 미늘창 날
-    if (wt >= 3) { ctx.fillStyle = 'rgba(179,136,255,0.35)'; circle(ctx, 3, -42, 10); }
+    if (T.glow) { ctx.fillStyle = T.glow + '55'; circle(ctx, 3, -42, 10); }
+  } else if (o.tool === 'halberd') {   // 미늘창: 긴 자루 + 도끼날 + 창끝
+    const T = TIERS.weapon[tierOf('weapon', g.lv.weapon)];
+    ctx.rotate(-0.2 + (sw > 0 ? Math.sin(sw * Math.PI) * 1.1 : 0));
+    ctx.fillStyle = '#5b4636'; ctx.beginPath(); ctx.roundRect(1, -40, 4, 52, 1); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = T.color; ctx.beginPath(); ctx.moveTo(-1, -40); ctx.lineTo(3, -54); ctx.lineTo(7, -40); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(5, -40); ctx.quadraticCurveTo(20, -36, 16, -22); ctx.lineTo(5, -26); ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (T.glow) { ctx.fillStyle = T.glow + '55'; circle(ctx, 6, -38, 12); }
+  } else if (o.tool === 'gun' || o.tool === 'rifle' || o.tool === 'smg' || o.tool === 'energy') {   // 총: 총열 + 개머리판, 쏠 때 총구 불꽃. 형태마다 길이·부품이 다르다
+    const T = TIERS.weapon[tierOf('weapon', g.lv.weapon)], shape = o.tool;
+    ctx.rotate(-1.35 + (sw > 0 ? Math.sin(sw * Math.PI) * 0.15 : 0));
+    const len = shape === 'smg' ? 24 : shape === 'rifle' ? 44 : shape === 'energy' ? 40 : 36;
+    ctx.fillStyle = '#5b4636'; ctx.beginPath(); ctx.roundRect(-2, -8, 6, 22, 2); ctx.fill(); ctx.stroke();   // 개머리판
+    if (shape === 'energy') { ctx.fillStyle = '#2b3442'; ctx.beginPath(); ctx.roundRect(-3, -6 - len, 9, len, 3); ctx.fill(); ctx.stroke(); ctx.fillStyle = T.color; ctx.beginPath(); ctx.roundRect(-1, -4 - len, 5, len - 10, 2); ctx.fill(); ctx.fillStyle = T.color + '66'; circle(ctx, 1.5, -2 - len, 8); }
+    else { ctx.fillStyle = T.color; ctx.beginPath(); ctx.roundRect(0, -6 - len, 3.5, len, 1); ctx.fill(); ctx.stroke(); }
+    if (shape === 'rifle') { ctx.fillStyle = '#2b3442'; ctx.beginPath(); ctx.roundRect(-3, -30, 9, 6, 2); ctx.fill(); ctx.stroke(); }   // 조준경
+    if (shape === 'smg') { ctx.fillStyle = '#2b3442'; ctx.beginPath(); ctx.roundRect(-1, -14, 5, 12, 1); ctx.fill(); ctx.stroke(); }   // 탄창
+    if (T.glow && shape !== 'energy') { ctx.fillStyle = T.glow + '44'; circle(ctx, 2, -6 - len, 7); }
+    if (o.flashT > 0) { ctx.fillStyle = shape === 'energy' ? T.color : 'rgba(255,230,120,0.95)'; circle(ctx, 2, -10 - len, 7); ctx.fillStyle = 'rgba(255,255,255,0.8)'; circle(ctx, 2, -10 - len, 3); }
   } else if (o.tool === 'hammer') {
     ctx.rotate(-0.5 + (sw > 0 ? Math.sin(sw * Math.PI) * 1.4 : 0));
     ctx.fillStyle = o.coat; rrect(ctx, -3, -2, 7, 16, 3);
@@ -816,9 +838,9 @@ function drawCampfire(ctx, time) {
   for (let i = 0; i < 3; i++) { const h = 18 + Math.sin(time * 9 + i) * 4; ctx.fillStyle = i === 0 ? '#ff8c42' : i === 1 ? '#ffb347' : '#ffe08a'; tri(ctx, x - 9 + i * 3, y - 2, x + (i - 1) * 4, y - h - i * 5, x + 9 - i * 3, y - 2); }
   ctx.fillStyle = 'rgba(255,170,60,0.12)'; circle(ctx, x, y - 6, 40);
 }
-function drawTower(ctx, g, time) {
+function drawTower(ctx, g, time, site, idx) {
   if (!g.lv.tower) return;
-  const x = CFG.tower.x, y = CFG.tower.y, tier = tierOf('tower', g.lv.tower), H = 78 + tier * 20;
+  const x = site.x, y = site.y, tier = tierOf('tower', g.lv.tower), H = 78 + Math.min(2, tier) * 20, D = TIERS.tower[tier];
   ctx.save(); const sc = popScale(g, 'tower'); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
   shadow(ctx, x, y + 4, 28 + tier * 4, 10);
   if (tier >= 2) {   // 석탑
@@ -838,11 +860,19 @@ function drawTower(ctx, g, time) {
     ctx.fillStyle = PAL.treeTop; tri(ctx, x - 26, y - H - 36, x, y - H - 56, x + 26, y - H - 36);
   }
   const top = y - H - (tier >= 2 ? 16 : 30);
+  if (tier >= 3) {   // 쇠뇌·대포·소총·기관총: 탑 위 무기
+    const fire = (g.towerTs && g.towerTs[idx] != null && g.towerTs[idx] > CFG.tower.cd * D.cd - 0.1);
+    if (D.shot === 'bolt') { ctx.strokeStyle = '#5b4636'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x - 24, top - 14); ctx.quadraticCurveTo(x, top - 4, x + 24, top - 14); ctx.stroke(); ctx.fillStyle = PAL.woodDark; rrect(ctx, x - 3, top - 26, 6, 30, 2); ctx.fillStyle = '#9aa7b5'; tri(ctx, x - 4, top - 26, x, top - 36, x + 4, top - 26); }
+    else if (D.shot === 'cannon') { ctx.fillStyle = '#2b3442'; rrect(ctx, x - 12, top - 14, 34, 12, 5); ctx.fillStyle = '#5b4636'; circle(ctx, x - 8, top - 2, 7); circle(ctx, x + 10, top - 2, 7); ctx.fillStyle = '#111'; circle(ctx, x + 22, top - 8, 4.5); if (fire) { ctx.fillStyle = 'rgba(255,200,80,0.8)'; circle(ctx, x + 30, top - 8, 9); } }
+    else if (D.shot === 'bullet') { for (let i = 0; i < 2; i++) { const ax = x - 12 + i * 24; ctx.fillStyle = '#34495e'; rrect(ctx, ax - 6, top - 2, 12, 13, 4); ctx.fillStyle = '#f1c9a5'; circle(ctx, ax, top - 7, 5); ctx.fillStyle = '#b87333'; rrect(ctx, ax - 2, top - 26, 4, 26, 1); ctx.fillStyle = '#5b4636'; rrect(ctx, ax - 3, top - 8, 6, 10, 1); } ctx.fillStyle = '#c9a47a'; rrect(ctx, x - 30, top + 4, 60, 8, 4); if (fire) { ctx.fillStyle = 'rgba(255,230,120,0.9)'; circle(ctx, x + 12, top - 28, 5); } }
+    else { ctx.fillStyle = '#7f8c8d'; rrect(ctx, x - 16, top - 6, 32, 12, 4); ctx.fillStyle = '#2b3442'; rrect(ctx, x - 6, top - 24, 12, 20, 3); ctx.fillStyle = '#111'; rrect(ctx, x - 2, top - 44, 5, 24, 1); ctx.fillStyle = '#b8862e'; rrect(ctx, x - 22, top - 14, 10, 12, 2); ctx.fillStyle = '#2c3e50'; rrect(ctx, x + 10, top - 4, 12, 13, 4); ctx.fillStyle = '#f1c9a5'; circle(ctx, x + 16, top - 9, 5); if (fire) { ctx.fillStyle = 'rgba(255,230,120,0.9)'; circle(ctx, x + 1, top - 48, 6 + Math.random() * 3); } }
+    if (D.color) { ctx.fillStyle = D.color + '66'; circle(ctx, x, top - 24, 16); ctx.fillStyle = D.color; circle(ctx, x, top - 24, 4); }   // 재질 빛
+  } else
   // 궁수(단계마다 한 명씩)
   for (let i = 0; i < 1 + tier; i++) { const ax = x - 10 * tier + i * 20; ctx.fillStyle = '#2c3e50'; rrect(ctx, ax - 6, top - 2, 12, 13, 4); ctx.fillStyle = '#f1c9a5'; circle(ctx, ax, top - 7, 5); ctx.strokeStyle = '#5b4636'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ax + 8, top - 4, 8, -1.2, 1.2); ctx.stroke(); }
   ctx.fillStyle = '#e74c3c'; tri(ctx, x + 28, top - 40, x + 46 + Math.sin(time * 5) * 2, top - 33, x + 28, top - 26);
   ctx.fillStyle = PAL.woodDark; ctx.fillRect(x + 27, top - 42, 2, 30);
-  pill(ctx, x, top - 54, `🏹 ${TIERS.tower[tier].name} Lv${g.lv.tower} · 화살 ${g.towerArrows}발`, 'rgba(20,30,45,0.75)');
+  pill(ctx, x, top - 54, `${D.shot === 'cannon' ? '💣' : D.shot === 'bullet' || D.shot === 'mg' ? '🔫' : '🏹'} ${D.name} Lv${g.lv.tower}${g.towerCount > 1 ? ` ${idx + 1}호` : ''} · ${D.shot === 'cannon' ? '포탄' : D.shot === 'bolt' ? '쇠뇌' : D.shot === 'bullet' || D.shot === 'mg' ? '탄' : '화살'} ${g.towerArrows}발`, 'rgba(20,30,45,0.75)');
   ctx.restore();
 }
 
@@ -963,6 +993,9 @@ function drawDrop(ctx, d) {
 }
 function drawArrow(ctx, a) {
   ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(a.ang || 0);
+  if (a.kind === 'cannon') { ctx.fillStyle = 'rgba(80,80,80,0.35)'; circle(ctx, -14, 0, 5); circle(ctx, -26, 1, 4); ctx.fillStyle = '#111'; circle(ctx, 0, 0, 6); ctx.fillStyle = '#555'; circle(ctx, -2, -2, 2); ctx.restore(); return; }
+  if (a.kind === 'bullet' || a.kind === 'mg') { ctx.strokeStyle = 'rgba(255,230,120,0.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(4, 0); ctx.stroke(); ctx.fillStyle = '#ffe08a'; circle(ctx, 4, 0, 2); ctx.restore(); return; }
+  if (a.kind === 'bolt') { ctx.strokeStyle = '#2b3442'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(10, 0); ctx.stroke(); ctx.fillStyle = '#9aa7b5'; tri(ctx, 10, -4, 17, 0, 10, 4); ctx.restore(); return; }
   ctx.strokeStyle = PAL.woodDark; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(8, 0); ctx.stroke();
   ctx.fillStyle = a.tier >= 2 ? '#ffb347' : '#d6dde6'; tri(ctx, 8, -3, 13, 0, 8, 3);
   if (a.tier >= 2) { ctx.fillStyle = 'rgba(255,140,66,0.6)'; circle(ctx, 9, 0, 5); }
@@ -1052,13 +1085,13 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   items.push({ y: BEACON.y, f: () => drawBeacon(ctx, g, time) });
   if (g.lv.militia) for (let i = 0; i < g.lv.militia; i++) { const mp = MILITIA_POSTS[i]; items.push({ y: mp.y - 1, f: () => drawMilitiaPost(ctx, mp) }); }
   items.push({ y: CFG.hut.y + 80, f: () => drawCampfire(ctx, time) });
-  items.push({ y: CFG.tower.y, f: () => drawTower(ctx, g, time) });
+  g.towerSites().forEach((S, i) => items.push({ y: S.y, f: () => drawTower(ctx, g, time, S, i) }));
   // 계산원(열린 가게마다)
   if (g.lv.cashier) for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id) && CFG.shops[id].goods.length) { const c = CFG.shops[id].cashier; items.push({ y: c.y, f: () => drawPerson(ctx, { x: c.x, y: c.y, facing: 1, moving: false, anim: 0, swing: 0, down: 0, flash: 0 }, { sprite: 'cashier', coat: '#8e44ad', hat: '#f1c40f', pom: '#fff' }, g) }); }
   const p = g.player;
   items.push({ y: p.y, f: () => {
     const sc = popScale(g, 'player');
-    drawPerson(ctx, p, { sprite: 'player', coat: '#e8d9b8', pants: '#4a3b2a', hood: '#c9b48e', beard: '#f4f4f4', tool: p.fishing ? 'rod' : p.crafting ? (p.craftShop === 'tailor' ? null : 'hammer') : 'axe', belt: '#7a5230', bag: g.lv.bag ? '#7a5230' : null, bagSize: Math.min(g.lv.bag, 6), showInv: true, scale: sc }, g);
+    drawPerson(ctx, p, { sprite: 'player', coat: '#e8d9b8', pants: '#4a3b2a', hood: '#c9b48e', beard: '#f4f4f4', tool: p.fishing ? 'rod' : p.crafting ? (p.craftShop === 'tailor' ? null : 'hammer') : p.gun ? (TIERS.weapon[tierOf('weapon', g.lv.weapon)].shape || 'gun') : 'axe', flashT: p.flashT || 0, belt: '#7a5230', bag: g.lv.bag ? '#7a5230' : null, bagSize: Math.min(g.lv.bag, 6), showInv: true, scale: sc }, g);
     if (p.fishing) { drawFishingLine(ctx, p, time); bar(ctx, p.x - 18, p.y - 76, 36, 4, p.fishT / g.fishTime, '#5aa9e6'); }
     if (p.tree && p.chopT > 0) bar(ctx, p.x - 18, p.y - 76, 36, 4, p.chopT / (CFG.player.chopTime * g.chopMul), '#f1c40f');
     if (p.harvesting) label(ctx, p.x, p.y - 96, '🦌 데려오는 중…', 11, '#fff');
@@ -1069,9 +1102,9 @@ function render(ctx, g, cam, time, dtv, js, ui) {
     if (p.down > 0) label(ctx, p.x, p.y - 60, `😵 ${Math.ceil(p.down)}`, 14, '#fff');
   } });
   for (const wk of g.workers) if (vis(wk.x, wk.y, 80)) items.push({ y: wk.y, f: () => drawPerson(ctx, wk, { sprite: 'worker', coat: '#d35400', vest: '#f39c12', hat: '#f1c40f', pom: '#fff', tool: 'axe' }, g) });
-  const wt = tierOf('weapon', g.lv.weapon), guardLook = { sprite: 'guard', coat: wt >= 3 ? '#5d6d7e' : '#2c3e50', pants: '#1b2631', helmet: TIERS.weapon[wt].color, hat: '#34495e', tool: 'spear', shield: wt >= 1 ? (wt >= 2 ? '#b8860b' : '#8b5a2b') : null, shieldKite: wt >= 2, armor: wt >= 3 ? '#aab4c0' : null };
+  const wt = tierOf('weapon', g.lv.weapon), guardLook = { sprite: 'guard', coat: wt >= 3 ? '#5d6d7e' : '#2c3e50', pants: '#1b2631', helmet: TIERS.weapon[wt].color, hat: '#34495e', tool: TIERS.weapon[wt].shape || 'spear', shield: wt >= 1 ? (wt >= 2 ? '#b8860b' : '#8b5a2b') : null, shieldKite: wt >= 2, armor: wt >= 3 ? '#aab4c0' : null };
   const militiaLook = { ...guardLook, sprite: 'militia', coat: '#8e2b2b', pants: '#2b1b1b', helmet: '#d4af37', shield: '#b8860b', shieldKite: true, armor: wt >= 2 ? '#c9c2b2' : null };
-  for (const gd of g.guards) if (vis(gd.x, gd.y, 80)) items.push({ y: gd.y, f: () => { drawPerson(ctx, gd, gd.militia ? militiaLook : guardLook, g); if (gd.hp < gd.maxhp && gd.down <= 0) bar(ctx, gd.x - 18, gd.y - 72, 36, 4, gd.hp / gd.maxhp, '#2ecc71'); if (gd.down > 0) label(ctx, gd.x, gd.y - 40, `💫 ${Math.ceil(gd.down)}`, 12, '#fff'); } });
+  for (const gd of g.guards) if (vis(gd.x, gd.y, 80)) items.push({ y: gd.y, f: () => { drawPerson(ctx, gd, Object.assign({ flashT: gd.flashT || 0 }, gd.militia ? militiaLook : guardLook), g); if (gd.hp < gd.maxhp && gd.down <= 0) bar(ctx, gd.x - 18, gd.y - 72, 36, 4, gd.hp / gd.maxhp, '#2ecc71'); if (gd.down > 0) label(ctx, gd.x, gd.y - 40, `💫 ${Math.ceil(gd.down)}`, 12, '#fff'); } });
   for (const hn of g.hunters) if (vis(hn.x, hn.y, 80)) items.push({ y: hn.y, f: () => drawPerson(ctx, hn, { sprite: 'hunter', coat: '#6d4c41', pants: '#3e2723', fur: '#a1887f', tool: 'spear' }, g) });
   for (const fs of g.fishers) if (vis(fs.x, fs.y, 80)) items.push({ y: fs.y, f: () => { drawPerson(ctx, fs, { sprite: 'fisher', coat: '#f1c40f', pants: '#2b3a55', cap: '#e67e22', tool: 'rod' }, g); if (fs.fishing) { drawFishingLine(ctx, fs, time); bar(ctx, fs.x - 18, fs.y - 76, 36, 4, fs.fishT / (g.fishTime * CFG.fishing.fisherMul / g.effMul), '#5aa9e6'); } } });
   for (const cl of g.collectors) if (vis(cl.x, cl.y, 90)) items.push({ y: cl.y, f: () => {

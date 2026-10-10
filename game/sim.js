@@ -61,7 +61,13 @@ const MART_RECT = { x: CFG.shops.mart.x - CFG.shops.mart.w / 2, y: CFG.shops.mar
 const FURN_RECT = { x: CFG.shops.furn.x - CFG.shops.furn.w / 2, y: CFG.shops.furn.y - 60, w: CFG.shops.furn.w, h: 90 };
 const RIVER_RECT = CFG.river;
 const MAIN_TREES = FOREST_SPOTS.filter(p => p.grove == null).length;   // 남쪽 숲 앞의 본 숲 나무 수
-const COLLECTOR_GOODS = ['meat', 'pelt', 'fish', 'wood'];   // 수거꾼이 나르는 것(드랍·더미·도축장 보관함)
+const COLLECTOR_GOODS = ['meat', 'pelt', 'fish', 'wood'];
+// 무한 업그레이드 가격: 20레벨까지는 표대로, 그 뒤 40레벨은 10%씩, 그 뒤로는 4%씩만 오른다(300레벨까지 가도 천문학적이 되지 않게)
+function softCost(u, l) {
+  if (u.max !== Infinity || l <= 20) return u.cost(l);
+  const mid = Math.min(l, 60) - 20, late = Math.max(0, l - 60);
+  return Math.round(u.cost(20) * Math.pow(1.1, mid) * Math.pow(1.04, late));
+}   // 수거꾼이 나르는 것(드랍·더미·도축장 보관함)
 const SLAUGHTER_RECT = { x: CFG.shops.slaughter.x - 75, y: CFG.shops.slaughter.y - 50, w: 150, h: 70 };
 const CUSTOMER_COATS = ['#3b82c4', '#2f6fb0', '#4a90d9', '#346fa8', '#5aa0e0', '#7b6fd1', '#d16f9a'];
 
@@ -81,7 +87,7 @@ class Game {
   get warnTime() { return CFG.wave.warn + 8 * this.lv.beacon; }
   get moraleMul() { return 1 + 0.1 * this.lv.beacon; }
   get fishTime() { return Math.max(0.3, CFG.fishing.time * Math.pow(0.89, this.lv.rod)); }
-  get workerCarry() { return CFG.worker.carry + Math.floor(this.lv.bag / 2); }
+  get workerCarry() { return CFG.worker.carry + this.lv.bag; }   // 가방은 전투원 빼고 모든 일꾼에게 적용
   get wantMax() { return CFG.customer.wantMax + Math.floor(this.lv.promo / 3); }
   get carryCap() { return CFG.player.carry + CFG.player.carryPerBag * this.lv.bag; }
   get moveMul() { return 1 + 0.1 * this.lv.shoes; }   // 👟 신발: 모두의 이동 속도
@@ -94,7 +100,13 @@ class Game {
   get hunterDmg() { return Math.round((CFG.hunt.hunterDmg + CFG.weapon.dmgPer * this.lv.weapon) * this.effMul * 10) / 10; }
   get towerDmg() { return CFG.tower.dmg + CFG.tower.dmgPer * this.lv.tower; }
   get towerRange() { return CFG.tower.range + CFG.tower.rangePer * this.lv.tower; }
-  get towerArrows() { return 1 + tierOf('tower', this.lv.tower); }
+  get towerTierDef() { return TIERS.tower[tierOf('tower', this.lv.tower)]; }
+  get towerArrows() { return this.towerTierDef.shots; }
+  get towerCount() { return this.lv.tower ? Math.min(CFG.tower.sites.length, 1 + Math.floor(this.lv.tower / CFG.tower.per)) : 0; }
+  towerSites() { return CFG.tower.sites.slice(0, this.towerCount); }
+  get weaponDef() { return TIERS.weapon[tierOf('weapon', this.lv.weapon)]; }
+  get guardRange() { return this.weaponDef.range || CFG.guard.range; }       // 총 단계면 멀리서 쏜다
+  get playerRange() { return this.weaponDef.range || CFG.player.atkRange; }
   get guardMaxHP() { return CFG.guard.hp + CFG.guard.hpPerWeapon * this.lv.weapon; }
   get playerMaxHP() { return CFG.player.hp + CFG.player.hpPerWeapon * this.lv.weapon; }
   get treeCount() { return Math.min(CFG.forest.base + CFG.forest.perLevel * this.lv.forest, MAIN_TREES); }
@@ -169,7 +181,7 @@ class Game {
   get animalCap() { return 1 + Math.floor(this.lv.bag / 3); }   // 한 번에 데려갈 수 있는 순록
   get slaughterTime() { return CFG.shops.slaughter.time * Math.pow(0.9, Math.max(0, this.lv.slaughter - 1)); }
   get peltPerAnimal() { return this.lv.tanning; }                 // 무두질: 도축 한 마리당 모피
-  get collectorCarry() { return CFG.hunt.collectorCarry + 2 * this.lv.collector + CFG.hunt.sledCarry * this.lv.sled + Math.floor(this.lv.bag / 2); }
+  get collectorCarry() { return CFG.hunt.collectorCarry + 2 * this.lv.collector + CFG.hunt.sledCarry * this.lv.sled + this.lv.bag; }
   get collectorSpeed() { return this.workerSpeed * (1 + 0.08 * this.lv.collector + CFG.hunt.sledSpeed * this.lv.sled); }
   get collectorPickup() { return CFG.hunt.collectorPickup + CFG.hunt.sledPickup * this.lv.sled; }
   get fishGrowTime() { return Math.max(8, CFG.fishFarm.growTime * Math.pow(0.89, this.lv.fishFeed)); }
@@ -715,7 +727,7 @@ class Game {
   }
   updateSlaughtermen(dt) {
     if (!this.shopOpen('slaughter')) return;
-    const S = CFG.shops.slaughter, shop = this.shops.slaughter, cap = 8 + Math.floor(this.lv.bag / 2);
+    const S = CFG.shops.slaughter, shop = this.shops.slaughter, cap = 8 + this.lv.bag;
     for (const m of this.slaughtermen) {
       const shopId = m.dest && this.shopOpen(m.dest) ? m.dest : this.destFor('meat');
       m.moving = false; m.swing = Math.max(0, m.swing - dt * 4);
@@ -970,10 +982,11 @@ class Game {
 
     p.atkT -= dt; p.swing = Math.max(0, p.swing - dt * 4); p.fullT = Math.max(0, p.fullT - dt);
     p.fishing = false; p.crafting = false; p.harvesting = null; p.slaughtering = false;
-    const enemy = this.nearestEnemy(p.x, p.y, CFG.player.atkRange);
+    const enemy = this.nearestEnemy(p.x, p.y, this.playerRange);
+    p.gun = !!(enemy && this.weaponDef.gun); p.flashT = Math.max(0, (p.flashT || 0) - dt);
     if (enemy) {
       p.chopT = 0; p.tree = null;
-      if (p.atkT <= 0) { p.atkT = CFG.player.atkCd; p.swing = 1; p.facing = enemy.x < p.x ? -1 : 1; this.hitBear(enemy, this.atkDmg, 'player', p); }
+      if (p.atkT <= 0) { p.atkT = CFG.player.atkCd; p.swing = 1; p.facing = enemy.x < p.x ? -1 : 1; if (p.gun) { p.flashT = 0.08; this.emit('shot', p.x, p.y); } this.hitBear(enemy, this.atkDmg, 'player', p); }
     } else {
       const tree = this.nearestTree(p.x, p.y, CFG.tree.range, p);
       const spot = !tree ? this.nearestSpot(p.x, p.y, CFG.fishing.range) : null;
@@ -1127,7 +1140,7 @@ class Game {
   }
 
   updateHunters(dt) {
-    const H = CFG.hunt, cap = H.hunterCarry + Math.floor(this.lv.bag / 2);
+    const H = CFG.hunt, cap = H.hunterCarry + this.lv.bag;
     for (const h of this.hunters) {
       const shopId = this.destFor('pelt');
       h.moving = false; h.atkT -= dt; h.swing = Math.max(0, h.swing - dt * 4); h.holdT = Math.max(0, (h.holdT || 0) - dt);
@@ -1168,7 +1181,7 @@ class Game {
   }
 
   updateFishers(dt) {
-    const F = CFG.fishing, cap = F.carry + Math.floor(this.lv.bag / 2);
+    const F = CFG.fishing, cap = F.carry + this.lv.bag;
     for (const f of this.fishers) {
       const shopId = f.dest && this.shopOpen(f.dest) ? f.dest : this.destFor('fish');
       f.moving = false; f.fishing = false;
@@ -1231,7 +1244,7 @@ class Game {
     while (this.pens.length < Math.min(this.lv.fishFarm, CFG.fishFarm.pens.length)) this.addPen(0);
     const gt = this.fishGrowTime;
     for (const p of this.pens) if (p.grow < 1) p.grow = Math.min(1, p.grow + dt / gt);
-    const F = CFG.fishFarm, cap = F.carry + Math.floor(this.lv.bag / 2);
+    const F = CFG.fishFarm, cap = F.carry + this.lv.bag;
     for (const f of this.fishFarmers) {
       const shopId = f.dest && this.shopOpen(f.dest) ? f.dest : this.destFor('fish');
       f.moving = false; f.swing = Math.max(0, f.swing - dt * 4);
@@ -1448,7 +1461,7 @@ class Game {
   // ---- 업그레이드 결제 원 ----
   padCost(u) {
     if (u.id === 'repair') return Math.max(1, Math.ceil((this.hut.maxhp - this.hut.hp) * (2 + this.wave.n * 0.4)));
-    return u.cost(this.lv[u.id]);
+    return softCost(u, this.lv[u.id]);
   }
   padVisible(u) {
     if (u.id !== 'repair' && this.lv[u.id] >= u.max) return false;
@@ -1566,6 +1579,7 @@ class Game {
     else if (id === 'tanning') { const R = CFG.shops.slaughter.rack; this.sparkle(R.x, R.y - 20, 16, '#a67c52'); this.pops.slaughter = 1; }
     else if (id === 'fishFarm' || id === 'fishFeed') { for (const p of this.pens) this.sparkle(p.x, p.y, 6, '#9ad0ff'); }
     else if (id === 'fishFarmer') { const f = this.fishFarmers[this.fishFarmers.length - 1]; if (f) this.sparkle(f.x, f.y - 40, 10, '#fff'); }
+    else if (id === 'tower' && this.lv.tower % CFG.tower.per === 0 && this.lv.tower / CFG.tower.per < CFG.tower.sites.length) { const S = CFG.tower.sites[this.towerCount - 1]; this.sparkle(S.x, S.y - 60, 24, '#ffd166'); this.text(S.x, S.y - 140, `🏹 감시탑 ${this.towerCount}호 완성!`, '#ffd166', 2.5); }
     else if (id === 'logistics') { for (const p of Object.values(this.piles)) if (this.pileActive(p)) this.sparkle(p.x, p.y - 10, 10, '#ffd166'); this.text(CFG.hunt.collectorPost.x, CFG.hunt.collectorPost.y - 70, `📦 운반 분업 ${lv}단계 — ${['사냥꾼·도축업자', '어부·양식업자', '벌목꾼'][lv - 1]}는 이제 자리에서 일만`, '#ffd166', 2.5); }
     else if (id === 'grove') { for (const t of this.trees) if (t.grove != null && t.active) this.sparkle(t.x, t.y - 30, 4, '#9ad8ac'); }
   }
@@ -1715,15 +1729,15 @@ class Game {
     const G = CFG.guard;
     this.assignGuardTargets();
     for (const g of this.guards) {
-      g.moving = false; g.atkT -= dt; g.swing = Math.max(0, g.swing - dt * 4); g.flash = Math.max(0, g.flash - dt * 6);
+      g.moving = false; g.atkT -= dt; g.swing = Math.max(0, g.swing - dt * 4); g.flash = Math.max(0, g.flash - dt * 6); g.flashT = Math.max(0, (g.flashT || 0) - dt);
       if (g.down > 0) { g.down -= dt; if (g.down <= 0) { g.hp = g.maxhp; this.text(g.x, g.y - 70, '경비병 복귀!', '#7CFC9A', 1.2); } continue; }
       if (g.hp < g.maxhp && this.bears.length === 0) g.hp = Math.min(g.maxhp, g.hp + (g.maxhp / G.regenTime) * dt);
       const b = g.target;
       if (b) {
-        if (dist(g.x, g.y, b.x, b.y) > G.range) moveToward(g, b.x, b.y, this.guardSpeed, dt);
+        if (dist(g.x, g.y, b.x, b.y) > this.guardRange) moveToward(g, b.x, b.y, this.guardSpeed, dt);
         else {
           g.facing = b.x < g.x ? -1 : 1;
-          if (g.atkT <= 0) { g.atkT = G.atkCd; g.swing = 1; this.hitBear(b, Math.round(this.guardDmg * (g.militia ? 1.6 : 1) * this.moraleMul * 10) / 10, 'guard', g); }
+          if (g.atkT <= 0) { g.atkT = G.atkCd; g.swing = 1; if (this.weaponDef.gun) { g.flashT = 0.08; this.emit('shot', g.x, g.y); } this.hitBear(b, Math.round(this.guardDmg * (g.militia ? 1.6 : 1) * this.moraleMul * 10) / 10, 'guard', g); }
         }
       } else moveToward(g, g.post.x, g.post.y, this.guardSpeed, dt);
       if (g.moving) g.anim += dt * 11;
@@ -1731,21 +1745,26 @@ class Game {
     separate(this.guards, 26, 0.4);
   }
 
+  // 감시탑: 탑마다 자기 사거리 안의 적에게 단계별 투사체를 쏜다
   updateTower(dt) {
     if (this.lv.tower <= 0) return;
-    this.towerT -= dt;
-    if (this.towerT > 0) return;
-    const T = CFG.tower;
-    const edist = b => Math.hypot(b.x - T.x, (b.y - T.y) / 0.74);
-    const inRange = this.bears.filter(b => !b.dead && edist(b) < this.towerRange).sort((a, b) => edist(a) - edist(b));
-    if (!inRange.length) return;
-    this.towerT = T.cd;
-    const sx = T.x, sy = T.y - 95 - 20 * tierOf('tower', this.lv.tower), n = this.towerArrows;
-    for (let i = 0; i < n; i++) {
-      const b = inRange[i % inRange.length];
-      this.arrows.push({ x: sx, y: sy, sx, sy, target: b, t: -i * 0.08, dur: Math.max(0.15, dist(sx, sy, b.x, b.y) / 650), dmg: this.towerDmg, tier: tierOf('tower', this.lv.tower) });
+    const T = CFG.tower, D = this.towerTierDef, tier = tierOf('tower', this.lv.tower);
+    if (!this.towerTs) this.towerTs = [];
+    const sites = this.towerSites();
+    for (let s = 0; s < sites.length; s++) {
+      this.towerTs[s] = (this.towerTs[s] || 0) - dt;
+      if (this.towerTs[s] > 0) continue;
+      const S = sites[s], edist = b => Math.hypot(b.x - S.x, (b.y - S.y) / 0.74);
+      const inRange = this.bears.filter(b => !b.dead && edist(b) < this.towerRange).sort((a, b) => edist(a) - edist(b));
+      if (!inRange.length) continue;
+      this.towerTs[s] = T.cd * D.cd;
+      const sx = S.x, sy = S.y - 95 - 20 * Math.min(2, tier), n = D.shots, speed = D.shot === 'arrow' ? 650 : D.shot === 'bolt' ? 900 : D.shot === 'cannon' ? 520 : 1500;
+      for (let i = 0; i < n; i++) {
+        const b = inRange[i % inRange.length];
+        this.arrows.push({ x: sx, y: sy, sx, sy, target: b, t: -i * (D.shot === 'mg' ? 0.05 : 0.08), dur: Math.max(0.12, dist(sx, sy, b.x, b.y) / speed), dmg: Math.round(this.towerDmg * D.dmg * 10) / 10, tier, kind: D.shot, splash: D.splash || 0 });
+      }
+      this.emit(D.shot === 'arrow' || D.shot === 'bolt' ? 'arrow' : D.shot === 'cannon' ? 'boom' : 'shot', sx, sy);
     }
-    this.emit('arrow', sx, sy);
   }
   updateArrows(dt) {
     for (const a of this.arrows) {
@@ -1754,9 +1773,16 @@ class Game {
       const k = Math.min(1, a.t / a.dur), b = a.target;
       const tx = b.x, ty = b.y - 16;
       const px = a.x, py = a.y;
-      a.x = lerp(a.sx, tx, k); a.y = lerp(a.sy, ty, k) - Math.sin(k * Math.PI) * 36;
+      const arc = a.kind === 'cannon' ? 70 : a.kind === 'bolt' ? 18 : a.kind === 'bullet' || a.kind === 'mg' ? 0 : 36;
+      a.x = lerp(a.sx, tx, k); a.y = lerp(a.sy, ty, k) - Math.sin(k * Math.PI) * arc;
       a.ang = Math.atan2(a.y - py, a.x - px);
-      if (k >= 1) { a.dead = true; if (!b.dead) this.hitBear(b, a.dmg, 'tower', null); }
+      if (k >= 1) {
+        a.dead = true;
+        if (a.splash) {   // 대포: 떨어진 자리 둘레에 범위 피해(멀수록 절반까지 줄어든다)
+          for (const o of this.bears) { if (o.dead) continue; const d = dist(o.x, o.y, tx, ty + 16); if (d <= a.splash) this.hitBear(o, Math.round(a.dmg * (1 - 0.5 * d / a.splash) * 10) / 10, 'tower', null); }
+          this.sparkle(tx, ty + 10, 14, '#ffb347'); this.sparkle(tx, ty + 10, 8, '#7f8c8d'); this.emit('boom', tx, ty);
+        } else if (!b.dead) this.hitBear(b, a.dmg, 'tower', null);
+      }
     }
     this.arrows = this.arrows.filter(a => !a.dead);
   }

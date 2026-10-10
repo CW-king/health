@@ -18,7 +18,9 @@ const CFG = {
   worker: { speed: 130, chopMul: 1.5, carry: 4, dropRate: 0.12, idle: { x: 720, y: 900 } },
   guard:  { speed: 155, atkCd: 0.8, range: 55, dmg: 4, hp: 50, hpPerWeapon: 10, downTime: 20, regenTime: 30 },   // 경비병도 맞으면 쓰러진다
   weapon: { dmgPer: 2 },
-  tower:  { x: 330, y: 1920, cd: 1.1, dmg: 6, dmgPer: 5, range: 320, rangePer: 14 },   // 캠프 남문 앞, 황무지에서 오는 길목   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
+  // 감시탑: 남문 앞이 첫 탑. per레벨마다 sites 순서대로 탑이 하나씩 더 선다(서쪽 담 밖 → 동쪽 담 밖 → 황무지 전진 초소)
+  tower:  { x: 330, y: 1920, cd: 1.1, dmg: 6, dmgPer: 5, range: 320, rangePer: 14, per: 6,
+            sites: [{ x: 330, y: 1920 }, { x: 50, y: 1720 }, { x: 610, y: 1650 }, { x: 160, y: 2110 }] },   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
 
   tree:   { logs: 3, regrow: 8, range: 50 },
   // 남쪽 숲: 공방 가까운 벌목지. 개간 레벨마다 perLevel그루가 열린다
@@ -148,10 +150,12 @@ const CFG = {
 };
 
 // 업그레이드 정의. pad = 바닥의 결제 원 위치, unlock = 보이는 조건. max가 Infinity면 끝없이 올릴 수 있다.
+// 고정 가격표 뒤로는 마지막 값에서 growth배씩 올린다(고용 상한을 늘려도 가격이 이어지도록)
+const tbl = (arr, growth) => l => (arr[l] != null ? arr[l] : Math.round(arr[arr.length - 1] * Math.pow(growth, l - arr.length + 1)));
 const UPG = [
   { id: 'axe',    icon: '🪓', name: '도끼',       desc: '모두의 벌목 속도 +11%',    max: Infinity,
     cost: l => Math.round(30 * Math.pow(1.35, l)),  pad: { x: 150, y: 960 }, unlock: () => true },
-  { id: 'bag',    icon: '🎒', name: '가방',       desc: '내 운반량 +3, 2레벨마다 벌목꾼 +1', max: Infinity,
+  { id: 'bag',    icon: '🎒', name: '가방',       desc: '내 운반량 +3, 모든 일꾼 운반량 +1(경비병 제외)', max: Infinity,
     cost: l => Math.round(60 * Math.pow(1.5, l)),   pad: { x: 340, y: 960 }, unlock: () => true },
   { id: 'worker', icon: '👷', name: '벌목꾼 고용', desc: '스스로 베고 나르는 일꾼',   max: 10,
     cost: l => [100, 250, 600, 1300, 2600, 5000, 9500, 18000, 35000, 70000][l], pad: { x: 530, y: 960 }, unlock: () => true },
@@ -174,10 +178,10 @@ const UPG = [
     cost: () => 500,                                pad: { x: 1560, y: 1000 }, unlock: g => g.lv.mart < 1 && (g.lv.worker >= 2 || g.stats.sales >= 20 || g.stats.kills >= 1) },
   { id: 'furShop', icon: '🧥', name: '모피 상점 열기', desc: '사냥터 곰의 모피를 파는 가게. 손님이 따로 옵니다', max: 1,
     cost: () => 400,                                pad: { x: 1780, y: 800 }, unlock: g => g.lv.mart < 1 && (g.stats.kills >= 1 || g.lv.hunter >= 1) },
-  { id: 'hunter', icon: '🏹', name: '사냥꾼 고용', desc: '사냥터의 곰을 잡아 모피를 나릅니다', max: 6,
-    cost: l => [300, 700, 1500, 3200, 6500, 13000][l], pad: { x: 1480, y: 680 }, unlock: g => g.lv.furShop >= 1 },
-  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 드랍·더미·습격 전리품을 가게로 나릅니다', max: 8,
-    cost: l => [350, 900, 2200, 5000, 11000, 20000, 35000, 60000][l], pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
+  { id: 'hunter', icon: '🏹', name: '사냥꾼 고용', desc: '사냥터의 곰을 잡아 모피를 나릅니다', max: 10,
+    cost: tbl([300, 700, 1500, 3200, 6500, 13000], 1.6), pad: { x: 1480, y: 680 }, unlock: g => g.lv.furShop >= 1 },
+  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 드랍·더미·습격 전리품을 가게로 나릅니다', max: 10,
+    cost: tbl([350, 900, 2200, 5000, 11000, 20000, 35000, 60000], 1.6), pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
   { id: 'sled',   icon: '🛷', name: '수거 썰매',   desc: '수거꾼 운반량 +4(종류당), 줍는 반경 +12, 이동 속도 +12%. 썰매를 끌고 다닙니다', max: 5,
     cost: l => [700, 1800, 4500, 10000, 22000][l], pad: { x: 1340, y: 700 }, unlock: g => g.lv.collector >= 1 },
   { id: 'logistics', icon: '📦', name: '운반 분업', desc: '1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미에 쌓습니다. 운반은 수거꾼 몫(단계마다 수거꾼 2·3·4명 필요)', max: 3,
@@ -200,14 +204,14 @@ const UPG = [
     cost: l => Math.round(150 * Math.pow(1.4, l)),  pad: { x: 1470, y: 1370 }, unlock: g => g.lv.ranch >= 1 },
   { id: 'breed',  icon: '🧬', name: '품종 개량',  desc: '순록 한 마리당 고기 +1',        max: Infinity,
     cost: l => Math.round(300 * Math.pow(1.45, l)), pad: { x: 1820, y: 1870 }, unlock: g => g.lv.ranch >= 1 },
-  { id: 'rancher', icon: '🧑‍🌾', name: '목동 고용', desc: '다 자란 순록을 도축장에 데려갑니다', max: 3,
-    cost: l => [400, 1000, 2500][l],               pad: { x: 1560, y: 1860 }, unlock: g => g.lv.ranch >= 1 && g.lv.slaughter >= 1 },
+  { id: 'rancher', icon: '🧑‍🌾', name: '목동 고용', desc: '다 자란 순록을 도축장에 데려갑니다', max: 5,
+    cost: tbl([400, 1000, 2500], 1.7),               pad: { x: 1560, y: 1860 }, unlock: g => g.lv.ranch >= 1 && g.lv.slaughter >= 1 },
 
   // ---- 도축장 ----
   { id: 'slaughter', icon: '🔪', name: '도축장',  desc: '1레벨: 건설. 이후 도축 속도 +10%, 대기 순록 +2', max: Infinity,
     cost: l => Math.round(800 * Math.pow(1.5, l)),  pad: { x: 1390, y: 1470 }, unlock: g => g.lv.ranch >= 1 },
-  { id: 'slaughterman', icon: '🧑‍🍳', name: '도축업자 고용', desc: '순록을 고기로 만들고 정육점에 나릅니다', max: 3,
-    cost: l => [500, 1200, 3000][l],               pad: { x: 1160, y: 1700 }, unlock: g => g.lv.slaughter >= 1 },
+  { id: 'slaughterman', icon: '🧑‍🍳', name: '도축업자 고용', desc: '순록을 고기로 만들고 정육점에 나릅니다', max: 5,
+    cost: tbl([500, 1200, 3000], 1.7),               pad: { x: 1160, y: 1700 }, unlock: g => g.lv.slaughter >= 1 },
   { id: 'tanning', icon: '🧶', name: '무두질',     desc: '도축한 순록 한 마리당 🧥 모피 +1. 도축업자가 모피 상점·마트·재단소로 나릅니다', max: 3,
     cost: l => [1800, 4500, 10000][l],             pad: { x: 1300, y: 1660 }, unlock: g => g.lv.slaughter >= 1 && g.lv.slaughterman >= 1 && (g.lv.furShop >= 1 || g.lv.mart >= 1) },
 
@@ -216,14 +220,14 @@ const UPG = [
     cost: () => 800,                                pad: { x: 980, y: 380 }, unlock: g => g.lv.mart < 1 && (g.lv.butcher >= 1 || g.lv.worker >= 3 || g.t >= 300) },
   { id: 'rod',    icon: '🎣', name: '낚싯대',     desc: '낚시 속도 +12%',             max: Infinity,
     cost: l => Math.round(80 * Math.pow(1.4, l)),   pad: { x: 740, y: 300 }, unlock: g => g.lv.fishShop >= 1 },
-  { id: 'fisher', icon: '🛶', name: '어부 고용',   desc: '강가에서 낚시해 생선을 나릅니다', max: 4,
-    cost: l => [350, 800, 1800, 4000][l],           pad: { x: 760, y: 480 }, unlock: g => g.lv.fishShop >= 1 },
+  { id: 'fisher', icon: '🛶', name: '어부 고용',   desc: '강가에서 낚시해 생선을 나릅니다', max: 8,
+    cost: tbl([350, 800, 1800, 4000], 1.6),           pad: { x: 760, y: 480 }, unlock: g => g.lv.fishShop >= 1 },
   { id: 'fishPrice', icon: '🍣', name: '생선 가격', desc: '생선 판매가 +12%',          max: Infinity,
     cost: l => Math.round(220 * Math.pow(1.4, l)),  pad: { x: 1200, y: 300 }, martPad: { x: 1140, y: 2350 }, unlock: g => g.lv.fishShop >= 1 },
   { id: 'fishFarm', icon: '🐠', name: '양식장',   desc: '강에 가두리 +1. 물고기가 다 자라면 양식업자가 그물로 건져 나릅니다', max: 6,
     cost: l => [1500, 2500, 4000, 5500, 7500, 10000][l], pad: { x: 860, y: 300 }, unlock: g => g.lv.restaurant >= 1 && g.lv.fisher >= 2 && g.lv.rod >= 3 },
-  { id: 'fishFarmer', icon: '🥅', name: '양식업자 고용', desc: '다 자란 가두리를 건져 생선을 마트·식당에 나릅니다', max: 3,
-    cost: l => [600, 1500, 3500][l],               pad: { x: 860, y: 420 }, unlock: g => g.lv.fishFarm >= 1 },
+  { id: 'fishFarmer', icon: '🥅', name: '양식업자 고용', desc: '다 자란 가두리를 건져 생선을 마트·식당에 나릅니다', max: 5,
+    cost: tbl([600, 1500, 3500], 1.7),               pad: { x: 860, y: 420 }, unlock: g => g.lv.fishFarm >= 1 },
   { id: 'fishFeed', icon: '🫧', name: '어분 사료', desc: '양식 성장 속도 +12%, 2레벨마다 가두리당 생선 +1', max: Infinity,
     cost: l => Math.round(250 * Math.pow(1.4, l)),  pad: { x: 880, y: 560 }, unlock: g => g.lv.fishFarm >= 1 },
 
@@ -241,14 +245,14 @@ const UPG = [
   // ---- 마트 이후 새 컨텐츠 ----
   { id: 'restaurant', icon: '🍲', name: '식당', desc: '1레벨: 건설(🍣 생선회) · 2: 🍲 순록 스튜 · 3: 🥘 해물탕 · 4: 🍱 잔치 상차림. 생선·고기를 요리로', max: 4,
     cost: l => [3000, 7000, 15000, 32000][l],      pad: { x: 1150, y: 950 }, unlock: g => g.lv.mart >= 1 },
-  { id: 'cook',   icon: '👨‍🍳', name: '요리사 고용', desc: '화덕에서 요리를 계속 만듭니다', max: 3,
-    cost: l => [900, 2200, 5000][l],               pad: { x: 780, y: 1130 }, unlock: g => g.lv.restaurant >= 1 },
+  { id: 'cook',   icon: '👨‍🍳', name: '요리사 고용', desc: '화덕에서 요리를 계속 만듭니다', max: 5,
+    cost: tbl([900, 2200, 5000], 1.7),               pad: { x: 780, y: 1130 }, unlock: g => g.lv.restaurant >= 1 },
   { id: 'dishPrice', icon: '🍽️', name: '요리 가격', desc: '요리 판매가 +12%',          max: Infinity,
     cost: l => Math.round(500 * Math.pow(1.4, l)),  pad: { x: 1270, y: 880 }, unlock: g => g.lv.restaurant >= 1 },
   { id: 'tailor', icon: '🧵', name: '재단소',     desc: '1레벨: 건설(🧤 가죽 장갑) · 2: 🧥 모피 코트 · 3: 🧣 모피 망토 · 4: 👘 왕실 예복. 모피를 옷으로', max: 4,
     cost: l => [2500, 6000, 14000, 30000][l],      pad: { x: 1920, y: 900 }, unlock: g => g.lv.mart >= 1 && g.lv.furShop >= 1 },
-  { id: 'tailorman', icon: '🪡', name: '재단사 고용', desc: '재봉대에서 옷을 계속 만듭니다', max: 2,
-    cost: l => [800, 2000][l],                     pad: { x: 1720, y: 690 }, unlock: g => g.lv.tailor >= 1 },
+  { id: 'tailorman', icon: '🪡', name: '재단사 고용', desc: '재봉대에서 옷을 계속 만듭니다', max: 4,
+    cost: tbl([800, 2000], 1.8),                     pad: { x: 1720, y: 690 }, unlock: g => g.lv.tailor >= 1 },
   { id: 'clothPrice', icon: '🏷️', name: '의복 가격', desc: '의복 판매가 +12%',          max: Infinity,
     cost: l => Math.round(450 * Math.pow(1.4, l)),  pad: { x: 1850, y: 690 }, unlock: g => g.lv.tailor >= 1 },
   { id: 'inn',    icon: '🏨', name: '여관',       desc: '객실 +1. 돈과 함께 공방의 🛏️ 침대 1 · 🪑 의자 1이 필요합니다. 손님이 묵고 숙박비를 냅니다', max: 12,
@@ -265,8 +269,8 @@ const UPG = [
     unlock: g => g.lv.worker >= 3 || g.stats.sales >= 60 },
   { id: 'tools',  icon: '🧰', name: '공구',       desc: '가구·요리·의복 제작 속도 +12%', max: Infinity,
     cost: l => Math.round(200 * Math.pow(1.4, l)),  pad: { x: 720, y: 1900 }, unlock: g => g.lv.workshop >= 1 },
-  { id: 'craftsman', icon: '👨‍🔧', name: '목수 고용', desc: '작업대에서 가구를 계속 만듭니다', max: 3,
-    cost: l => [600, 1600, 4000][l],                pad: { x: 1080, y: 2000 }, unlock: g => g.lv.workshop >= 1 },
+  { id: 'craftsman', icon: '👨‍🔧', name: '목수 고용', desc: '작업대에서 가구를 계속 만듭니다', max: 5,
+    cost: tbl([600, 1600, 4000], 1.7),                pad: { x: 1080, y: 2000 }, unlock: g => g.lv.workshop >= 1 },
   { id: 'furnPrice', icon: '🏷️', name: '가구 가격', desc: '가구 판매가 +12%',          max: Infinity,
     cost: l => Math.round(400 * Math.pow(1.4, l)),  pad: { x: 1240, y: 1800 }, unlock: g => g.lv.workshop >= 1 },
 
@@ -283,11 +287,11 @@ const UPG = [
 
   { id: 'fence',  icon: '🧱', name: '울타리 보강', desc: '울타리 내구도 ×1.22, 본부 +20', max: Infinity,
     cost: l => Math.round(60 * Math.pow(1.3, l)),  pad: { x: 660, y: 1560 }, unlock: () => true },
-  { id: 'guard',  icon: '🛡️', name: '경비병 고용', desc: '곰과 싸우는 경비병',       max: 8,
-    cost: l => [180, 400, 900, 2000, 4200, 9000, 19000, 40000][l], pad: { x: 220, y: 1960 }, unlock: g => g.lv.worker >= 1 || g.wave.n >= 1 || g.t >= 60 },
-  { id: 'weapon', icon: '⚔️', name: '무기',       desc: '나와 경비병 공격력 +2',     max: Infinity,
+  { id: 'guard',  icon: '🛡️', name: '경비병 고용', desc: '곰과 싸우는 경비병',       max: 12,
+    cost: tbl([180, 400, 900, 2000, 4200, 9000, 19000, 40000], 1.7), pad: { x: 220, y: 1960 }, unlock: g => g.lv.worker >= 1 || g.wave.n >= 1 || g.t >= 60 },
+  { id: 'weapon', icon: '⚔️', name: '무기',       desc: '나와 경비병 공격력 +2. 3·7·12·18·28레벨, 그 뒤 10레벨마다 재질과 형태가 바뀝니다(창 → 미늘창 → 머스킷 → 소총 → … → 빔 캐논, 300레벨까지)', max: Infinity,
     cost: l => Math.round(80 * Math.pow(1.3, l)),  pad: { x: 440, y: 1960 }, unlock: g => g.lv.guard >= 1 },
-  { id: 'tower',  icon: '🏹', name: '감시탑',     desc: '화살 공격력 +5, 사거리 +12', max: Infinity,
+  { id: 'tower',  icon: '🏹', name: '감시탑',     desc: '공격력 +5, 사거리 +12. 6레벨마다 탑 +1(최대 4). 12: 쇠뇌 · 16: 대포 · 20: 소총 · 26: 기관총, 36부터 10레벨마다 새 포대(300레벨까지)', max: Infinity,
     cost: l => Math.round(250 * Math.pow(1.4, l)), pad: { x: 580, y: 1900 }, unlock: g => g.lv.guard >= 1 && g.wave.n >= 2 },
   { id: 'repair', icon: '🔧', name: '본부 수리',  desc: '본부 내구도 전부 회복',     max: Infinity,
     cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 },
@@ -323,7 +327,10 @@ const ENRAGE = { at: 0.35, speed: 1.5, dmg: 1.4 };   // 체력 35% 이하에서 
 const TIERS = {
   fence: [{ at: 0, name: '나무 울타리' }, { at: 5, name: '통나무 목책' }, { at: 10, name: '돌담' }, { at: 20, name: '성벽' }],
   hut:   [{ at: 0, name: '오두막' }, { at: 5, name: '통나무집' }, { at: 10, name: '석조 본부' }, { at: 20, name: '요새' }],
-  tower: [{ at: 1, name: '망루' }, { at: 4, name: '감시탑' }, { at: 8, name: '석탑' }],
+  // 감시탑 단계: shot(투사체) arrow 화살 · bolt 쇠뇌 · cannon 대포(범위 피해) · bullet 소총(연사) · mg 기관총. shots 한 번에 쏘는 수, cd 발사 간격 배수, dmg 한 발 피해 배수
+  tower: [{ at: 1, name: '망루', shot: 'arrow', shots: 1, cd: 1, dmg: 1 }, { at: 4, name: '감시탑', shot: 'arrow', shots: 2, cd: 1, dmg: 1 }, { at: 8, name: '석탑', shot: 'arrow', shots: 3, cd: 1, dmg: 1 },
+          { at: 12, name: '쇠뇌탑', shot: 'bolt', shots: 3, cd: 1.1, dmg: 1.7 }, { at: 16, name: '대포탑', shot: 'cannon', shots: 2, cd: 1.7, dmg: 2.4, splash: 80 },
+          { at: 20, name: '소총탑', shot: 'bullet', shots: 4, cd: 0.55, dmg: 0.6 }, { at: 26, name: '기관총탑', shot: 'mg', shots: 6, cd: 0.35, dmg: 0.45 }],
   stall: [{ at: 0, name: '좌판' }, { at: 3, name: '천막 가게' }, { at: 7, name: '목재 상점' }],
   workshop: [{ at: 1, name: '작업 헛간' }, { at: 2, name: '가구 공방' }, { at: 4, name: '대형 공방' }],
   mart:  [{ at: 1, name: '동네 마트' }, { at: 3, name: '마트' }, { at: 6, name: '대형 마트' }, { at: 10, name: '백화점' }],
@@ -332,8 +339,31 @@ const TIERS = {
   ranch: [{ at: 1, name: '울타리 목장' }, { at: 4, name: '축사' }, { at: 8, name: '대형 축사' }],
   village: [{ at: 0, name: '개척지' }, { at: 1, name: '마을' }, { at: 3, name: '큰 마을' }, { at: 6, name: '읍내' }, { at: 10, name: '도시' }],
   axe:   [{ at: 0, name: '쇠도끼', color: '#9aa7b5' }, { at: 3, name: '강철 도끼', color: '#6fa8dc' }, { at: 6, name: '황금 도끼', color: '#f1c40f' }, { at: 10, name: '수정 도끼', color: '#b388ff' }],
-  weapon: [{ at: 0, name: '나무 창', color: '#d6dde6' }, { at: 3, name: '강철 창', color: '#6fa8dc' }, { at: 7, name: '황금 창', color: '#f1c40f' }, { at: 12, name: '수정 창', color: '#b388ff' }],
+  weapon: null,   // 아래에서 재질×형태로 300레벨까지 만든다
 };
+// 무기 재질(색)과 형태(모양·사거리). 단계 k마다 재질이 바뀌고 3단계마다 형태가 바뀐다. 0·3·7·12·18·28레벨 뒤로는 10레벨마다 한 단계
+const MATERIALS = [{ name: '나무', color: '#d6dde6' }, { name: '강철', color: '#6fa8dc' }, { name: '황금', color: '#f1c40f' }, { name: '수정', color: '#b388ff' }, { name: '흑요석', color: '#4a4a5a' },
+                   { name: '미스릴', color: '#8ef1e6' }, { name: '용뼈', color: '#f5e6c8' }, { name: '별철', color: '#ff8a65' }, { name: '얼음핵', color: '#9ad0ff' }, { name: '태양석', color: '#ffd166' },
+                   { name: '흑철', color: '#3b3f4a' }, { name: '오리하르콘', color: '#ff6f91' }, { name: '아다만트', color: '#7fe0a0' }, { name: '운석', color: '#a0522d' }, { name: '천둥석', color: '#fff176' },
+                   { name: '월광석', color: '#cfd8ff' }, { name: '심연석', color: '#283593' }, { name: '영혼석', color: '#80deea' }, { name: '혼돈석', color: '#d500f9' }, { name: '창공석', color: '#40c4ff' },
+                   { name: '불사조깃', color: '#ff7043' }, { name: '거인뼈', color: '#e0d8c3' }, { name: '성운석', color: '#ba68c8' }, { name: '시간석', color: '#c8e6c9' }, { name: '무한석', color: '#ffd54f' },
+                   { name: '신성석', color: '#ffffff' }, { name: '공허석', color: '#1a1a2e' }, { name: '창세석', color: '#00e5ff' }, { name: '종말석', color: '#ff1744' }, { name: '초월석', color: '#e1bee7' },
+                   { name: '영원석', color: '#b2ff59' }, { name: '절대석', color: '#f8bbd0' }, { name: '궁극석', color: '#ffea00' }];
+const WEAPON_FAMILIES = [{ name: '창', shape: 'spear' }, { name: '미늘창', shape: 'halberd' }, { name: '머스킷', shape: 'gun', gun: true, range: 125 }, { name: '소총', shape: 'rifle', gun: true, range: 150 },
+                         { name: '연발 소총', shape: 'rifle', gun: true, range: 170 }, { name: '기관단총', shape: 'smg', gun: true, range: 180 }, { name: '레일건', shape: 'energy', gun: true, range: 220 },
+                         { name: '플라즈마 총', shape: 'energy', gun: true, range: 240 }, { name: '빔 캐논', shape: 'energy', gun: true, range: 260 }, { name: '특이점 포', shape: 'energy', gun: true, range: 280 }];
+TIERS.weapon = (() => {
+  const ats = [0, 3, 7, 12, 18, 28]; for (let a = 38; a <= 298; a += 10) ats.push(a);
+  return ats.map((at, k) => { const fam = WEAPON_FAMILIES[Math.min(WEAPON_FAMILIES.length - 1, Math.floor(k / 3))], mat = MATERIALS[Math.min(k, MATERIALS.length - 1)];
+    return { at, k, name: `${mat.name} ${fam.name}`, color: mat.color, glow: k >= 3 ? mat.color : null, shape: fam.shape, gun: !!fam.gun, range: fam.range }; });
+})();
+// 감시탑도 36레벨부터 10레벨마다 한 단계: 네 가지 포대를 돌며 재질이 바뀌고 피해가 15%씩 오른다
+(() => {
+  const kinds = [{ name: '기관총탑', shot: 'mg', shots: 8, cd: 0.32, dmg: 0.5 }, { name: '속사포탑', shot: 'cannon', shots: 3, cd: 1.4, dmg: 2.6, splash: 100 },
+                 { name: '레일건탑', shot: 'bolt', shots: 4, cd: 0.9, dmg: 2.4 }, { name: '플라즈마탑', shot: 'cannon', shots: 2, cd: 1.1, dmg: 3.2, splash: 120 }];
+  let i = 0; for (let at = 36; at <= 296; at += 10, i++) { const K = kinds[i % kinds.length], mat = MATERIALS[Math.min(i + 5, MATERIALS.length - 1)], up = Math.pow(1.15, Math.floor(i / 4));
+    TIERS.tower.push(Object.assign({}, K, { at, name: `${mat.name} ${K.name}`, color: mat.color, dmg: Math.round(K.dmg * up * 100) / 100 })); }
+})();
 const tierOf = (kind, lv) => { const t = TIERS[kind]; let i = 0; for (let k = 0; k < t.length; k++) if (lv >= t[k].at) i = k; return i; };
 
 // 숲의 나무 자리. 캠프와 가까운 아래쪽 줄부터 채운다.
@@ -404,4 +434,4 @@ const TIPS = [
   { id: 'martopen', when: g => g.lv.mart >= 1,                       text: '마트 개업! 이제 목재·고기·생선·모피를 마트 왼쪽 칸에 내려놓으세요. 가게 재고는 마트로 옮겨졌습니다(가구 공방과 도축장은 그대로)' },
 ];
 
-if (typeof module !== 'undefined') module.exports = { CFG, UPG, ENEMY, FOREST_SPOTS, GUARD_POSTS, MILITIA_POSTS, TOWNHALL, BEACON, HINTS, TIPS, TIERS, tierOf, BOSS, bossTier, ENRAGE, ADVICE };
+if (typeof module !== 'undefined') module.exports = { CFG, UPG, ENEMY, FOREST_SPOTS, GUARD_POSTS, MILITIA_POSTS, TOWNHALL, BEACON, HINTS, TIPS, TIERS, tierOf, BOSS, bossTier, ENRAGE, ADVICE, MATERIALS, WEAPON_FAMILIES };
