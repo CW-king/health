@@ -18,7 +18,7 @@ const CFG = {
   worker: { speed: 130, chopMul: 1.5, carry: 4, dropRate: 0.12, idle: { x: 720, y: 900 } },
   guard:  { speed: 155, atkCd: 0.8, range: 55, dmg: 4, hp: 50, hpPerWeapon: 10, downTime: 20, regenTime: 30 },   // 경비병도 맞으면 쓰러진다
   weapon: { dmgPer: 2 },
-  tower:  { x: 520, y: 1540, cd: 1.1, dmg: 6, dmgPer: 5, range: 320, rangePer: 14 },   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
+  tower:  { x: 330, y: 1920, cd: 1.1, dmg: 6, dmgPer: 5, range: 320, rangePer: 14 },   // 캠프 남문 앞, 황무지에서 오는 길목   // 외형 단계(1/4/8레벨)마다 화살 1→2→3발
 
   tree:   { logs: 3, regrow: 8, range: 50 },
   // 남쪽 숲: 공방 가까운 벌목지. 개간 레벨마다 perLevel그루가 열린다
@@ -101,6 +101,14 @@ const CFG = {
           // 전리품 구역(캠프·황무지): 이 안의 드랍은 거리 가중치 zoneMul, 모피는 peltMul, 오래된 드랍은 agePer px/초만큼 먼저 줍는다
           loot: { rect: { x: 0, y: 1300, w: 900, h: 1300 }, zoneMul: 0.5, peltMul: 0.7, agePer: 8, ageMax: 60, sweepRange: 650 } },   // 야생 곰 사냥터(오른쪽 위)
   drops: { max: 150 },                                            // 바닥 드랍 상한(넘으면 전리품 구역 밖의 오래된 것부터 치운다)
+  // 더미: 운반 분업(logistics) 뒤 생산자가 물건을 쌓아 두는 곳. 수거꾼이 여기서 실어 가게로 나른다. lv = 열리는 분업 단계
+  piles: {
+    pelt:      { x: 1560, y: 520,  good: 'pelt', name: '가죽 더미',   cap: 60, lv: 1 },   // 사냥꾼 초소 옆
+    fish:      { x: 900,  y: 162,  good: 'fish', name: '생선 바구니', cap: 60, lv: 2 },   // 낚시터 물가
+    fishFarm:  { x: 520,  y: 200,  good: 'fish', name: '양식 바구니', cap: 60, lv: 2 },   // 양식장 둑
+    woodMain:  { x: 740,  y: 840,  good: 'wood', name: '통나무 더미', cap: 80, lv: 3 },   // 숲 동쪽 울타리 밖(벌목꾼 대기 자리 옆)
+    woodGrove: { x: 640,  y: 1290, good: 'wood', name: '통나무 더미', cap: 80, lv: 3 },   // 남쪽 숲 옆
+  },
   // 양식장: 강 왼쪽 가두리. growTime초 자라면 양식업자가 건져 yield마리를 나른다
   fishFarm: { pens: [{ x: 300, y: 95 }, { x: 390, y: 95 }, { x: 480, y: 95 }, { x: 570, y: 95 }, { x: 660, y: 95 }, { x: 750, y: 95 }],
               growTime: 40, yield: 6, harvestTime: 1.5, bankY: 174, post: { x: 400, y: 186 }, carry: 12 },
@@ -167,10 +175,12 @@ const UPG = [
     cost: () => 400,                                pad: { x: 1780, y: 800 }, unlock: g => g.lv.mart < 1 && (g.stats.kills >= 1 || g.lv.hunter >= 1) },
   { id: 'hunter', icon: '🏹', name: '사냥꾼 고용', desc: '사냥터의 곰을 잡아 모피를 나릅니다', max: 6,
     cost: l => [300, 700, 1500, 3200, 6500, 13000][l], pad: { x: 1480, y: 680 }, unlock: g => g.lv.furShop >= 1 },
-  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 고기·모피·습격 전리품을 주워 가게에 나릅니다', max: 5,
-    cost: l => [350, 900, 2200, 5000, 11000][l],   pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
-  { id: 'sled',   icon: '🛷', name: '수거 썰매',   desc: '수거꾼 운반량 +4(종류당), 줍는 반경 +12, 이동 속도 +12%. 썰매를 끌고 다닙니다', max: 3,
-    cost: l => [700, 1800, 4500][l],               pad: { x: 1340, y: 700 }, unlock: g => g.lv.collector >= 1 },
+  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 드랍·더미·습격 전리품을 가게로 나릅니다', max: 8,
+    cost: l => [350, 900, 2200, 5000, 11000, 20000, 35000, 60000][l], pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
+  { id: 'sled',   icon: '🛷', name: '수거 썰매',   desc: '수거꾼 운반량 +4(종류당), 줍는 반경 +12, 이동 속도 +12%. 썰매를 끌고 다닙니다', max: 5,
+    cost: l => [700, 1800, 4500, 10000, 22000][l], pad: { x: 1340, y: 700 }, unlock: g => g.lv.collector >= 1 },
+  { id: 'logistics', icon: '📦', name: '운반 분업', desc: '1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미에 쌓습니다. 운반은 수거꾼이 맡으니 수거꾼을 늘리세요', max: 3,
+    cost: l => [2500, 6000, 12000][l],             pad: { x: 1480, y: 820 }, unlock: g => g.lv.collector >= 2 },
   { id: 'traps',  icon: '🪤', name: '덫',         desc: '사냥터 곰 +1마리, 리젠 7% 단축. 모피 생산량이 늘어납니다', max: Infinity,
     cost: l => Math.round(600 * Math.pow(1.45, l)), pad: { x: 1950, y: 1080 }, unlock: g => g.lv.hunter >= 1 },
   { id: 'skinning', icon: '🗡️', name: '가죽 손질', desc: '잡은 곰·늑대·설인(사냥터·습격 모두)에서 🧥 모피 +1', max: 3,
@@ -277,7 +287,7 @@ const UPG = [
   { id: 'weapon', icon: '⚔️', name: '무기',       desc: '나와 경비병 공격력 +2',     max: Infinity,
     cost: l => Math.round(80 * Math.pow(1.3, l)),  pad: { x: 440, y: 1960 }, unlock: g => g.lv.guard >= 1 },
   { id: 'tower',  icon: '🏹', name: '감시탑',     desc: '화살 공격력 +5, 사거리 +12', max: Infinity,
-    cost: l => Math.round(250 * Math.pow(1.4, l)), pad: { x: 680, y: 1420 }, unlock: g => g.lv.guard >= 1 && g.wave.n >= 2 },
+    cost: l => Math.round(250 * Math.pow(1.4, l)), pad: { x: 580, y: 1900 }, unlock: g => g.lv.guard >= 1 && g.wave.n >= 2 },
   { id: 'repair', icon: '🔧', name: '본부 수리',  desc: '본부 내구도 전부 회복',     max: Infinity,
     cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 },
 ];
@@ -357,6 +367,10 @@ const TIPS = [
   { id: 'wild',    when: g => g.wild.length > 0,                      text: '사냥터(오른쪽 위)에 🐻 야생 곰이 나타났어요. 옆에 서면 도끼로 사냥합니다. 잡으면 🧥 모피! ⚔️ 사냥 버튼을 누르면 알아서 달려갑니다' },
   { id: 'pelt',    when: g => g.drops.some(d => d.kind === 'pelt'),  text: '🧥 모피가 떨어졌어요! 주워 두세요. 사냥터 옆 모피 상점을 열면 비싸게 팝니다' },
   { id: 'collector', when: g => g.padVisible(UPG.find(u => u.id === 'collector')) && g.drops.length >= 4, text: '바닥에 고기·모피가 남아 있어요. 🧺 수거꾼(사냥터 입구)을 고용하면 맵 전체를 돌며 주워 가게에 나릅니다. 2명째부터는 캠프 옆 초소에서 습격 전리품을 기다립니다' },
+  { id: 'logipad', when: g => g.padVisible(UPG.find(u => u.id === 'logistics')), text: '📦 운반 분업(사냥터 입구)을 하면 사냥꾼·도축업자부터 자리에서 일만 하고 더미에 쌓습니다. 운반은 수거꾼 몫이 되니 수거꾼과 썰매를 함께 늘리세요' },
+  { id: 'logi1',   when: g => g.lv.logistics >= 1, text: '운반 분업 1단계! 사냥꾼은 🧥 가죽 더미(사냥꾼 초소 옆)에 쌓고 도축업자는 도축장 보관함에 둡니다. 수거꾼이 실어 나릅니다. 더미가 가득 차면 직접 나릅니다' },
+  { id: 'logi2',   when: g => g.lv.logistics >= 2, text: '운반 분업 2단계! 어부는 🐟 생선 바구니(낚시터 옆), 양식업자는 양식 바구니(둑)에 담습니다' },
+  { id: 'logi3',   when: g => g.lv.logistics >= 3, text: '운반 분업 3단계! 벌목꾼은 🪵 통나무 더미(숲 동쪽 문, 남쪽 숲 옆)에 쌓습니다. 수거꾼이 판매대·마트·공방으로 나릅니다' },
   { id: 'sled',    when: g => g.lv.sled >= 1, text: '🛷 썰매 장착! 수거꾼이 한 번에 더 많이 싣고, 지나가며 넓게 줍고, 더 빨리 달립니다' },
   { id: 'skinning', when: g => g.padVisible(UPG.find(u => u.id === 'skinning')), text: '🗡️ 가죽 손질(사냥터 입구)을 배우면 곰 한 마리에서 모피를 더 벗깁니다. 습격 온 곰·늑대·설인도 마찬가지라 수거꾼이 가져올 전리품이 늘어요' },
   { id: 'bait',    when: g => g.padVisible(UPG.find(u => u.id === 'bait')), text: '덫을 놓아도 곰은 한 마리씩만 나오네요. 🐟 미끼(사냥터 안)를 두면 한 번에 여러 마리가 몰려와 사냥꾼이 바빠집니다' },
