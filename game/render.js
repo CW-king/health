@@ -87,19 +87,21 @@ function fmtMoney(n) {
 const GROUND = (() => {
   let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const FULL_W = CFG.world.w + CFG.districts.reduce((a, d) => a + d.w, 0);
-  const dots = []; for (let i = 0; i < 900; i++) dots.push({ x: r() * FULL_W, y: 160 + r() * (CFG.world.h - 160), s: 2 + r() * 5, a: 0.25 + r() * 0.35 });
+  const FULL_H = Math.max(...CFG.wall.stages.map(s => s.worldH));
+  const dots = []; for (let i = 0; i < 1100; i++) dots.push({ x: r() * FULL_W, y: 160 + r() * (FULL_H - 160), s: 2 + r() * 5, a: 0.25 + r() * 0.35 });
   const flakes = []; for (let i = 0; i < 70; i++) flakes.push({ x: r(), y: r(), s: 1 + r() * 2.2, v: 18 + r() * 30, w: r() * 6.28 });
   const gusts = []; for (let i = 0; i < 60; i++) gusts.push({ x: r(), y: r(), l: 20 + r() * 50, v: 1.2 + r() * 1.5 });   // 눈보라 줄기
   const floes = []; for (let i = 0; i < 22; i++) floes.push({ x: r() * FULL_W, y: CFG.river.y + 20 + r() * (CFG.river.h - 40), w: 24 + r() * 40, h: 12 + r() * 10, v: 8 + r() * 10 });
   const H = CFG.hunt.rect, rocks = []; for (let i = 0; i < 7; i++) rocks.push({ x: H.x + 30 + r() * (H.w - 60), y: H.y + 30 + r() * (H.h - 60), s: 10 + r() * 14 });
   const W = CFG.wild.rect, dead = []; for (let i = 0; i < 10; i++) dead.push({ x: W.x + 30 + r() * (W.w - 60), y: W.y + 40 + r() * (W.h - 80), s: 0.7 + r() * 0.6, k: r() });
-  return { dots, flakes, gusts, floes, rocks, dead, FULL_W };
+  const S1 = CFG.wall.stages[1], W1 = { x: 20, y: S1.south + CFG.wall.wildGap, w: FULL_W - 40, h: CFG.wall.wildH }, dead1 = []; for (let i = 0; i < 26; i++) dead1.push({ x: W1.x + 30 + r() * (W1.w - 60), y: W1.y + 40 + r() * (W1.h - 80), s: 0.7 + r() * 0.6, k: r() });
+  return { dots, flakes, gusts, floes, rocks, dead, dead1, FULL_W, FULL_H };
 })();
 
 function drawGround(ctx, g, view, time) {
   const vis = (x, y, m) => x > view.x0 - m && x < view.x1 + m && y > view.y0 - m && y < view.y1 + m;
   ctx.fillStyle = PAL.snow; ctx.fillRect(view.x0 - 50, view.y0 - 50, view.x1 - view.x0 + 100, view.y1 - view.y0 + 100);
-  const F = CFG.forest.rect, C = CFG.camp, H = CFG.hunt.rect, W = CFG.wild.rect;
+  const F = CFG.forest.rect, C = CFG.camp, H = CFG.hunt.rect, W = g.wildRect;
   ctx.fillStyle = PAL.snow2; rrect(ctx, F.x, F.y, F.w, F.h, 24);
   ctx.fillStyle = '#dfe6ee'; rrect(ctx, H.x, H.y, H.w, H.h, 30);
   ctx.fillStyle = PAL.wildSnow; rrect(ctx, W.x, W.y, W.w, W.h, 40);
@@ -108,7 +110,7 @@ function drawGround(ctx, g, view, time) {
   for (const D of CFG.districts) {   // 개척지: 바닥, 큰길(세로·가로), 산(광산 골짜기)
     if (!g.lv[D.upg]) break;
     if (!vis(D.x + D.w / 2, 1300, D.w)) continue;
-    ctx.fillStyle = D.ground; ctx.fillRect(D.x, 160, D.w, CFG.world.h - 160);
+    ctx.fillStyle = D.ground; ctx.fillRect(D.x, 160, D.w, g.worldH - 160);
     ctx.strokeStyle = PAL.path; ctx.lineWidth = 50; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(D.x - 40, CFG.east.road.y); ctx.lineTo(D.x + 520, CFG.east.road.y); ctx.moveTo(D.x + 330, CFG.east.road.y); ctx.lineTo(D.x + 330, 700); ctx.moveTo(D.x + 330, CFG.east.road.y); ctx.lineTo(D.x + 330, 1330); ctx.stroke();
   }
   for (const [fid, F] of Object.entries(CFG.farms)) if (g.lv[F.upg] && vis(F.rect.x + F.rect.w / 2, F.rect.y + F.rect.h / 2, F.rect.w)) { ctx.fillStyle = F.sprite === 'vein' ? '#cfd6de' : F.sprite === 'field' ? '#e3dcc2' : F.sprite === 'cow' ? '#e3e6d6' : PAL.snow2; rrect(ctx, F.rect.x, F.rect.y, F.rect.w, F.rect.h, 22); }
@@ -1072,6 +1074,9 @@ function drawFarm(ctx, g, id, items, vis, time) {
       ctx.fillStyle = PAL.treeL; for (let i = 0; i < 4; i++) tri(ctx, bx - 30 + i * 20 - 6, by + 12, bx - 30 + i * 20, by - 2, bx - 30 + i * 20 + 6, by + 12);
     }
     ctx.restore();
+    const tier = g.farmTier(id);
+    if (tier >= 1) label(ctx, F.post.x + 60, F.post.y - 44, F.mech[tier - 1], 11, '#fff');
+    if (tier >= 3 && g.piles[F.pile]) { const P = g.piles[F.pile]; ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.lineDashOffset = -time * 20; ctx.beginPath(); ctx.moveTo(Math.max(R.x, Math.min(R.x + R.w, P.x)), R.y + R.h); ctx.lineTo(P.x, P.y - 10); ctx.stroke(); ctx.setLineDash([]); }
     const ready = farm.plots.filter(p => p.active && p.state === 'ready').length;
     pill(ctx, bx, by - (F.sprite === 'vein' ? 74 : F.sprite === 'field' ? 100 : 76), `${F.icon} ${F.name} Lv${g.lv[F.upg]} · 자리 ${n} · 수확 가능 ${ready} · 일꾼 ${farm.workers.length}`, 'rgba(20,30,45,0.75)');
   } });
@@ -1188,19 +1193,22 @@ function drawTower(ctx, g, time, site, idx) {
 }
 
 // 캠프 울타리: 둘레를 따라 세우고, 내구도가 깎이면 뒤쪽부터 부서진다
-const FENCE_SEGS = (() => {
-  const C = CFG.camp, step = 40, segs = [];
+function buildFenceSegs(C, step, gates, sides) {   // sides: 'nesw', gates: { south: [x1,x2], east: [[y1,y2],...] }
   const pts = [];
-  for (let x = C.x; x < C.x + C.w; x += step) pts.push([x, C.y, x + step, C.y]);
-  for (let y = C.y; y < C.y + C.h; y += step) pts.push([C.x + C.w, y, C.x + C.w, y + step]);
-  for (let x = C.x + C.w; x > C.x; x -= step) pts.push([x, C.y + C.h, x - step, C.y + C.h]);
-  for (let y = C.y + C.h; y > C.y; y -= step) pts.push([C.x, y, C.x, y - step]);
+  if (sides.includes('n')) for (let x = C.x; x < C.x + C.w; x += step) pts.push([x, C.y, x + step, C.y]);
+  if (sides.includes('e')) for (let y = C.y; y < C.y + C.h; y += step) pts.push([C.x + C.w, y, C.x + C.w, y + step]);
+  if (sides.includes('s')) for (let x = C.x + C.w; x > C.x; x -= step) pts.push([x, C.y + C.h, x - step, C.y + C.h]);
+  if (sides.includes('w')) for (let y = C.y + C.h; y > C.y; y -= step) pts.push([C.x, y, C.x, y - step]);
   let seed = 3; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  pts.forEach(p => segs.push({ x1: p[0], y1: p[1], x2: p[2], y2: p[3], order: r(), gate: p[1] === C.y + C.h && p[3] === C.y + C.h && Math.min(p[0], p[2]) >= C.x + C.w / 2 - 40 && Math.max(p[0], p[2]) <= C.x + C.w / 2 + 40 }));
-  const sorted = segs.slice().sort((a, b) => a.order - b.order);
-  sorted.forEach((s, i) => (s.rank = i / segs.length));
+  const segs = pts.map(p => { const south = p[1] === C.y + C.h && p[3] === C.y + C.h, east = p[0] === C.x + C.w && p[2] === C.x + C.w;
+    const gate = (south && gates.south && Math.min(p[0], p[2]) >= gates.south[0] && Math.max(p[0], p[2]) <= gates.south[1]) || (east && (gates.east || []).some(([a, b]) => Math.min(p[1], p[3]) >= a && Math.max(p[1], p[3]) <= b));
+    return { x1: p[0], y1: p[1], x2: p[2], y2: p[3], order: r(), gate }; });
+  segs.slice().sort((a, b) => a.order - b.order).forEach((s, i) => (s.rank = i / segs.length));
   return segs;
-})();
+}
+const FENCE_CACHE = new Map();
+function fenceSegs(C, step, gates, sides) { const k = [C.x, C.y, C.w, C.h, step, sides].join(','); let v = FENCE_CACHE.get(k); if (!v) FENCE_CACHE.set(k, v = buildFenceSegs(C, step, gates, sides)); return v; }
+const FENCE_SEGS = fenceSegs(CFG.camp, 40, { south: [CFG.camp.x + CFG.camp.w / 2 - 40, CFG.camp.x + CFG.camp.w / 2 + 40] }, 'nesw');
 function drawFenceSeg(ctx, s, k, broken, tier, g) {
   const vertical = Math.abs(s.x2 - s.x1) < 1;
   const x1 = Math.min(s.x1, s.x2), x2 = Math.max(s.x1, s.x2), y = Math.max(s.y1, s.y2);
@@ -1324,15 +1332,15 @@ function drawJoystick(ctx, js, dpr) {
 
 // 미니맵(화면 왼쪽 아래)
 function drawMinimap(ctx, g, cam, ui) {
-  const W = 92, H = Math.round(W * CFG.world.h / g.worldW), x0 = 10, y0 = ui.topPad + 8;
+  const W = 92, H = Math.round(W * g.worldH / g.worldW), x0 = 10, y0 = ui.topPad + 8;
   const k = W / g.worldW;
   ctx.save(); ctx.setTransform(cam.dpr, 0, 0, cam.dpr, 0, 0); ctx.globalAlpha = 0.9;
   ctx.fillStyle = '#dfe8f1'; rrect(ctx, x0 - 3, y0 - 3, W + 6, H + 6, 8);
   ctx.fillStyle = PAL.snow; ctx.fillRect(x0, y0, W, H);
   const R = (r, c) => { ctx.fillStyle = c; ctx.fillRect(x0 + r.x * k, y0 + r.y * k, r.w * k, r.h * k); };
-  for (const D of CFG.districts) { if (!g.lv[D.upg]) break; R({ x: D.x, y: 160, w: D.w, h: CFG.world.h - 160 }, D.ground); }
+  for (const D of CFG.districts) { if (!g.lv[D.upg]) break; R({ x: D.x, y: 160, w: D.w, h: g.worldH - 160 }, D.ground); }
   for (const F of Object.values(CFG.farms)) if (g.lv[F.upg]) R(F.rect, F.sprite === 'vein' ? '#b9c2cc' : F.sprite === 'field' ? '#d8cf9c' : '#9ad8ac');
-  R({ x: 0, y: CFG.river.y, w: g.worldW, h: CFG.river.h }, PAL.water); R(CFG.forest.rect, '#9ad8ac'); if (g.lv.grove) R(CFG.grove.rect, '#9ad8ac'); R(CFG.hunt.rect, '#d3c3a8'); R(CFG.wild.rect, '#c9cfd6'); R(CFG.camp, '#c9a47a'); if (g.lv.ranch) R(CFG.ranch.rect, '#cfd6b8');
+  R({ x: 0, y: CFG.river.y, w: g.worldW, h: CFG.river.h }, PAL.water); R(CFG.forest.rect, '#9ad8ac'); if (g.lv.grove) R(CFG.grove.rect, '#9ad8ac'); R(CFG.hunt.rect, '#d3c3a8'); R(g.wildRect, '#c9cfd6'); R(CFG.camp, '#c9a47a'); if (g.wallRect) { const Wr = g.wallRect; ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 1.2; ctx.strokeRect(x0 + Wr.x * k, y0 + Wr.y * k, Wr.w * k, Wr.h * k); } if (g.lv.ranch) R(CFG.ranch.rect, '#cfd6b8');
   const dot = (x, y, c, r) => { ctx.fillStyle = c; circle(ctx, x0 + x * k, y0 + y * k, r); };
   for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id)) dot(CFG.shops[id].x, CFG.shops[id].y, id === 'mart' ? '#e74c3c' : id === 'furn' ? '#d35400' : id === 'meat' ? '#c0392b' : id === 'fish' ? '#2980b9' : id === 'pelt' ? '#6d4c41' : id === 'slaughter' ? '#7b2d26' : id === 'rest' ? '#e67e22' : id === 'tailor' ? '#8e44ad' : id === 'inn' ? '#f1c40f' : '#8b5a2b', 3);
   for (const b of g.wild) dot(b.x, b.y, '#a67c52', 2);
@@ -1359,7 +1367,7 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   drawGround(ctx, g, view, time);
   // 바닥에 붙은 것들
   for (const id of Object.keys(CFG.shops)) if (g.shopOpen(id) && g.shopAccepts(id).length && CFG.shops[id].drop.r > 0 && vis(CFG.shops[id].drop.x, CFG.shops[id].drop.y, 80)) drawDropZone(ctx, g, id, time);
-  if (g.lv.tower && g.bears.length) { ctx.strokeStyle = 'rgba(231,76,60,0.25)'; ctx.lineWidth = 2; ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.ellipse(CFG.tower.x, CFG.tower.y, g.towerRange, g.towerRange * 0.74, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+  if (g.lv.tower && g.bears.length) { ctx.strokeStyle = 'rgba(231,76,60,0.25)'; ctx.lineWidth = 2; ctx.setLineDash([8, 8]); for (const S of g.towerSites()) { if (!vis(S.x, S.y, g.towerRange)) continue; ctx.beginPath(); ctx.ellipse(S.x, S.y, g.towerRange, g.towerRange * 0.74, 0, 0, Math.PI * 2); ctx.stroke(); } ctx.setLineDash([]); }
   for (const u of UPG) { const pp = g.padPos(u); if (g.padVisible(u) && vis(pp.x, pp.y, 90)) drawPad(ctx, g, u, time); }
   for (const b of g.bills) if (b.state === 'ground' && b.z <= 0.5 && vis(b.x, b.y, 30)) drawBill(ctx, b);
   for (const d of g.drops) if (d.state === 'ground' && d.z <= 0.5 && vis(d.x, d.y, 30)) drawDrop(ctx, d);
@@ -1375,9 +1383,15 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   const fk = g.fence.hp / g.fence.maxhp, ftier = tierOf('fence', g.lv.fence);
   for (const s of FENCE_SEGS) { if (s.gate) continue; if (!vis(s.x1, s.y1, 80)) continue; const broken = (s.rank >= fk - 1e-6 && fk < 1) || fk <= 0; items.push({ y: Math.max(s.y1, s.y2), f: () => drawFenceSeg(ctx, s, fk, broken, ftier, g) }); }
   if (ftier >= 3) { const C = CFG.camp; for (const [cx, cy] of [[C.x, C.y], [C.x + C.w, C.y], [C.x, C.y + C.h], [C.x + C.w, C.y + C.h]]) items.push({ y: cy + 1, f: () => drawCornerTower(ctx, cx, cy, time) }); }
+  const Wr = g.wallRect;   // 마을 성벽(동·남·서변. 북쪽은 강)
+  if (Wr) { const wk = g.wall.maxhp ? g.wall.hp / g.wall.maxhp : 0, wtier = Math.max(2, ftier);
+    for (const s of fenceSegs(Wr, CFG.wall.step, CFG.wall.gates, 'esw')) { if (s.gate || !vis(s.x1, s.y1, 80)) continue; const broken = (s.rank >= wk - 1e-6 && wk < 1) || wk <= 0; items.push({ y: Math.max(s.y1, s.y2), f: () => drawFenceSeg(ctx, s, wk, broken, wtier, g) }); }
+    for (const [cx, cy] of [[Wr.x, Wr.y + Wr.h], [Wr.x + Wr.w, Wr.y + Wr.h]]) if (vis(cx, cy, 80)) items.push({ y: cy + 1, f: () => drawCornerTower(ctx, cx, cy, time) });
+    const gx = (CFG.wall.gates.south[0] + CFG.wall.gates.south[1]) / 2; if (vis(gx, Wr.y + Wr.h, 80)) items.push({ y: Wr.y + Wr.h - 2, f: () => { pill(ctx, gx, Wr.y + Wr.h - 40, `🏗️ ${CFG.wall.stages[g.wallStage].name} ${Math.ceil(g.wall.hp)}/${g.wall.maxhp}`, wk < 0.35 ? '#c0392b' : 'rgba(20,30,45,0.75)'); } });
+  }
   for (const t of g.trees) if (t.active && vis(t.x, t.y, 120)) items.push({ y: t.y, f: () => drawTree(ctx, t, time) });
   for (const r of GROUND.rocks) if (vis(r.x, r.y, 40)) items.push({ y: r.y, f: () => drawRock(ctx, r) });
-  for (const d of GROUND.dead) if (vis(d.x, d.y, 60)) items.push({ y: d.y, f: () => drawDeadTree(ctx, d, time) });
+  for (const d of (g.wallStage ? GROUND.dead1 : GROUND.dead)) if (d.x < g.worldW && vis(d.x, d.y, 60)) items.push({ y: d.y, f: () => drawDeadTree(ctx, d, time) });
   items.push({ y: CFG.hunt.rect.y + CFG.hunt.rect.h - 40, f: () => drawCave(ctx) });
   for (const sp of CFG.fishing.spots) if (vis(sp.x, sp.y, 60)) items.push({ y: sp.y, f: () => drawFishingSpot(ctx, sp) });
   if (g.shopOpen('wood')) items.push({ y: CFG.shops.wood.y + 10, f: () => drawWoodStall(ctx, g, time) });
@@ -1404,11 +1418,11 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   if (g.lv.infirmary) items.push({ y: CFG.infirmary.y + 14, f: () => drawInfirmary(ctx, g, time) });
   if (g.manager && g.lv.manager && vis(g.manager.x, g.manager.y, 80)) items.push({ y: g.manager.y, f: () => { const m = g.manager; drawPerson(ctx, m, { sprite: 'manager', coat: '#2c3e50', pants: '#1b2631', hat: '#111', hatBand: '#c0392b', belt: '#c0392b' }, g); label(ctx, m.x, m.y - 72, g.autoInvest ? '🧑‍💼 관리인' : '🧑‍💼 관리인(쉼)', 11, '#fff'); if (m.sayT > 0) drawBubble(ctx, m.x, m.y - 86, m.say); } });
   if (g.lv.mess) items.push({ y: CFG.mess.y + 14, f: () => drawMess(ctx, g, time) });
-  for (const r of g.repairmen) if (vis(r.x, r.y, 80)) items.push({ y: r.y, f: () => { drawPerson(ctx, r, { sprite: 'repairman', coat: '#e67e22', vest: '#f1c40f', pants: '#2b3a55', hat: '#f1c40f', belt: '#5b4636', tool: 'hammer' }, g); if (r.working && r.target) { const j = r.target, k = j.kind === 'tower' ? g.towerHp[j.i] / g.towerMax(g.lv.tower) : j.kind === 'hut' ? g.hut.hp / g.hut.maxhp : g.fence.hp / g.fence.maxhp; bar(ctx, r.x - 18, r.y - 76, 36, 5, k, '#f1c40f'); label(ctx, r.x, r.y - 86, '🔨 수리 중', 10, '#fff'); } } });
+  for (const r of g.repairmen) if (vis(r.x, r.y, 80)) items.push({ y: r.y, f: () => { drawPerson(ctx, r, { sprite: 'repairman', coat: '#e67e22', vest: '#f1c40f', pants: '#2b3a55', hat: '#f1c40f', belt: '#5b4636', tool: 'hammer' }, g); if (r.working && r.target) { const j = r.target, k = j.kind === 'tower' ? g.towerHp[j.i] / g.towerMax(g.lv.tower) : j.kind === 'hut' ? g.hut.hp / g.hut.maxhp : j.kind === 'wall' ? g.wall.hp / g.wall.maxhp : g.fence.hp / g.fence.maxhp; bar(ctx, r.x - 18, r.y - 76, 36, 5, k, '#f1c40f'); label(ctx, r.x, r.y - 86, '🔨 수리 중', 10, '#fff'); } } });
   for (const m of g.medics) if (vis(m.x, m.y, 80)) items.push({ y: m.y, f: () => { drawPerson(ctx, m, { sprite: 'medic', coat: '#f4f6f8', pants: '#2b3a55', cap: '#e74c3c', belt: '#c0392b', bag: '#e74c3c', bagSize: 2 }, g); if (m.healing && m.target) bar(ctx, m.target.x - 18, m.target.y - 50, 36, 5, (m.target.healT || 0) / CFG.guard.healTime, '#7CFC9A'); } });
   for (const shopId of CRAFT_SHOPS) for (const r of g.runners[shopId]) if (vis(r.x, r.y, 80)) items.push({ y: r.y, f: () => drawPerson(ctx, r, { sprite: 'runner', coat: shopId === 'furn' ? '#a0522d' : shopId === 'rest' ? '#e67e22' : '#8e44ad', pants: '#2b3a55', cap: '#f1c40f', bag: '#b8962e', bagSize: 5 }, g) });
   items.push({ y: BEACON.y, f: () => drawBeacon(ctx, g, time) });
-  if (g.lv.militia) for (let i = 0; i < g.lv.militia; i++) { const mp = MILITIA_POSTS[i]; items.push({ y: mp.y - 1, f: () => drawMilitiaPost(ctx, mp) }); }
+  if (g.lv.militia) for (let i = 0; i < g.lv.militia; i++) { const mp = g.militiaPosts[i % g.militiaPosts.length]; if (vis(mp.x, mp.y, 60)) items.push({ y: mp.y - 1, f: () => drawMilitiaPost(ctx, mp) }); }
   items.push({ y: CFG.hut.y + 80, f: () => drawCampfire(ctx, time) });
   g.towerSites().forEach((S, i) => items.push({ y: S.y, f: () => drawTower(ctx, g, time, S, i) }));
   // 계산원(열린 가게마다)
@@ -1433,8 +1447,8 @@ function render(ctx, g, cam, time, dtv, js, ui) {
   for (const hn of g.hunters) if (vis(hn.x, hn.y, 80)) items.push({ y: hn.y, f: () => drawPerson(ctx, hn, { sprite: 'hunter', coat: '#6d4c41', pants: '#3e2723', fur: '#a1887f', tool: 'spear' }, g) });
   for (const fs of g.fishers) if (vis(fs.x, fs.y, 80)) items.push({ y: fs.y, f: () => { drawPerson(ctx, fs, { sprite: 'fisher', coat: '#f1c40f', pants: '#2b3a55', cap: '#e67e22', tool: 'rod' }, g); if (fs.fishing) { drawFishingLine(ctx, fs, time); bar(ctx, fs.x - 18, fs.y - 76, 36, 4, fs.fishT / (g.fishTime * CFG.fishing.fisherMul / g.effMul), '#5aa9e6'); } } });
   for (const cl of g.collectors) if (vis(cl.x, cl.y, 90)) items.push({ y: cl.y, f: () => {
-    if (g.lv.sled) drawCollectorSled(ctx, cl);
-    drawPerson(ctx, cl, { sprite: 'collector', coat: '#7f8c8d', pants: '#2b3a55', cap: '#27ae60', bag: '#b8962e', bagSize: 4 + g.lv.sled }, g);
+    if (g.lv.sled) drawCollectorSled(ctx, cl, g.wagonTier);
+    drawPerson(ctx, cl, { sprite: 'collector', coat: '#7f8c8d', pants: '#2b3a55', cap: '#27ae60', bag: '#b8962e', bagSize: 4 + Math.min(5, g.lv.sled) }, g);
     if (cl.sweepT > 0) drawBubble(ctx, cl.x, cl.y - 86, '🧺 청소!'); else if (cl.wait === 'raid' && cl === g.collectors.find(o => o.wait === 'raid')) drawBubble(ctx, cl.x, cl.y - 86, '🧺 전리품 대기');
   } });
   for (const pen of g.pens) if (vis(pen.x, pen.y, 70)) items.push({ y: pen.y + 22, f: () => drawPen(ctx, pen, g, time) });
@@ -1535,9 +1549,14 @@ function render(ctx, g, cam, time, dtv, js, ui) {
 }
 
 // 수거꾼 썰매: 고기·모피를 싣고 끈다
-function drawCollectorSled(ctx, c) {
+function drawCollectorSled(ctx, c, tier) {
   drawSled(ctx, { x: c.x, y: c.y, facing: c.facing, got: null });
   const x = c.x + (c.facing < 0 ? 34 : -34), y = c.y;
+  if (tier >= 1) {   // 🛒 수레: 바퀴 달린 짐칸, 4단계부터 🐎 마차
+    ctx.fillStyle = '#8b5a2b'; rrect(ctx, x - 20, y - 20, 40, 14, 3); ctx.fillStyle = '#5b4636'; ctx.fillRect(x - 20, y - 14, 40, 2);
+    ctx.fillStyle = '#2b3442'; circle(ctx, x - 12, y - 2, 5); circle(ctx, x + 12, y - 2, 5); ctx.fillStyle = '#9aa7b5'; circle(ctx, x - 12, y - 2, 1.8); circle(ctx, x + 12, y - 2, 1.8);
+    if (tier >= 4) emoji(ctx, x + (c.facing < 0 ? -30 : 30), y - 14, '🐎', 18);
+  }
   const nm = Math.min(c.inv.meat || 0, 4), np = Math.min(c.inv.pelt || 0, 4);
   for (let i = 0; i < nm; i++) meatChunk(ctx, x - 12 + (i % 2) * 14, y - 22 - Math.floor(i / 2) * 8, 0.7);
   for (let i = 0; i < np; i++) peltBundle(ctx, x + 6 - (i % 2) * 14, y - 22 - Math.floor(i / 2) * 8 - (nm ? 0 : 0), 0.65);
@@ -1587,7 +1606,8 @@ function drawPile(ctx, g, pl) {
     if (!k) { ctx.fillStyle = '#a67c52'; ellipse(ctx, x, y - 30, 10, 5); }
   }
   const emo = CFG.goods[pl.good].emoji;
-  pill(ctx, x, y - 54, `${emo} ${n}/${pl.cap}`, full ? '#c0392b' : 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
+  const ratio = n / pl.cap, idle = (pl.idleT || 0) > 30 && n > 0;
+  pill(ctx, x, y - 54, `${emo} ${n}/${pl.cap}${idle ? ' ⏳' : ''}`, ratio >= 0.8 ? '#c0392b' : ratio >= 0.6 ? '#b9770e' : 'rgba(20,30,45,0.75)', '#fff', 'bold 10px system-ui, sans-serif');
   label(ctx, x, y + 18, pl.name, 10, '#fff');
 }
 // 양식장 가두리: 물 위 나무틀과 그물. 다 자라면 물고기가 보인다

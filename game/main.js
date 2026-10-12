@@ -144,7 +144,7 @@
   // 수급 현황: 품목별 생산·소비·재고와 상태·추천. 무엇을 올려야 하는지 게임이 알려 준다
   function supplyHtml() {
     const rows = game.advice().map(a => {
-      const G = CFG.goods[a.good], st = { ok: '🟢 괜찮음', short: '🔴 생산 부족', stuck: '🟠 운반 지연', glut: '🟡 과잉' }[a.status];
+      const G = CFG.goods[a.good], st = { ok: '🟢 괜찮음', short: '🔴 생산 부족', stuck: '🟠 운반 지연', starved: '🟣 재료 굶음', glut: '🟡 과잉' }[a.status];
       const recs = a.recs.slice(0, 3).map(u => `${u.icon} ${u.name}`).join(' · ');
       return `<tr><td>${G.emoji} ${G.name}</td><td>${Math.round(a.prod)}</td><td>${Math.round(a.cons)}</td><td>${a.stock}/${a.cap}${a.held ? `<br><span class="dim">쌓임 ${a.held}</span>` : ''}</td><td>${st}${recs ? `<br><span class="dim">${recs}</span>` : ''}</td></tr>`;
     }).join('');
@@ -153,7 +153,7 @@
     const W = game.weatherDef, weatherTxt = game.lv.expandEast ? `<p class="dim">${W.icon} 지금 날씨 <b>${W.name}</b>${game.weather.kind === 'snow' ? '' : ` (${Math.max(0, Math.ceil(game.weather.t))}초 남음)`} — ☀️ 맑음: 손님·성장 +15% · ❄️ 눈보라: 손님 −30%, 성장 −40%, 이동 −20% · 🌫️ 안개: 탑 사거리 −30% · 🌌 오로라: 판매가 +20% · 🌤️ 해빙: 작물 성장 +60%</p>` : '';
     const ordersTxt = game.lv.board ? `<h3>📜 주문 게시판</h3>${game.orders.length ? `<table class="supply"><tr><th>주문자</th><th>물건</th><th>진행</th><th>남은 시간</th><th>보상</th></tr>${game.orders.map(o => `<tr><td>${['', '', '🧳 상인', '🎩 귀족', '👑 왕족'][o.cls]}</td><td>${CFG.goods[o.good].emoji} ${CFG.goods[o.good].name}</td><td>${o.done}/${o.qty}</td><td>${Math.floor(o.t / 60)}:${String(Math.ceil(o.t) % 60).padStart(2, '0')}</td><td>$${fmt(o.reward)} · 평판 +${o.rep}</td></tr>`).join('')}</table><p class="dim">마트(또는 만드는 가게) 재고에서 1초에 1개씩 채워집니다. 기한을 넘기면 평판 −2.</p>` : '<p class="dim">지금은 주문이 없어요. 110초마다 새 주문이 붙습니다.</p>'}` : '';
     return `<h2>📊 수급 현황</h2>${repTxt}${weatherTxt}${ordersTxt}${mgr}
-      <p class="dim">최근 2분 기준 분당 생산·소비입니다. 🔴 부족이면 생산 업그레이드, 🟠 운반 지연이면 수거꾼·썰매, 🟡 과잉이면 수요(홍보·제작·마트)를 올리세요. 90초 넘게 이어지는 문제는 새 소식으로도 알려 줍니다.</p>
+      <p class="dim">최근 2분 기준 분당 생산·소비입니다. 🔴 부족이면 생산 업그레이드, 🟠 운반 지연이면 수거꾼·썰매, 🟣 재료 굶음이면 그 공방 배달부·수레, 🟡 과잉이면 수요(홍보·제작·마트)를 올리세요. 90초 넘게 이어지는 문제는 새 소식으로도 알려 줍니다.</p>
       <table class="supply"><tr><th>품목</th><th>생산/분</th><th>소비/분</th><th>가게 재고</th><th>상태 · 추천</th></tr>${rows || '<tr><td colspan="5" class="dim">아직 파는 가게가 없어요</td></tr>'}</table>`;
   }
   function showSupply() { modal(supplyHtml(), [{ label: '닫기', cls: 'primary' }]); const b = document.getElementById('btn-auto'); if (b) b.onclick = () => { game.autoInvest = !game.autoInvest; save(); showSupply(); }; }
@@ -288,10 +288,10 @@
     if (lastHud.waveCls !== cls) { lastHud.waveCls = cls; hud.wave.className = 'pill wave ' + cls; }
     const hk = game.hut.hp / game.hut.maxhp, fk = game.fence.hp / game.fence.maxhp, pk = game.player.hp / game.player.maxhp;
     hud.hutBar.style.width = (hk * 100).toFixed(1) + '%'; hud.hutBar.className = 'fill ' + (hk < 0.35 ? 'bad' : hk < 0.7 ? 'warn' : '');
-    hud.fenceBar.style.width = (fk * 100).toFixed(1) + '%'; hud.fenceBar.className = 'fill fence ' + (fk <= 0 ? 'bad' : '');
+    const wkk = game.wallStage ? game.wall.hp / game.wall.maxhp : fk; hud.fenceBar.style.width = (wkk * 100).toFixed(1) + '%'; hud.fenceBar.className = 'fill fence ' + (fk <= 0 ? 'bad' : '');
     hud.hpBar.style.width = (pk * 100).toFixed(1) + '%'; hud.hpBar.className = 'fill hp ' + (pk < 0.35 ? 'bad' : '');
     setText(hud.hutText, 'hut', `🏠 ${Math.ceil(game.hut.hp)}/${game.hut.maxhp}`);
-    setText(hud.fenceText, 'fence', `🧱 ${Math.ceil(game.fence.hp)}/${game.fence.maxhp}`);
+    setText(hud.fenceText, 'fence', game.wallStage ? `🏗️ ${Math.ceil(game.wall.hp)}/${game.wall.maxhp}` : `🧱 ${Math.ceil(game.fence.hp)}/${game.fence.maxhp}`);
     setText(hud.hpText, 'hp', game.player.down > 0 ? `😵 기절 ${Math.ceil(game.player.down)}초` : `❤️ ${Math.ceil(game.player.hp)}/${game.player.maxhp}`);
     const hint = HINTS[game.tutorial];
     const hidden = !hint; if (hud.hint.hidden !== hidden) hud.hint.hidden = hidden;
@@ -341,7 +341,7 @@
     const hw = cam.w / 2 / cam.scale, hh = cam.h / 2 / cam.scale;
     const topPad = ui.topPad / cam.scale, botPad = ui.bottomPad / cam.scale;   // HUD에 가려지는 띠만큼 더 보여 준다
     cam.x = hw * 2 >= game.worldW ? game.worldW / 2 : clamp(cam.x, hw, game.worldW - hw);
-    cam.y = hh * 2 >= CFG.world.h + topPad + botPad ? CFG.world.h / 2 : clamp(cam.y, hh - topPad, CFG.world.h - hh + botPad);
+    cam.y = hh * 2 >= game.worldH + topPad + botPad ? game.worldH / 2 : clamp(cam.y, hh - topPad, game.worldH - hh + botPad);
     ui.onTitle = onTitle;
     render(ctx, game, cam, time, dt, js, ui);
     if (!onTitle) updateHud();

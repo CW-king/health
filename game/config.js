@@ -18,7 +18,25 @@ const CFG = {
   worker: { speed: 130, chopMul: 1.5, carry: 4, dropRate: 0.12, idle: { x: 720, y: 900 } },
   guard:  { speed: 155, atkCd: 0.8, range: 55, dmg: 4, hp: 50, hpPerWeapon: 10, downTime: 20, regenTime: 30, bleedOut: 30, healTime: 5, reviveHp: 0.6 },   // 쓰러진 경비병은 bleedOut초 안에 치료받지 못하면 전사한다
   infirmary: { x: 150, y: 1560, post: { x: 150, y: 1660 } },   // 의무소(캠프 북서쪽). 대기 자리는 간판 아래
-  repair: { post: { x: 150, y: 1860 }, towerTime: 20, hutTime: 30, fenceTime: 40 },   // 수리공 대기 자리(캠프 남서쪽), 하나를 전부 고치는 데 걸리는 초
+  repair: { post: { x: 150, y: 1860 }, towerTime: 20, hutTime: 30, fenceTime: 40 },
+  // 마을 성벽: 1단계부터 마을 전체(개척지 포함)를 성벽이 두르고 습격은 남쪽 벌판(세계가 아래로 늘어난다)에서 온다. 0단계는 오늘의 캠프 울타리 그대로
+  wall: {
+    stages: [
+      { name: '오두막 울타리', south: null, worldH: 2600, hpMul: 0,   bastion: false },
+      { name: '마을 성벽',     south: 2600, worldH: 3300, hpMul: 1.6, bastion: false },
+      { name: '모서리 보루',   south: 2600, worldH: 3300, hpMul: 2.4, bastion: true },
+    ],
+    top: 170, margin: 40, wildGap: 40, wildH: 660, step: 48,
+    gates: { south: [960, 1040], east: [[1200, 1300], [1400, 1500]] },
+    towerDy: 70, guardDy: -40, militiaDy: 110,
+    coreSites: [{ x: 700 }, { x: 300 }, { x: 1100 }],
+    bastionSites: [{ x: 120, y: 2670 }, { x: 1850, y: 2710 }],
+    reserveSites: [{ x: 330, y: 1920 }, { x: 820, y: 1990 }],
+    maxSites: 10,
+    guardCore: [[200, -40], [440, -40], [680, -40], [920, -40], [1080, -40], [1300, -40], [320, -100], [560, -100]],
+    militiaCore: [200, 500, 900, 1300, 1700],
+    regenTime: 90, breachSpeed: 1.5, repairTime: 60, repairPerDistrict: 15, extraFrom: 8,
+  },   // 수리공 대기 자리(캠프 남서쪽), 하나를 전부 고치는 데 걸리는 초
   // 급식소: 직원 1인당 분당 perWorker만큼 고기·생선을 먹는다. 배부르면 효율 bonus, 굶으면 penalty
   mess: { x: 490, y: 1560, drop: { x: 480, y: 1630, r: 40 }, cap: 120, perWorker: 0.15, bonus: 1.15, penalty: 0.8 },
   weapon: { dmgPer: 2 },
@@ -181,13 +199,13 @@ const CFG = {
   // 농장류(묘목장·낙농장·광산·밀밭): 자리(plot)가 자라면 일꾼이 거둬 더미·가게로 나른다. plant면 거둔 뒤 다시 심어야 자란다
   farms: {
     nursery: { name: '묘목장', icon: '🌱', good: 'wood',  worker: 'forester', upg: 'nursery', plant: true,  plantTime: 2.5, growTime: 55, yield: 4, harvestTime: 1.6, carry: 8,  perLevel: 4, sprite: 'tree',
-               rect: { x: 2040, y: 1500, w: 400, h: 330 }, origin: { x: 2090, y: 1575 }, dx: 100, dy: 84, cols: 4, rows: 3, post: { x: 2060, y: 1880 }, pile: 'woodEast', district: 'east', boost: 'sapling' },
+               rect: { x: 2040, y: 1500, w: 400, h: 330 }, origin: { x: 2090, y: 1575 }, dx: 100, dy: 84, cols: 4, rows: 3, post: { x: 2060, y: 1880 }, pile: 'woodEast', district: 'east', boost: 'sapling', minGrow: 8, mech: ['🪚 전기톱', '🤖 자동 식수기', '🛤️ 운반 궤도'] },
     dairy:   { name: '낙농장', icon: '🥛', good: 'milk',  worker: 'dairyman', upg: 'dairy',   plant: false, growTime: 45, yield: 3, harvestTime: 2.0, carry: 8,  perLevel: 2, sprite: 'cow',
-               rect: { x: 2480, y: 1480, w: 260, h: 400 }, origin: { x: 2530, y: 1590 }, dx: 85, dy: 92, cols: 3, rows: 3, post: { x: 2500, y: 1920 }, pile: 'milk', district: 'east' },
+               rect: { x: 2480, y: 1480, w: 260, h: 400 }, origin: { x: 2530, y: 1590 }, dx: 85, dy: 92, cols: 3, rows: 3, post: { x: 2500, y: 1920 }, pile: 'milk', district: 'east', minGrow: 8, mech: ['🪣 착유기', '🤖 자동 착유기', '🛤️ 우유 관로'] },
     mine:    { name: '광산',   icon: '⛏️', good: 'ore',   worker: 'miner',    upg: 'mine',    plant: false, growTime: 18, yield: 2, harvestTime: 2.2, carry: 6,  perLevel: 2, sprite: 'vein',
-               rect: { x: 2800, y: 250, w: 680, h: 420 },  origin: { x: 2860, y: 450 }, dx: 100, dy: 90, cols: 6, rows: 2, post: { x: 2840, y: 700 }, pile: 'ore', district: 'mine', boost: 'pickaxe' },
+               rect: { x: 2800, y: 250, w: 680, h: 420 },  origin: { x: 2860, y: 450 }, dx: 100, dy: 90, cols: 6, rows: 2, post: { x: 2840, y: 700 }, pile: 'ore', district: 'mine', boost: 'pickaxe', minGrow: 4, mech: ['⛏️ 착암기', '🤖 자동 채굴기', '🛤️ 광차 궤도'] },
     grain:   { name: '밀밭',   icon: '🌾', good: 'grain', worker: 'farmer',   upg: 'field',   plant: true,  plantTime: 2.0, growTime: 65, yield: 5, harvestTime: 1.8, carry: 10, perLevel: 4, sprite: 'field',
-               rect: { x: 3570, y: 300, w: 660, h: 500 },  origin: { x: 3620, y: 380 }, dx: 100, dy: 90, cols: 6, rows: 5, post: { x: 3580, y: 860 }, pile: 'grain', district: 'farm', boost: 'seed' },
+               rect: { x: 3570, y: 300, w: 660, h: 500 },  origin: { x: 3620, y: 380 }, dx: 100, dy: 90, cols: 6, rows: 5, post: { x: 3580, y: 860 }, pile: 'grain', district: 'farm', boost: 'seed', minGrow: 8, mech: ['🚜 수확기', '🤖 자동 파종기', '🛤️ 컨베이어'] },
   },
   // 날씨: 개척할수록 종류가 는다. cust 손님 빈도, grow 작물·가축 성장, move 이동 속도, enemy 적 속도, tower 탑 사거리, price 판매가
   weather: {
@@ -213,7 +231,11 @@ const CFG = {
           // 전리품 구역(캠프·황무지): 이 안의 드랍은 거리 가중치 zoneMul, 모피는 peltMul, 오래된 드랍은 agePer px/초만큼 먼저 줍는다
           loot: { rect: { x: 0, y: 1300, w: 900, h: 1300 }, zoneMul: 0.5, peltMul: 0.7, agePer: 8, ageMax: 60, sweepRange: 1200 } },   // 야생 곰 사냥터(오른쪽 위)
   drops: { max: 150 },                                            // 바닥 드랍 상한(넘으면 전리품 구역 밖의 오래된 것부터 치운다)
-  pileFull: 0.8,                                                  // 더미가 이만큼 차면 생산자는 직접 나른다(수거꾼이 모자라다는 신호)
+  pileFull: 0.8,
+  // 물류: 운반 분업 4·5단계 더미 배수, 수레 운반 보너스, 오래 방치된 더미 우선(idlePer px/초)
+  logi: { pileMul: [1, 1, 1, 1, 2, 3], wagonRunnerCarry: 4, directHaulAt: 0.6, idleMax: 60, idlePer: 2.5 },
+  // 농장 기계화: 자리가 다 찬 뒤(집약) 3레벨마다 한 단계. work 작업 시간 배수, grow 성장 배수, carry 일꾼 운반 +, autoPlant 수확 뒤 바로 다시 자람, conveyor 수확물이 농장 더미로 직접, pileMul 그 더미 상한 배수
+  mech: { every: 3, tiers: [ { work: 0.6, carry: 4 }, { work: 0.6, carry: 4, grow: 0.85, autoPlant: true }, { work: 0.5, carry: 4, grow: 0.85, autoPlant: true, conveyor: true, pileMul: 1.5 } ] },                                                  // 더미가 이만큼 차면 생산자는 직접 나른다(수거꾼이 모자라다는 신호)
   // 더미: 운반 분업(logistics) 뒤 생산자가 물건을 쌓아 두는 곳. 수거꾼이 여기서 실어 가게로 나른다. lv = 열리는 분업 단계
   piles: {
     pelt:      { x: 1560, y: 520,  good: 'pelt', name: '가죽 더미',   cap: 100, lv: 1 },   // 사냥꾼 초소 옆
@@ -269,6 +291,8 @@ const CFG = {
 
 // 업그레이드 정의. pad = 바닥의 결제 원 위치, unlock = 보이는 조건. max가 Infinity면 끝없이 올릴 수 있다.
 // 고정 가격표 뒤로는 마지막 값에서 growth배씩 올린다(고용 상한을 늘려도 가격이 이어지도록)
+// 자리가 다 찬 뒤(집약) 가격: 예전 상한까지는 표 그대로, 그 뒤로는 1.35배씩(20레벨 뒤엔 softCost가 더 눌러 준다)
+const overTbl = (arr, oldMax, g2 = 1.35) => l => (l < oldMax ? tbl(arr, 2)(l) : Math.round(tbl(arr, 2)(oldMax - 1) * Math.pow(g2, l - oldMax + 1)));
 const tbl = (arr, growth) => l => (arr[l] != null ? arr[l] : Math.round(arr[arr.length - 1] * Math.pow(growth, l - arr.length + 1)));
 const UPG = [
   { id: 'axe',    icon: '🪓', name: '도끼',       desc: '모두의 벌목 속도 +11%',    max: 21,
@@ -298,18 +322,18 @@ const UPG = [
     cost: () => 400,                                pad: { x: 1780, y: 800 }, unlock: g => g.lv.mart < 1 && (g.stats.kills >= 1 || g.lv.hunter >= 1) },
   { id: 'hunter', icon: '🏹', name: '사냥꾼 고용', desc: '사냥터의 곰을 잡아 모피를 나릅니다', max: 10,
     cost: tbl([300, 700, 1500, 3200, 6500, 13000], 1.6), pad: { x: 1480, y: 680 }, unlock: g => g.lv.furShop >= 1 },
-  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 드랍·더미·습격 전리품을 가게로 나릅니다. 홀수 번째는 캠프 초소에서 황무지 전리품을 먼저 치웁니다', max: 20,
-    cost: tbl([350, 900, 2200, 5000, 11000, 20000, 35000, 60000], 1.6), pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
-  { id: 'sled',   icon: '🛷', name: '수거 썰매',   desc: '수거꾼 운반량 +4(종류당), 줍는 반경 +12, 이동 속도 +12%. 썰매를 끌고 다닙니다', max: 5,
-    cost: l => [700, 1800, 4500, 10000, 22000][l], pad: { x: 1340, y: 700 }, unlock: g => g.lv.collector >= 1 },
-  { id: 'runner_furn', icon: '🚚', name: '공방 배달부', desc: '통나무 더미·마트에서 목재를 공방으로 직접 가져옵니다(수거꾼을 기다리지 않음)', max: 2,
+  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 드랍·더미·습격 전리품을 가게로 나릅니다. 홀수 번째는 캠프 초소에서 황무지 전리품을 먼저 치웁니다', max: 24,
+    cost: l => (l < 20 ? tbl([350, 900, 2200, 5000, 11000, 20000, 35000, 60000], 1.6)(l) : Math.round(tbl([350, 900, 2200, 5000, 11000, 20000, 35000, 60000], 1.6)(19) * Math.pow(1.3, l - 19))), pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
+  { id: 'sled',   icon: '🛷', name: '수거 썰매·수레', desc: '수거꾼 운반량 +4(종류당), 줍는 반경 +12, 이동 속도 +12%. 6레벨부터 🛒 수레(9레벨 🐎 마차): 수거꾼·배달부·농장 일꾼이 한 번에 (레벨−5)+1개씩 싣고 내리고, 배달부 운반 +4', max: 10,
+    cost: l => [700, 1800, 4500, 10000, 22000, 60000, 150000, 400000, 1000000, 2500000][l], pad: { x: 1340, y: 700 }, unlock: g => g.lv.collector >= 1 && (g.lv.sled < 5 || g.lv.logistics >= 3) },
+  { id: 'runner_furn', icon: '🚚', name: '공방 배달부', desc: '통나무 더미·마트에서 목재를 공방으로 직접 가져옵니다(수거꾼을 기다리지 않음)', max: 3,
     cost: tbl([1500, 4000], 1.8),                  pad: { x: 1240, y: 1920 }, unlock: g => g.lv.workshop >= 1 && (g.lv.logistics >= 1 || g.lv.mart >= 1) },
-  { id: 'runner_rest', icon: '🚚', name: '식당 배달부', desc: '바구니·도축장·마트에서 생선·고기를 식당으로 직접 가져옵니다', max: 2,
+  { id: 'runner_rest', icon: '🚚', name: '식당 배달부', desc: '바구니·도축장·마트에서 생선·고기를 식당으로 직접 가져옵니다', max: 3,
     cost: tbl([1500, 4000], 1.8),                  pad: { x: 1270, y: 1010 }, unlock: g => g.lv.restaurant >= 1 },
-  { id: 'runner_tailor', icon: '🚚', name: '재단소 배달부', desc: '가죽 더미·도축장·마트에서 모피를 재단소로 직접 가져옵니다', max: 2,
+  { id: 'runner_tailor', icon: '🚚', name: '재단소 배달부', desc: '가죽 더미·도축장·마트에서 모피를 재단소로 직접 가져옵니다', max: 3,
     cost: tbl([1500, 4000], 1.8),                  pad: { x: 1600, y: 900 }, unlock: g => g.lv.tailor >= 1 },
-  { id: 'logistics', icon: '📦', name: '운반 분업', desc: '1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미에 쌓습니다. 운반은 수거꾼 몫(단계마다 수거꾼 2·3·4명 필요)', max: 3,
-    cost: l => [2500, 6000, 12000][l],             pad: { x: 1480, y: 820 }, unlock: g => g.lv.collector >= 2 + g.lv.logistics },   // 단계마다 수거꾼이 한 명 더 필요(2/3/4명)
+  { id: 'logistics', icon: '📦', name: '운반 분업', desc: '1: 사냥꾼·도축업자 · 2: 어부·양식업자 · 3: 벌목꾼이 자리에서 일만 하고 더미에 쌓습니다 · 4: 모든 더미 ×2, 공방 재료칸 +60 · 5: 더미 ×3, 재료칸 +120. 운반은 수거꾼 몫(단계마다 수거꾼 2·3·4명 필요)', max: 5,
+    cost: l => [2500, 6000, 12000, 40000, 120000][l], pad: { x: 1480, y: 820 }, unlock: g => g.lv.collector >= 2 + g.lv.logistics },   // 단계마다 수거꾼이 한 명 더 필요(2/3/4/5/6명)
   { id: 'traps',  icon: '🪤', name: '덫',         desc: '사냥터 곰 +1마리, 리젠 7% 단축. 모피 생산량이 늘어납니다', max: Infinity,
     cost: l => Math.round(600 * Math.pow(1.45, l)), pad: { x: 1950, y: 1080 }, unlock: g => g.lv.hunter >= 1 },
   { id: 'skinning', icon: '🗡️', name: '가죽 손질', desc: '잡은 곰·늑대·설인(사냥터·습격 모두)에서 🐾 모피 +1', max: 3,
@@ -404,18 +428,22 @@ const UPG = [
   { id: 'townhall', icon: '🏛️', name: '마을 회관', desc: '마을 단위 투자. 모두의 작업 효율 +8%, 판매가 +5%, 마을 등급 상승(손님 계급이 올라 더 비싸게·많이 삽니다). 방위대·봉화대가 열립니다', max: Infinity,
     cost: l => Math.round(20000 * Math.pow(1.45, l)), pad: { x: 460, y: 1420 },
     unlock: g => g.lv.mart >= 1 || g.lv.workshop >= 3 || (g.lv.butcher >= 1 && g.lv.fishShop >= 1 && g.lv.worker >= 5) },
-  { id: 'militia', icon: '🪖', name: '마을 방위대', desc: '황무지 경계를 지키는 정예 병사(체력 2.2배, 공격 1.6배)', max: 6,
+  { id: 'militia', icon: '🪖', name: '마을 방위대', desc: '황무지 경계를 지키는 정예 병사(체력 2.2배, 공격 1.6배). 성벽이 있으면 남쪽 성벽 앞 초소', max: 8,
     cost: l => Math.round(15000 * Math.pow(1.8, l)), pad: { x: 620, y: 2080 }, unlock: g => g.lv.townhall >= 1 },
   { id: 'beacon', icon: '🔥', name: '봉화대',     desc: '습격 경고 +8초, 경비병·방위대 사기(공격력) +10%', max: Infinity,
     cost: l => Math.round(30000 * Math.pow(1.4, l)), pad: { x: 60, y: 2010 }, unlock: g => g.lv.townhall >= 2 },
 
-  { id: 'fence',  icon: '🧱', name: '울타리 보강', desc: '울타리 내구도 ×1.22, 본부 +20', max: Infinity,
+  { id: 'wall', icon: '🏗️', name: '마을 성벽', max: 2,
+    desc: '1: 마을 전체를 성벽으로 두릅니다. 습격이 남쪽 벌판으로 내려가고 전선이 넓어지며, 지대를 개척할수록 성벽도 동쪽으로 늘어납니다(탑 자리·초소 +1). 성벽이 뚫려도 캠프 울타리가 한 번 더 막습니다 · 2: 모서리 보루(보루 탑 2, 내구도 ×2.4). 성벽 내구도는 🧱 울타리 보강·🏰 성채를 따릅니다',
+    cost: l => [25000, 150000][l], pad: { x: 960, y: 2000 },
+    unlock: g => g.bears.length === 0 && (g.lv.wall === 0 ? g.lv.townhall >= 1 && g.lv.mart >= 1 && g.lv.fence >= 5 && g.wave.n >= 10 : g.lv.fence >= 12 && g.wave.n >= 20) },
+  { id: 'fence',  icon: '🧱', name: '울타리 보강', desc: '울타리 내구도 ×1.22, 본부 +20(성벽도 함께)', max: Infinity,
     cost: l => Math.round(60 * Math.pow(1.3, l)),  pad: { x: 660, y: 1560 }, unlock: () => true },
   { id: 'guard',  icon: '🛡️', name: '경비병 고용', desc: '곰과 싸우는 경비병',       max: 12,
     cost: tbl([180, 400, 900, 2000, 4200, 9000, 19000, 40000], 1.7), pad: { x: 220, y: 1960 }, unlock: g => g.lv.worker >= 1 || g.wave.n >= 1 || g.t >= 60 },
   { id: 'weapon', icon: '⚔️', name: '무기',       desc: '나와 경비병 공격력 +2. 3·7·12·18·28레벨, 그 뒤 10레벨마다 재질과 형태가 바뀝니다(창 → 미늘창 → 머스킷 → 소총 → … → 빔 캐논, 300레벨까지)', max: Infinity,
     cost: l => Math.round(80 * Math.pow(1.3, l)),  pad: { x: 440, y: 1960 }, unlock: g => g.lv.guard >= 1 },
-  { id: 'tower',  icon: '🏹', name: '감시탑',     desc: '공격력 +5, 사거리 +12. 6레벨마다 탑 +1(최대 4). 12: 쇠뇌 · 16: 대포 · 20: 소총 · 26: 기관총, 36부터 10레벨마다 새 포대(300레벨까지)', max: Infinity,
+  { id: 'tower',  icon: '🏹', name: '감시탑',     desc: '공격력 +5, 사거리 +12. 6레벨마다 탑 +1(성벽·개척마다 자리 추가, 최대 10). 12: 쇠뇌 · 16: 대포 · 20: 소총 · 26: 기관총, 36부터 10레벨마다 새 포대(300레벨까지)', max: Infinity,
     cost: l => Math.round(250 * Math.pow(1.4, l)), pad: { x: 580, y: 1900 }, unlock: g => g.lv.guard >= 1 && g.wave.n >= 2 },
   { id: 'infirmary', icon: '🏥', name: '의무소',   desc: '캠프에 의무소를 짓습니다. 쓰러진 경비병은 30초 안에 치료받지 못하면 전사해 경비병 레벨이 깎입니다(내가 옆에 서도 치료)', max: 1,
     cost: () => 600,                               pad: { x: 160, y: 1460 }, unlock: g => g.lv.guard >= 1 && g.wave.n >= 1 },
@@ -439,15 +467,15 @@ const UPG = [
   { id: 'procPrice', icon: '🏷️', name: '육가공품 가격', desc: '육가공품 판매가 +12%', max: Infinity,
     cost: l => Math.round(600 * Math.pow(1.4, l)),  pad: { x: 2560, y: 1270 }, unlock: g => g.lv.meatproc >= 1 },
   // 동쪽 아래: 묘목장(나무 심기) · 낙농장 · 유제품 공방
-  { id: 'nursery', icon: '🌱', name: '묘목장',   desc: '1레벨: 건설 + 나무 자리 4 (최대 12). 산림꾼이 묘목을 심고 다 자라면 베어 목재로. 훈제장·마트에 가깝습니다', max: 3,
-    cost: tbl([5000, 12000, 25000], 2),            pad: { x: 2100, y: 1990 }, unlock: g => g.lv.expandEast >= 1 && g.lv.worker >= 2 },
-  { id: 'forester', icon: '🧑‍🌾', name: '산림꾼 고용', desc: '묘목장에서 묘목을 심고 자란 나무를 베어 목재를 나릅니다', max: 5,
+  { id: 'nursery', icon: '🌱', name: '묘목장',   desc: '1레벨: 건설 + 나무 자리 4 (최대 12). 산림꾼이 묘목을 심고 다 자라면 베어 목재로. 자리가 다 차면 레벨마다 그루당 목재 +1·성장 −6%, 3·6·9단계 집약마다 🪚 전기톱 → 🤖 자동 식수기 → 🛤️ 운반 궤도(수확물이 바로 더미로)', max: Infinity,
+    cost: overTbl([5000, 12000, 25000], 3),            pad: { x: 2100, y: 1990 }, unlock: g => g.lv.expandEast >= 1 && g.lv.worker >= 2 },
+  { id: 'forester', icon: '🧑‍🌾', name: '산림꾼 고용', desc: '묘목장에서 묘목을 심고 자란 나무를 베어 목재를 나릅니다', max: 8,
     cost: tbl([1500, 3500, 8000], 1.8),            pad: { x: 2220, y: 1990 }, unlock: g => g.lv.nursery >= 1 },
-  { id: 'sapling', icon: '🌳', name: '묘목 개량', desc: '묘목장 나무 성장 −10%, 3레벨마다 그루당 목재 +1', max: 10,
+  { id: 'sapling', icon: '🌳', name: '묘목 개량', desc: '묘목장 나무 성장 −10%, 3레벨마다 그루당 목재 +1 (끝없이)', max: Infinity,
     cost: l => Math.round(2500 * Math.pow(1.5, l)), pad: { x: 2340, y: 1990 }, unlock: g => g.lv.nursery >= 1 },
-  { id: 'dairy',  icon: '🥛', name: '낙농장',     desc: '1레벨: 건설 + 젖소 순록 2마리(최대 9). 낙농꾼이 젖을 짜 🥛 우유를 마트·유제품 공방에 나릅니다', max: 5,
-    cost: tbl([8000, 16000, 32000], 2),            pad: { x: 2520, y: 2010 }, unlock: g => g.lv.expandEast >= 1 && g.lv.ranch >= 3 },
-  { id: 'dairyman', icon: '🧑‍🌾', name: '낙농꾼 고용', desc: '낙농장에서 젖을 짜고 우유를 나릅니다', max: 5,
+  { id: 'dairy',  icon: '🥛', name: '낙농장',     desc: '1레벨: 건설 + 젖소 순록 2마리(최대 9). 낙농꾼이 젖을 짜 🥛 우유를 마트·유제품 공방에 나릅니다. 자리가 다 차면 레벨마다 마리당 우유 +1·주기 −6%, 3·6·9단계마다 🪣 착유기 → 🤖 자동 착유기 → 🛤️ 우유 관로', max: Infinity,
+    cost: overTbl([8000, 16000, 32000], 5),            pad: { x: 2520, y: 2010 }, unlock: g => g.lv.expandEast >= 1 && g.lv.ranch >= 3 },
+  { id: 'dairyman', icon: '🧑‍🌾', name: '낙농꾼 고용', desc: '낙농장에서 젖을 짜고 우유를 나릅니다', max: 8,
     cost: tbl([1500, 3500, 8000], 1.8),            pad: { x: 2640, y: 2010 }, unlock: g => g.lv.dairy >= 1 },
   { id: 'cream',  icon: '🧀', name: '유제품 공방', desc: '1레벨: 건설(🧀 치즈) · 2: 🧈 버터 · 3: 🍦 아이스크림 · 4: 🎁 유제품 세트. 우유를 비싼 상품으로', max: 4,
     cost: tbl([7000, 16000, 34000, 70000], 2),      pad: { x: 2330, y: 2440 }, unlock: g => g.lv.dairy >= 1 },
@@ -458,11 +486,11 @@ const UPG = [
   // ---- 광산 골짜기(두 번째 확장) ----
   { id: 'expandMine', icon: '🧭', name: '광산 골짜기 개척', desc: '세계가 더 동쪽으로 넓어집니다. ⛏️ 광산(광석), ⚒️ 대장간(철물·갑옷), 💎 보석 세공소(귀족·왕족용)를 지을 수 있고 🌫️ 안개·🌌 오로라 날씨가 생깁니다', max: 1,
     cost: () => 150000,                            pad: { x: 2700, y: 1250 }, unlock: g => g.lv.expandEast >= 1 && (g.lv.townhall >= 2 || g.longGlut('wood')) },
-  { id: 'mine',   icon: '⛏️', name: '광산',       desc: '1레벨: 건설 + 광맥 2 (최대 12). 광부가 광석을 캐 더미·대장간·마트로 나릅니다', max: 6,
-    cost: tbl([12000, 24000, 48000], 2),           pad: { x: 2860, y: 790 }, unlock: g => g.lv.expandMine >= 1 },
-  { id: 'miner',  icon: '👷', name: '광부 고용',   desc: '광산에서 광석을 캐고 나릅니다', max: 6,
+  { id: 'mine',   icon: '⛏️', name: '광산',       desc: '1레벨: 건설 + 광맥 2 (최대 12). 광부가 광석을 캐 더미·대장간·마트로 나릅니다. 자리가 다 차면 레벨마다 광맥당 광석 +1·채굴 주기 −6%, 3·6·9단계마다 ⛏️ 착암기 → 🤖 자동 채굴기 → 🛤️ 광차 궤도', max: Infinity,
+    cost: overTbl([12000, 24000, 48000], 6),           pad: { x: 2860, y: 790 }, unlock: g => g.lv.expandMine >= 1 },
+  { id: 'miner',  icon: '👷', name: '광부 고용',   desc: '광산에서 광석을 캐고 나릅니다', max: 8,
     cost: tbl([2500, 5500, 12000], 1.8),           pad: { x: 2980, y: 790 }, unlock: g => g.lv.mine >= 1 },
-  { id: 'pickaxe', icon: '⛏️', name: '곡괭이',    desc: '채굴 시간 −8%, 2레벨마다 광맥당 광석 +1', max: 10,
+  { id: 'pickaxe', icon: '⛏️', name: '곡괭이',    desc: '채굴 시간 −8%, 2레벨마다 광맥당 광석 +1 (끝없이)', max: Infinity,
     cost: l => Math.round(4000 * Math.pow(1.5, l)), pad: { x: 3100, y: 790 }, unlock: g => g.lv.mine >= 1 },
   { id: 'smith',  icon: '⚒️', name: '대장간',     desc: '1레벨: 건설(🔩 철물) · 2: 🛠️ 연장 세트 · 3: 🛡️ 강철 갑옷 · 4: ⚙️ 태엽 장치. 광석과 목재로', max: 4,
     cost: tbl([10000, 22000, 45000, 90000], 2),     pad: { x: 3140, y: 1390 }, unlock: g => g.lv.mine >= 1 },
@@ -479,11 +507,11 @@ const UPG = [
   // ---- 평원 농장(세 번째 확장) ----
   { id: 'expandFarm', icon: '🧭', name: '평원 농장 개척', desc: '세계가 더 넓어집니다. 🌾 밀밭(곡물), 🍞 빵집, 🍺 양조장을 지을 수 있고 🌤️ 해빙 날씨(작물 성장 +60%)가 생깁니다', max: 1,
     cost: () => 400000,                            pad: { x: 3460, y: 1400 }, unlock: g => g.lv.expandMine >= 1 && g.lv.townhall >= 3 },
-  { id: 'field',  icon: '🌾', name: '밀밭',       desc: '1레벨: 건설 + 밭 4 (최대 28). 농부가 씨를 뿌리고 익으면 거둬 🌾 곡물을 나릅니다', max: 7,
-    cost: tbl([15000, 30000, 60000], 2),           pad: { x: 3620, y: 950 }, unlock: g => g.lv.expandFarm >= 1 },
-  { id: 'farmer', icon: '🧑‍🌾', name: '농부 고용',  desc: '밀밭에서 씨를 뿌리고 거둡니다', max: 6,
+  { id: 'field',  icon: '🌾', name: '밀밭',       desc: '1레벨: 건설 + 밭 4 (최대 30). 농부가 씨를 뿌리고 익으면 거둬 🌾 곡물을 나릅니다. 자리가 다 차면 레벨마다 밭당 곡물 +1·성장 −6%, 3·6·9단계마다 🚜 수확기 → 🤖 자동 파종기 → 🛤️ 컨베이어', max: Infinity,
+    cost: overTbl([15000, 30000, 60000], 8),           pad: { x: 3620, y: 950 }, unlock: g => g.lv.expandFarm >= 1 },
+  { id: 'farmer', icon: '🧑‍🌾', name: '농부 고용',  desc: '밀밭에서 씨를 뿌리고 거둡니다', max: 8,
     cost: tbl([3000, 6500, 14000], 1.8),           pad: { x: 3740, y: 950 }, unlock: g => g.lv.field >= 1 },
-  { id: 'seed',   icon: '🌱', name: '개량 종자',  desc: '곡물 성장 −10%, 3레벨마다 밭당 곡물 +1', max: 10,
+  { id: 'seed',   icon: '🌱', name: '개량 종자',  desc: '곡물 성장 −10%, 3레벨마다 밭당 곡물 +1 (끝없이)', max: Infinity,
     cost: l => Math.round(5000 * Math.pow(1.5, l)), pad: { x: 3860, y: 950 }, unlock: g => g.lv.field >= 1 },
   { id: 'bakery', icon: '🍞', name: '빵집',       desc: '1레벨: 건설(🍞 빵) · 2: 🥧 파이 · 3: 🎂 케이크 · 4: 🎁 축제 케이크. 곡물과 우유로', max: 4,
     cost: tbl([14000, 30000, 60000, 120000], 2),    pad: { x: 3900, y: 1390 }, unlock: g => g.lv.field >= 1 },
@@ -510,16 +538,21 @@ const UPG = [
   { id: 'magetower', icon: '🔮', name: '마법탑',   desc: '모든 감시탑 공격력 +60%(레벨마다), 사거리 +40', max: 5,
     cost: l => Math.round(5e8 * Math.pow(3, l)),   pad: { x: 1120, y: 1480 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
   { id: 'guild',  icon: '🎓', name: '장인 길드',   desc: '모든 직원 작업 효율 +15%(레벨마다), 경비병 공격 +10%', max: 5,
-    cost: l => Math.round(1e9 * Math.pow(3, l)),   pad: { x: 820, y: 1480 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
+    cost: l => Math.round(1e9 * Math.pow(3, l)),   pad: { x: 1000, y: 1600 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
   { id: 'cathedral', icon: '⛪', name: '대성당',   desc: '손님 +15%(레벨마다), 평판이 60 아래로 떨어지지 않습니다', max: 5,
     cost: l => Math.round(2e9 * Math.pow(3, l)),   pad: { x: 1700, y: 1300 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
   { id: 'palace', icon: '🏯', name: '왕궁',        desc: '모든 판매가 +10%(레벨마다), 주문 보상 +25%, 격퇴마다 눈송이 1개 추가', max: 5,
     cost: l => Math.round(5e9 * Math.pow(4, l)),   pad: { x: 1800, y: 1180 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
   { id: 'repair', icon: '🔧', name: '수리',  desc: '본부와 감시탑 내구도 전부 회복. 부서진 탑은 고칠 때까지 쏘지 못합니다',     max: Infinity,
     cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 || g.towerSites().some((S, i) => !(g.towerHp[i] > g.towerMax(g.lv.tower) * 0.6)) },
-  { id: 'repairman', icon: '🔨', name: '수리공 고용', desc: '부서지거나 상한 감시탑·본부·울타리를 돌며 고칩니다(탑 하나 20초). 보스는 탑부터 부수니 꼭 두세요', max: 3,
+  { id: 'repairman', icon: '🔨', name: '수리공 고용', desc: '부서지거나 상한 감시탑·본부·울타리·성벽을 돌며 고칩니다(탑 하나 20초). 보스는 탑부터 부수니 꼭 두세요', max: 3,
     cost: tbl([900, 2400, 6000], 2),              pad: { x: 150, y: 2090 }, unlock: g => g.lv.tower >= 1 && g.lv.fence >= 1 },
 ];
+
+// 동쪽·광산·농장 공방 배달부(더미·마트에서 재료를 직접 가져온다)
+const RUNNER_PADS = { smoke: { x: 2080, y: 640 }, meatproc: { x: 2080, y: 1270 }, cream: { x: 2080, y: 2320 }, smith: { x: 2890, y: 1270 }, jewel: { x: 2890, y: 1920 }, bakery: { x: 3650, y: 1270 }, brew: { x: 3650, y: 1920 } };
+for (const [id, pad] of Object.entries(RUNNER_PADS)) UPG.push({ id: 'runner_' + id, icon: '🚚', name: CFG.shops[id].name + ' 배달부', desc: `더미·마트에서 ${CFG.shops[id].accepts.map(k => CFG.goods[k].name).join('·')}를 ${CFG.shops[id].name}으로 직접 가져옵니다(수거꾼을 기다리지 않음)`, max: 3,
+  cost: tbl(['smith', 'jewel', 'bakery', 'brew'].includes(id) ? [4500, 12000] : [1500, 4000], 1.8), pad, unlock: g => g.lv[CFG.shops[id].upg] >= 1 });
 
 // 적 종류. 웨이브가 오를수록 섞여 나온다.
 const ENEMY = {
@@ -548,7 +581,8 @@ const ADVICE = {
   more: { wood: ['worker', 'axe', 'forest', 'grove', 'nursery', 'forester', 'sapling', 'training'], meat: ['ranch', 'slaughterman', 'coldstore', 'breed', 'feed', 'rancher', 'hunter'],
           fish: ['fisher', 'rod', 'fishFarm', 'fishFarmer', 'fishFeed'], pelt: ['traps', 'bait', 'skinning', 'tanning', 'hunter'],
           milk: ['dairy', 'dairyman'], ore: ['mine', 'miner', 'pickaxe'], grain: ['field', 'farmer', 'seed'] },
-  haul: ['collector', 'sled', 'runner_tailor', 'runner_rest', 'runner_furn', 'shoes'],
+  haul: ['collector', 'sled', 'logistics', 'runner_tailor', 'runner_rest', 'runner_furn', 'runner_smoke', 'runner_meatproc', 'runner_cream', 'runner_smith', 'runner_jewel', 'runner_bakery', 'runner_brew', 'shoes'],
+  starved: { by: shop => ['runner_' + shop, 'sled', 'logistics'] },   // 재료 굶음: 그 공방 배달부 → 수레 → 운반 분업
   sell: { wood: ['promo', 'workshop', 'craftsman', 'smoke', 'smith', 'mart', 'martLanes'], meat: ['meatproc', 'meatworker', 'expandEast', 'restaurant', 'cook', 'promo', 'mart', 'martLanes'],
           fish: ['smoke', 'smoker', 'expandEast', 'restaurant', 'cook', 'promo', 'mart', 'martLanes'], pelt: ['tailor', 'tailorman', 'promo', 'mart', 'martLanes'],
           milk: ['cream', 'creamer', 'bakery', 'baker', 'promo', 'martGoods'], ore: ['smith', 'smithman', 'jewel', 'jeweler', 'promo', 'martGoods'], grain: ['bakery', 'baker', 'brew', 'brewer', 'promo', 'martGoods'] },
@@ -673,6 +707,13 @@ const TIPS = [
   { id: 'order', when: g => g.orders && g.orders.length > 0, text: '📜 새 주문이 들어왔어요! 📊 창에서 어떤 물건이 얼마나 필요한지 보세요. 기한 안에 마트 재고로 채워지면 보상을 받습니다' },
   { id: 'kingdom', when: g => g.padVisible(UPG.find(u => u.id === 'citadel')), text: '👑 왕국 건설이 열렸어요! 🏰 성채·🔮 마법탑·🎓 장인 길드(도축장 왼쪽)와 ⛪ 대성당·🏯 왕궁(손님 입구 쪽)은 억 단위 투자로 마을 전체를 한 단계 올립니다' },
   { id: 'newfoe', when: g => g.wave.n >= 14, text: '⚠️ 15웨이브부터 🐗 서리 멧돼지 무리, 25부터 🦣 매머드(탑부터 부숨), 35부터 👻 서리 망령(울타리 통과), 45부터 🧙 얼음 주술사(동료 치유)가 섞여 옵니다. 60부터는 정예(체력 2.2배)도' },
+  { id: 'over', when: g => Object.keys(CFG.farms).some(id => g.farmOver(id) >= 1), text: '🌾 집약 재배! 자리가 다 찬 농장은 레벨마다 수확량 +1·성장 −6%. 3단계마다 기계가 들어옵니다(🚜 → 🤖 → 🛤️)' },
+  { id: 'mech3', when: g => Object.keys(CFG.farms).some(id => g.farmTier(id) >= 3), text: '🛤️ 컨베이어! 수확물이 바로 농장 더미로 떨어지고 더미도 1.5배 커집니다. 수거꾼·수레를 늘려 실어 가세요' },
+  { id: 'wagon', when: g => g.lv.sled >= 6, text: '🛒 수레! 수거꾼·배달부·농장 일꾼이 한 번에 여러 개씩 싣고 내립니다. 9레벨이면 🐎 마차' },
+  { id: 'logi4', when: g => g.lv.logistics >= 4, text: '📦 더미가 두 배로 커지고 공방 재료칸도 늘었어요. 오래 방치된 더미는 수거꾼이 먼저 가져갑니다' },
+  { id: 'wallpad', when: g => g.padVisible(UPG.find(u => u.id === 'wall')) && g.lv.wall < 1, text: '🏗️ 마을 성벽(공방 아래)을 쌓으면 마을 전체가 성벽 안에 들어가고 습격이 남쪽 벌판에서 옵니다. 전선이 넓어지니 감시탑·방위대를 늘리세요' },
+  { id: 'wall', when: g => g.lv.wall >= 1, text: '🏗️ 마을 성벽 완공! 적은 남쪽 벌판(아래로 스크롤)에서 올라와 성벽을 칩니다. 성벽이 뚫리면 캠프 울타리가 한 번 더 막습니다. 수리공이 성벽도 고칩니다' },
+  { id: 'wall2', when: g => g.lv.wall >= 2, text: '🏗️ 모서리 보루! 성벽 양 끝에 보루 탑 자리가 생기고 내구도가 올랐습니다' },
   { id: 'coldstore', when: g => g.padVisible(UPG.find(u => u.id === 'coldstore')), text: '도축장이 자주 막히나요? ❄️ 냉동 창고(도축장 아래)는 보관함과 대기 순록 자리를 늘립니다' },
   { id: 'manager', when: g => g.lv.manager >= 1, text: '🧑‍💼 관리인 고용! 20초마다 수급·방어를 살펴 가장 급한 업그레이드를 알아서 삽니다(돈의 25%는 남김). 📊 수급 현황 창에서 자동 투자를 끌 수 있어요' },
   { id: 'towerhp', when: g => g.towerSites().some((S, i) => g.towerHp[i] < g.towerMax(g.lv.tower) * 0.7), text: '⚠️ 감시탑도 내구도가 있어요. 적이 지나가며 부수고 보스는 탑부터 노립니다. 부서진 탑은 쏘지 못하니 🔧 수리(본부 왼쪽)로 고치거나 🔨 수리공(캠프 남서쪽)을 두세요' },
