@@ -211,7 +211,7 @@ const CFG = {
           post: { x: 1520, y: 580 }, collectorPost: { x: 1600, y: 640 }, collectorPostSouth: { x: 615, y: 1790 },   // 수거꾼 초소: 사냥터 입구 + 캠프 옆
           collectorCarry: 6, collectorPickup: 44, sledCarry: 4, sledPickup: 12, sledSpeed: 0.12, baitPer: 1,
           // 전리품 구역(캠프·황무지): 이 안의 드랍은 거리 가중치 zoneMul, 모피는 peltMul, 오래된 드랍은 agePer px/초만큼 먼저 줍는다
-          loot: { rect: { x: 0, y: 1300, w: 900, h: 1300 }, zoneMul: 0.5, peltMul: 0.7, agePer: 8, ageMax: 60, sweepRange: 650 } },   // 야생 곰 사냥터(오른쪽 위)
+          loot: { rect: { x: 0, y: 1300, w: 900, h: 1300 }, zoneMul: 0.5, peltMul: 0.7, agePer: 8, ageMax: 60, sweepRange: 1200 } },   // 야생 곰 사냥터(오른쪽 위)
   drops: { max: 150 },                                            // 바닥 드랍 상한(넘으면 전리품 구역 밖의 오래된 것부터 치운다)
   pileFull: 0.8,                                                  // 더미가 이만큼 차면 생산자는 직접 나른다(수거꾼이 모자라다는 신호)
   // 더미: 운반 분업(logistics) 뒤 생산자가 물건을 쌓아 두는 곳. 수거꾼이 여기서 실어 가게로 나른다. lv = 열리는 분업 단계
@@ -298,7 +298,7 @@ const UPG = [
     cost: () => 400,                                pad: { x: 1780, y: 800 }, unlock: g => g.lv.mart < 1 && (g.stats.kills >= 1 || g.lv.hunter >= 1) },
   { id: 'hunter', icon: '🏹', name: '사냥꾼 고용', desc: '사냥터의 곰을 잡아 모피를 나릅니다', max: 10,
     cost: tbl([300, 700, 1500, 3200, 6500, 13000], 1.6), pad: { x: 1480, y: 680 }, unlock: g => g.lv.furShop >= 1 },
-  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 드랍·더미·습격 전리품을 가게로 나릅니다', max: 10,
+  { id: 'collector', icon: '🧺', name: '수거꾼 고용', desc: '레벨마다 모든 수거꾼 운반 +2·이동 +8%. 맵 전체의 드랍·더미·습격 전리품을 가게로 나릅니다. 홀수 번째는 캠프 초소에서 황무지 전리품을 먼저 치웁니다', max: 20,
     cost: tbl([350, 900, 2200, 5000, 11000, 20000, 35000, 60000], 1.6), pad: { x: 1600, y: 700 }, unlock: g => g.lv.furShop >= 1 || g.lv.butcher >= 1 },
   { id: 'sled',   icon: '🛷', name: '수거 썰매',   desc: '수거꾼 운반량 +4(종류당), 줍는 반경 +12, 이동 속도 +12%. 썰매를 끌고 다닙니다', max: 5,
     cost: l => [700, 1800, 4500, 10000, 22000][l], pad: { x: 1340, y: 700 }, unlock: g => g.lv.collector >= 1 },
@@ -504,6 +504,17 @@ const UPG = [
     cost: tbl([3000, 6000, 12000, 24000, 48000], 2), pad: { x: 1440, y: 1700 }, unlock: g => g.lv.slaughter >= 2 },
   { id: 'manager', icon: '🧑‍💼', name: '관리인 고용', desc: '📊 수급 현황을 읽고 막힌 곳(생산 부족·운반 지연·과잉·방어)에 알아서 투자합니다. 돈의 25%는 남겨 둡니다. 📊 창에서 켜고 끕니다', max: 1,
     cost: () => 15000,                             pad: { x: 560, y: 1340 }, unlock: g => g.lv.townhall >= 1 },
+  // ---- 왕국(후반 거대 투자): 도시 등급 + 누적 수입 5천만 이상 ----
+  { id: 'citadel', icon: '🏰', name: '성채',       desc: '본부·울타리 내구도 ×2(레벨마다). 보스가 와도 버팁니다', max: 5,
+    cost: l => Math.round(2e8 * Math.pow(3, l)),   pad: { x: 1000, y: 1480 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
+  { id: 'magetower', icon: '🔮', name: '마법탑',   desc: '모든 감시탑 공격력 +60%(레벨마다), 사거리 +40', max: 5,
+    cost: l => Math.round(5e8 * Math.pow(3, l)),   pad: { x: 1120, y: 1480 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
+  { id: 'guild',  icon: '🎓', name: '장인 길드',   desc: '모든 직원 작업 효율 +15%(레벨마다), 경비병 공격 +10%', max: 5,
+    cost: l => Math.round(1e9 * Math.pow(3, l)),   pad: { x: 820, y: 1480 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
+  { id: 'cathedral', icon: '⛪', name: '대성당',   desc: '손님 +15%(레벨마다), 평판이 60 아래로 떨어지지 않습니다', max: 5,
+    cost: l => Math.round(2e9 * Math.pow(3, l)),   pad: { x: 1700, y: 1300 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
+  { id: 'palace', icon: '🏯', name: '왕궁',        desc: '모든 판매가 +10%(레벨마다), 주문 보상 +25%, 격퇴마다 눈송이 1개 추가', max: 5,
+    cost: l => Math.round(5e9 * Math.pow(4, l)),   pad: { x: 1800, y: 1180 }, unlock: g => g.lv.townhall >= 8 && g.earned >= 5e7 },
   { id: 'repair', icon: '🔧', name: '수리',  desc: '본부와 감시탑 내구도 전부 회복. 부서진 탑은 고칠 때까지 쏘지 못합니다',     max: Infinity,
     cost: () => 0,                                 pad: { x: 50, y: 1430 }, unlock: g => g.hut.hp < g.hut.maxhp - 0.5 || g.towerSites().some((S, i) => !(g.towerHp[i] > g.towerMax(g.lv.tower) * 0.6)) },
   { id: 'repairman', icon: '🔨', name: '수리공 고용', desc: '부서지거나 상한 감시탑·본부·울타리를 돌며 고칩니다(탑 하나 20초). 보스는 탑부터 부수니 꼭 두세요', max: 3,
@@ -515,7 +526,14 @@ const ENEMY = {
   bear: { name: '북극곰', emoji: '🐻', hp: 1,    dmg: 1,   speed: 1,   bounty: 1,   r: 34, meat: 2, pelt: 2 },
   wolf: { name: '늑대',   emoji: '🐺', hp: 0.45, dmg: 0.6, speed: 1.9, bounty: 0.6, r: 26, meat: 0, pelt: 2 },
   yeti: { name: '설인',   emoji: '👹', hp: 6,    dmg: 2.5, speed: 0.7, bounty: 8,   r: 50, meat: 10, pelt: 6 },
+  // 뒤로 갈수록 섞여 나오는 적들(from: 등장 웨이브)
+  boar:   { name: '서리 멧돼지', emoji: '🐗', hp: 0.6, dmg: 0.8, speed: 1.6, bounty: 0.8, r: 28, meat: 3,  pelt: 1, from: 15 },                       // 빠른 무리
+  mammoth: { name: '매머드',   emoji: '🦣', hp: 4,   dmg: 2,   speed: 0.6, bounty: 5,   r: 48, meat: 10, pelt: 5, from: 25, smash: true, scale: 1.3 }, // 탑부터 부순다
+  wraith: { name: '서리 망령', emoji: '👻', hp: 0.8, dmg: 0.5, speed: 1.3, bounty: 1.5, r: 30, meat: 0,  pelt: 0, from: 35, ghost: true },             // 울타리를 통과한다
+  shaman: { name: '얼음 주술사', emoji: '🧙', hp: 1.5, dmg: 0, speed: 0.9, bounty: 3,  r: 30, meat: 0,  pelt: 2, from: 45, support: true, heal: 0.003 }, // 뒤에서 동료를 치유
 };
+// 정예: 60웨이브부터 일반 적의 일부가 정예(체력 2.2배·현상금 2.5배)로 나온다
+const ELITE = { from: 60, chance: 0.15, hp: 2.2, bounty: 2.5, scale: 1.15 };
 
 // 보스(설인) 단계: 10웨이브마다 한 단계씩. hp/dmg는 일반 곰 대비 배수, scale은 크기
 const BOSS = [
@@ -544,8 +562,10 @@ const BOSS_KINDS = [
   { type: 'gbear', name: '거대 북극곰', emoji: '🐻‍❄️', hp: 7, dmg: 2.2, speed: 0.95, scale: 1.6, bounty: 9, meat: 18, pelt: 6, r: 48, ability: 'charge', every: 6 },
   { type: 'wolfking', name: '늑대 왕', emoji: '🐺', hp: 5, dmg: 1.8, speed: 1.4, scale: 1.5, bounty: 9, meat: 6, pelt: 8, r: 40, ability: 'howl', every: 11 },
   { type: 'golem', name: '얼음 골렘', emoji: '🧊', hp: 9, dmg: 3, speed: 0.55, scale: 1.3, bounty: 13, meat: 0, pelt: 0, r: 50, ability: 'armor' },
+  { type: 'dragon', name: '얼음 용', emoji: '🐉', hp: 12, dmg: 4, speed: 0.8, scale: 1.5, bounty: 20, meat: 20, pelt: 10, r: 56, ability: 'breath', every: 9 },   // 숨결: 울타리·탑을 한 번에 깎는다
+  { type: 'titan', name: '서리 거인', emoji: '🗿', hp: 16, dmg: 5, speed: 0.6, scale: 1.7, bounty: 28, meat: 0, pelt: 0, r: 60, ability: 'quake', every: 12 },    // 지진: 경비병을 밀쳐 쓰러뜨린다
 ];
-const BOSS_RANKS = ['', ' 장로', ' 군주', ' 고대', ' 태초', ' 신화'];
+const BOSS_RANKS = ['', ' 장로', ' 군주', ' 고대', ' 태초', ' 신화', ' 종말', ' 영겁', ' 무한'];
 // n웨이브 보스: 몇 번째 보스(k)인지로 종류와 계급을 정한다
 const bossKindFor = n => { const k = Math.max(0, Math.floor(n / 10) - 1), i = k % BOSS_KINDS.length, rank = Math.min(BOSS_RANKS.length - 1, Math.floor(k / BOSS_KINDS.length)); return { kind: BOSS_KINDS[i], rank, k }; };
 
@@ -651,6 +671,8 @@ const TIPS = [
   { id: 'weather', when: g => g.weather && g.weather.kind !== 'snow', text: '🌦️ 날씨가 바뀝니다! ☀️ 맑음은 손님·성장 +15%, ❄️ 눈보라는 모두 느려지고 손님이 줄어요. 🌫️ 안개는 탑 사거리 −30%, 🌌 오로라는 판매가 +20%, 🌤️ 해빙은 작물 성장 +60%. 위쪽 ❄ 줄에서 지금 날씨를 봅니다' },
   { id: 'board', when: g => g.padVisible(UPG.find(u => u.id === 'board')) && g.lv.board < 1, text: '📜 주문 게시판(회관 왼쪽)을 세우면 상인·귀족·왕족이 대량 주문을 냅니다. 재고로 채우면 보상과 평판!' },
   { id: 'order', when: g => g.orders && g.orders.length > 0, text: '📜 새 주문이 들어왔어요! 📊 창에서 어떤 물건이 얼마나 필요한지 보세요. 기한 안에 마트 재고로 채워지면 보상을 받습니다' },
+  { id: 'kingdom', when: g => g.padVisible(UPG.find(u => u.id === 'citadel')), text: '👑 왕국 건설이 열렸어요! 🏰 성채·🔮 마법탑·🎓 장인 길드(도축장 왼쪽)와 ⛪ 대성당·🏯 왕궁(손님 입구 쪽)은 억 단위 투자로 마을 전체를 한 단계 올립니다' },
+  { id: 'newfoe', when: g => g.wave.n >= 14, text: '⚠️ 15웨이브부터 🐗 서리 멧돼지 무리, 25부터 🦣 매머드(탑부터 부숨), 35부터 👻 서리 망령(울타리 통과), 45부터 🧙 얼음 주술사(동료 치유)가 섞여 옵니다. 60부터는 정예(체력 2.2배)도' },
   { id: 'coldstore', when: g => g.padVisible(UPG.find(u => u.id === 'coldstore')), text: '도축장이 자주 막히나요? ❄️ 냉동 창고(도축장 아래)는 보관함과 대기 순록 자리를 늘립니다' },
   { id: 'manager', when: g => g.lv.manager >= 1, text: '🧑‍💼 관리인 고용! 20초마다 수급·방어를 살펴 가장 급한 업그레이드를 알아서 삽니다(돈의 25%는 남김). 📊 수급 현황 창에서 자동 투자를 끌 수 있어요' },
   { id: 'towerhp', when: g => g.towerSites().some((S, i) => g.towerHp[i] < g.towerMax(g.lv.tower) * 0.7), text: '⚠️ 감시탑도 내구도가 있어요. 적이 지나가며 부수고 보스는 탑부터 노립니다. 부서진 탑은 쏘지 못하니 🔧 수리(본부 왼쪽)로 고치거나 🔨 수리공(캠프 남서쪽)을 두세요' },
@@ -686,4 +708,4 @@ const TIPS = [
   { id: 'martopen', when: g => g.lv.mart >= 1,                       text: '마트 개업! 이제 목재·고기·생선·모피를 마트 왼쪽 칸에 내려놓으세요. 가게 재고는 마트로 옮겨졌습니다(가구 공방과 도축장은 그대로)' },
 ];
 
-if (typeof module !== 'undefined') module.exports = { CFG, UPG, ENEMY, FOREST_SPOTS, GUARD_POSTS, MILITIA_POSTS, TOWNHALL, BEACON, HINTS, TIPS, TIERS, tierOf, BOSS, bossTier, ENRAGE, ADVICE, MATERIALS, WEAPON_FAMILIES, BOSS_KINDS, BOSS_RANKS, bossKindFor };
+if (typeof module !== 'undefined') module.exports = { CFG, UPG, ENEMY, ELITE, FOREST_SPOTS, GUARD_POSTS, MILITIA_POSTS, TOWNHALL, BEACON, HINTS, TIPS, TIERS, tierOf, BOSS, bossTier, ENRAGE, ADVICE, MATERIALS, WEAPON_FAMILIES, BOSS_KINDS, BOSS_RANKS, bossKindFor };

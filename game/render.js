@@ -482,7 +482,73 @@ function drawYeti(ctx, b, time) {
 function drawBossBar(ctx, b) {
   const sc = b.scale || 1;
   bar(ctx, b.x - 34, b.y - 80 * sc, 68, 7, b.hp / b.maxhp, b.enraged ? '#ff1744' : '#8e44ad');
-  label(ctx, b.x, b.y - 92 * sc, `${b.ability === 'armor' ? '🧊' : b.type === 'wolfking' ? '🐺' : '🐻‍❄️'} ${b.bossName}${b.enraged ? ' (분노)' : ''}`, 12, '#fff');
+  label(ctx, b.x, b.y - 92 * sc, `${b.ability === 'armor' ? '🧊' : b.type === 'wolfking' ? '🐺' : b.type === 'dragon' ? '🐉' : b.type === 'titan' ? '🗿' : '🐻‍❄️'} ${b.bossName}${b.enraged ? ' (분노)' : ''}`, 12, '#fff');
+}
+function eliteMark(ctx, b) { if (b.elite) label(ctx, b.x, b.y - 66 * (b.scale || 1), '⭐ 정예', 10, '#ffd166'); }
+// 서리 멧돼지: 낮고 빠른 몸통, 엄니
+function drawBoar(ctx, b) {
+  const sc = b.scale || 1; shadow(ctx, b.x, b.y + 2, 18 * sc, 6 * sc);
+  ctx.save(); ctx.translate(b.x, b.y); if (b.facing < 0) ctx.scale(-1, 1); ctx.scale(sc, sc); ctx.translate(b.lunge * 8, 0);
+  const bob = b.moving ? Math.abs(Math.sin(b.anim * 1.6)) * 2 : 0, body = b.flash > 0.6 ? '#ffd6d6' : '#6d5a4a', dark = b.flash > 0.6 ? '#f0b0b0' : '#4a3b2f';
+  ctx.fillStyle = dark; rrect(ctx, -14, -10, 5, 11, 2); rrect(ctx, -5, -10, 5, 11, 2); rrect(ctx, 4, -10, 5, 11, 2); rrect(ctx, 11, -10, 5, 11, 2);
+  ctx.fillStyle = body; ellipse(ctx, -1, -16 - bob, 19, 10); ctx.fillStyle = '#8a7462'; ctx.fillRect(-14, -24 - bob, 26, 3);   // 등갈기
+  ctx.fillStyle = body; ellipse(ctx, 16, -17 - bob, 9, 7); ctx.fillStyle = dark; ellipse(ctx, 24, -15 - bob, 5, 3.5);
+  ctx.strokeStyle = '#f4f4f4'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(21, -12 - bob); ctx.lineTo(26, -20 - bob); ctx.stroke();
+  ctx.fillStyle = '#222'; circle(ctx, 19, -20 - bob, 1.6); ctx.restore();
+  if (b.hp < b.maxhp) bar(ctx, b.x - 16, b.y - 40 * sc, 32, 4, b.hp / b.maxhp, '#e74c3c'); eliteMark(ctx, b);
+}
+// 매머드: 큰 털북숭이 몸통과 긴 엄니
+function drawMammoth(ctx, b) {
+  const sc = b.scale || 1; shadow(ctx, b.x, b.y + 3, 34 * sc, 11 * sc);
+  ctx.save(); ctx.translate(b.x, b.y); if (b.facing < 0) ctx.scale(-1, 1); ctx.scale(sc, sc); ctx.translate(b.lunge * 6, 0);
+  const bob = b.moving ? Math.abs(Math.sin(b.anim)) * 2 : 0, body = b.flash > 0.6 ? '#ffd6d6' : '#7a5a3a', dark = b.flash > 0.6 ? '#f0b0b0' : '#4e3a26';
+  ctx.fillStyle = dark; for (const lx of [-24, -12, 6, 18]) rrect(ctx, lx, -16, 9, 18, 3);
+  ctx.fillStyle = body; ellipse(ctx, -4, -30 - bob, 32, 19); ctx.fillStyle = dark; for (let i = 0; i < 5; i++) ctx.fillRect(-30 + i * 12, -18 - bob, 3, 9);   // 털
+  ctx.fillStyle = body; circle(ctx, 24, -36 - bob, 14); ctx.fillStyle = dark; ctx.beginPath(); ctx.moveTo(30, -30 - bob); ctx.quadraticCurveTo(44, -22 - bob, 38, -6 - bob); ctx.quadraticCurveTo(36, -12 - bob, 32, -28 - bob); ctx.closePath(); ctx.fill();   // 코
+  ctx.strokeStyle = '#f5e6c8'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(26, -26 - bob); ctx.quadraticCurveTo(44, -24 - bob, 46, -40 - bob); ctx.stroke();   // 엄니
+  ctx.fillStyle = '#222'; circle(ctx, 28, -40 - bob, 2); ctx.restore();
+  if (b.hp < b.maxhp) bar(ctx, b.x - 24, b.y - 66 * sc, 48, 5, b.hp / b.maxhp, '#e74c3c'); eliteMark(ctx, b);
+}
+// 서리 망령: 반투명한 떠다니는 영혼(울타리를 통과한다)
+function drawWraith(ctx, b, time) {
+  const sc = b.scale || 1, fl = Math.sin(time * 4 + b.x * 0.01) * 4;
+  ctx.save(); ctx.translate(b.x, b.y - 24 + fl); if (b.facing < 0) ctx.scale(-1, 1); ctx.scale(sc, sc); ctx.globalAlpha = 0.75;
+  ctx.fillStyle = b.flash > 0.6 ? '#ffd6d6' : '#dbe8ff'; ctx.beginPath(); ctx.arc(0, -14, 14, Math.PI, 0); ctx.lineTo(14, 10); for (let i = 3; i >= -3; i--) ctx.lineTo(i * 4.6, 10 + (i % 2 ? 6 : 0)); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#4a5a8a'; ellipse(ctx, -4, -16, 2.2, 3); ellipse(ctx, 5, -16, 2.2, 3); ellipse(ctx, 1, -7, 3, 2);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(160,190,255,0.35)'; ellipse(ctx, b.x, b.y + 2, 14, 5);
+  if (b.hp < b.maxhp) bar(ctx, b.x - 16, b.y - 56 * sc, 32, 4, b.hp / b.maxhp, '#e74c3c'); eliteMark(ctx, b);
+}
+// 얼음 주술사: 지팡이를 든 작은 인물, 주변에 치유 빛
+function drawShaman(ctx, b, time) {
+  drawPerson(ctx, { x: b.x, y: b.y, facing: b.facing, moving: b.moving, anim: b.anim, swing: 0, down: 0, flash: b.flash }, { sprite: 'shaman', coat: '#2e4a7a', pants: '#1b2631', hood: '#9ad0ff', belt: '#9ad0ff', tool: 'staff' }, null);
+  ctx.strokeStyle = `rgba(154,208,255,${0.3 + Math.sin(time * 3) * 0.15})`; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.lineDashOffset = -time * 20; ctx.beginPath(); ctx.ellipse(b.x, b.y + 2, 60, 24, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  if (b.hp < b.maxhp) bar(ctx, b.x - 18, b.y - 76, 36, 4, b.hp / b.maxhp, '#e74c3c'); label(ctx, b.x, b.y - 86, '🧙 주술사', 10, '#9ad0ff');
+}
+// 얼음 용(보스): 긴 몸, 날개, 숨결 빛
+function drawDragon(ctx, b, time) {
+  const sc = b.scale || 1; shadow(ctx, b.x, b.y + 4, 40 * sc, 12 * sc);
+  ctx.save(); ctx.translate(b.x, b.y - 10); if (b.facing < 0) ctx.scale(-1, 1); ctx.scale(sc, sc);
+  const bob = Math.sin(time * 3) * 3, body = b.flash > 0.6 ? '#ffd6d6' : (b.enraged ? '#b0d8ff' : '#7fb7e6'), dark = '#3f78b0';
+  ctx.fillStyle = 'rgba(200,230,255,0.8)'; ctx.beginPath(); ctx.moveTo(-6, -30 - bob); ctx.lineTo(-40, -70 - bob + Math.sin(time * 6) * 8); ctx.lineTo(-18, -34 - bob); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(4, -30 - bob); ctx.lineTo(30, -72 - bob + Math.sin(time * 6 + 1) * 8); ctx.lineTo(16, -32 - bob); ctx.closePath(); ctx.fill();   // 날개
+  ctx.strokeStyle = body; ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-34, -10 - bob); ctx.quadraticCurveTo(-50, -4 - bob, -56, 4 - bob); ctx.stroke();   // 꼬리
+  ctx.fillStyle = body; ellipse(ctx, -4, -20 - bob, 30, 16); ctx.fillStyle = dark; for (let i = 0; i < 5; i++) tri(ctx, -26 + i * 11, -30 - bob, -22 + i * 11, -40 - bob, -18 + i * 11, -30 - bob);   // 등 가시
+  ctx.fillStyle = dark; for (const lx of [-18, -4, 10]) rrect(ctx, lx, -8, 9, 14, 3);
+  ctx.fillStyle = body; rrect(ctx, 20, -40 - bob, 26, 18, 8); ctx.fillStyle = dark; tri(ctx, 24, -40 - bob, 28, -52 - bob, 32, -40 - bob); tri(ctx, 34, -40 - bob, 38, -52 - bob, 42, -40 - bob);
+  ctx.fillStyle = '#ffd166'; circle(ctx, 38, -34 - bob, 2.5); ctx.fillStyle = `rgba(154,208,255,${0.4 + Math.sin(time * 8) * 0.3})`; ellipse(ctx, 52, -28 - bob, 8, 4);
+  ctx.restore();
+}
+// 서리 거인(보스): 거대한 얼음 몸통
+function drawTitan(ctx, b, time) {
+  const sc = b.scale || 1; shadow(ctx, b.x, b.y + 4, 36 * sc, 12 * sc);
+  ctx.save(); ctx.translate(b.x, b.y); if (b.facing < 0) ctx.scale(-1, 1); ctx.scale(sc, sc);
+  const bob = b.moving ? Math.abs(Math.sin(b.anim)) * 2 : 0, body = b.flash > 0.6 ? '#ffd6d6' : (b.enraged ? '#c9d8ff' : '#aebfd6'), dark = '#6b7f99';
+  ctx.fillStyle = dark; rrect(ctx, -22, -24, 16, 26, 4); rrect(ctx, 6, -24, 16, 26, 4);
+  ctx.fillStyle = body; rrect(ctx, -26, -70 - bob, 52, 50, 10); ctx.fillStyle = dark; ctx.fillRect(-26, -46 - bob, 52, 4);
+  ctx.fillStyle = body; rrect(ctx, -40, -66 - bob, 14, 36, 6); rrect(ctx, 26, -66 - bob, 14, 36, 6);
+  ctx.fillStyle = dark; rrect(ctx, -14, -92 - bob, 28, 26, 6); ctx.fillStyle = '#9ad0ff'; ctx.fillRect(-8, -84 - bob, 6, 4); ctx.fillRect(2, -84 - bob, 6, 4);
+  ctx.fillStyle = '#f4f8fb'; tri(ctx, -16, -92 - bob, -10, -104 - bob, -4, -92 - bob); tri(ctx, 4, -92 - bob, 10, -104 - bob, 16, -92 - bob);
+  ctx.restore();
 }
 // 얼음 골렘: 각진 얼음 몸통, 느리고 단단하다
 function drawGolem(ctx, b, time) {
@@ -501,13 +567,19 @@ function drawGolem(ctx, b, time) {
 }
 function drawEnemy(ctx, b, time) {
   if ((b.type === 'wolf' || b.type === 'yeti') && typeof Sprites !== 'undefined' && Sprites.draw(ctx, b.type, b.lunge > 0.3 ? 'attack' : b.moving ? 'walk' : 'idle', b.anim || 0, time, b.x, b.y, b.facing, b.scale || 1)) { bar(ctx, b.x - 22, b.y - 60 * (b.scale || 1), 44, 5, b.hp / b.maxhp, '#e74c3c'); return; }
-  if (b.type === 'wolf') drawWolf(ctx, b);
+  if (b.type === 'wolf') { drawWolf(ctx, b); eliteMark(ctx, b); }
   else if (b.type === 'yeti') drawYeti(ctx, b, time);
   else if (b.type === 'gbear') { ctx.save(); ctx.translate(b.x, b.y); ctx.scale(b.scale, b.scale); ctx.translate(-b.x, -b.y); drawBear(ctx, b, { body: b.enraged ? '#ffe3e3' : '#eef2f7', dark: '#c9d3df' }); ctx.restore(); ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(b.x + 10, b.y - 44); ctx.lineTo(b.x + 22, b.y - 30); ctx.moveTo(b.x + 16, b.y - 46); ctx.lineTo(b.x + 28, b.y - 32); ctx.stroke(); drawBossBar(ctx, b); }
   else if (b.type === 'wolfking') { ctx.save(); ctx.translate(b.x, b.y); ctx.scale(b.scale, b.scale); ctx.translate(-b.x, -b.y); drawWolf(ctx, b); ctx.restore(); ctx.fillStyle = '#f1c40f'; const cx = b.x + b.facing * 24 * b.scale, cy = b.y - 44 * b.scale; tri(ctx, cx - 10, cy, cx - 6, cy - 12, cx - 2, cy); tri(ctx, cx - 2, cy, cx + 2, cy - 14, cx + 6, cy); tri(ctx, cx + 6, cy, cx + 10, cy - 12, cx + 14, cy); ctx.fillRect(cx - 10, cy - 2, 24, 4); drawBossBar(ctx, b); }
   else if (b.type === 'golem') { drawGolem(ctx, b, time); drawBossBar(ctx, b); }
+  else if (b.type === 'boar') drawBoar(ctx, b);
+  else if (b.type === 'mammoth') drawMammoth(ctx, b);
+  else if (b.type === 'wraith') drawWraith(ctx, b, time);
+  else if (b.type === 'shaman') drawShaman(ctx, b, time);
+  else if (b.type === 'dragon') { drawDragon(ctx, b, time); drawBossBar(ctx, b); }
+  else if (b.type === 'titan') { drawTitan(ctx, b, time); drawBossBar(ctx, b); }
   else if (b.type === 'wild') drawBear(ctx, b, { body: '#a67c52', dark: '#7a5230' });
-  else drawBear(ctx, b, { body: '#f6f8fb', dark: '#dde5ee' });
+  else { if (b.elite) { ctx.save(); ctx.translate(b.x, b.y); ctx.scale(b.scale, b.scale); ctx.translate(-b.x, -b.y); } drawBear(ctx, b, b.elite ? { body: '#e8e3ff', dark: '#b8a8e8' } : { body: '#f6f8fb', dark: '#dde5ee' }); if (b.elite) { ctx.restore(); eliteMark(ctx, b); } }
 }
 
 // ---- 가게 ----
